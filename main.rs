@@ -20,7 +20,7 @@ macro_rules! logi{
 	($a:expr,$b:expr,$c:expr)=>(println(file!()+":"+line!().to_str()+": "+$a.to_str+$b.to_str(),$c.to_str()))
 
 }
-
+macro_rules! dump{ ($a:expr)=>(logi!(fmt!("%?",$a));)}
 
 pub static ctxtkey: local_data::Key<@DocContext> = &local_data::Key;
 
@@ -115,6 +115,16 @@ impl MyToStr for syntax::codemap::ExpnInfo {
 	fn myToStr(&self)->~str{~"ExpnInfo{TODO}"}
 }
 
+impl MyToStr for syntax::ast::ident {
+	fn myToStr(&self)->~str{~"ident{"+~"name:"+self.name.myToStr()+~"}"}
+}
+impl MyToStr for syntax::ast::Name {
+	fn myToStr(&self)->~str{
+		self.to_str()
+	}
+}
+
+
 fn fMyToStr(x:&syntax::codemap::ExpnInfo)->~str {
 	x.myToStr()
 }
@@ -135,7 +145,7 @@ impl MyToStr for ast::item_ {
 	fn myToStr(&self)->~str{
 		use syntax::ast::*;
 		match (self) {
-			&item_static(ref t,ref m,ref e)=> ~"item_static"+(*m,*e).myToStr()+~")",
+			&item_static(ref t,ref m,ref e)=> ~"item_static"+(*m,*e).myToStr(),
 			&item_fn(ref decl, ref purity,ref AbiSet, ref Generics, ref refblk)=>
 				~"item_fn()",
 			&item_mod(ref m) => ~"item_mod()",
@@ -157,11 +167,77 @@ impl MyToStr for ast::expr_ {
 		}
 	}
 }
+impl MyToStr for ast::item {
+	fn myToStr(&self)->~str {
+		~"item{"+
+			~"ident:"+self.ident.myToStr()+
+			~",node:"+self.node.myToStr()+
+			~",span:"+self.span.myToStr()+
+		~"}"
+	}
+}
+
+impl MyToStr for ast::_mod{
+	fn myToStr(&self)->~str{
+		~"_mod{"+~"view_items:"+array_myToStr(self.view_items)+~",items"+arrayOfSharedPtr_myToStr(self.items)+~"}"		
+	}
+}
+impl<T: MyToStr> MyToStr for syntax::codemap::spanned<T> {
+	fn myToStr(&self)->~str{
+		~"spanned<>{"+~"node:"+self.node.myToStr()+~",span:"+self.span.myToStr()+~"}"
+	}
+}
+impl MyToStr for ast::crate_ {
+	fn myToStr(&self)->~str{
+		~"crate_{"+~"module:"+self.module.myToStr()
+		+~",attrs:?,config:?"
+		+~"}"
+	}
+}
+impl MyToStr for ast::view_item {
+	fn myToStr(&self)->~str {
+		~"view_item{"+
+		~"node:"+self.node.myToStr()+
+		~",attrs:?"+
+		~",vis:?"+
+		~",span:"+self.span.myToStr()+
+		"}"
+	}
+}
+impl MyToStr for ast::view_item_ {
+	fn myToStr(&self)->~str {
+		use syntax::ast::*;
+		match (self) {
+		&view_item_extern_mod(ref ident, ref mis, ref nid)=>~"view_item_extern_mod()",
+		&view_item_use(ref vps)=>~"view_item_use()"
+		}
+	}
+}
+/*
+impl<T:MyToStr> MyToStr for ~[T]{
+	fn myToStr(&self)->~str {
+		self.iter().transform( |x|{ x.myToStr()}).collect()
+	}
+}
+*/
+fn arrayOfSharedPtr_myToStr<T:MyToStr>(a:&[@T])->~str {
+	let mut acc:~str=~"[";
+	for a.iter().advance |x| {acc=acc.append( (*x).myToStr() )+","};
+	acc=acc.append(~"]");
+	acc
+//	a.iter().map( |x|{ x.myToStr()}).to_str()
+}
+fn array_myToStr<T:MyToStr>(a:&[T])->~str {
+	let mut acc:~str=~"[";
+	for a.iter().advance |x| {acc=acc.append( x.myToStr() )+","};
+	acc=acc.append(~"]");
+	acc
+//	a.iter().map( |x|{ x.myToStr()}).to_str()
+}
 
 fn my_visit(c:&ast::crate){
-
 	for c.node.module.items.iter().advance|x|{
-		println(x.node.myToStr());		
+		println(x.myToStr());		
 	}
 }
 
@@ -180,12 +256,14 @@ fn main() {
 
     let ctxt = @get_ast_and_resolve(&Path(matches.free[0]), libs);
     debug!("defmap:");
-    for ctxt.tycx.def_map.iter().advance |(k, v)| {
-        debug!("%?: %?", k, v);
-    }
+//    for ctxt.tycx.def_map.iter().advance |(k, v)| {
+//        debug!("%?: %?", k, v);
+//    }
     local_data::set(ctxtkey, ctxt);
 //	println(ctxt.to_str());
-	my_visit(ctxt.crate);
+	//my_visit(ctxt.crate);
+//	println(ctxt.crate.myToStr());
+	dump!(ctxt.crate);
 /*
     let mut v = @mut RustdocVisitor::new();
     v.visit(ctxt.crate);
