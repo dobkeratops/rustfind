@@ -109,14 +109,15 @@ fn main() {
 	// TODO: parse commandline source locations,convert to codemap locations
 	//dump!(ctxt.tycx);
 
+	logi!("==== dump def table.===")
+	dump_ctxt_table(ctxt);
+
     local_data::set(ctxtkey, ctxt);
 	logi!("")
 	logi!("==== Test node search by location...===")
-	dump!(find_ast_node::find(ctxt.crate,25))
-	dump!(find_ast_node::find(ctxt.crate,97))
  
 	let mut pos=15 as uint;
-	while pos<300 {
+	while pos<250 {
 		// get the AST node under 'pos', and dump info 
 		logi!(~"Find AST node at:",pos)
 		let node = find_ast_node::find(ctxt.crate,pos);
@@ -126,9 +127,8 @@ fn main() {
 		// node_id = get_node_id()
 		// node_type=ctxt.node_types./*node_type_table*/.get...
 
-		pos+=10;
+		pos+=12;
 	}
-	//dump_ctxt_table(ctxt:DocContext)
 }
 
 fn get_node_info_str(ctxt:&DocContext,node:&[find_ast_node::AstNode])->~str
@@ -142,7 +142,6 @@ fn get_node_info_str(ctxt:&DocContext,node:&[find_ast_node::AstNode])->~str
 		acc
 		// typeparams too... path.types?
 	}
-
 	match node.last() {
 //			TODO -factor out repeatedly used functions here..
 //			fn astnode_pat_to_str(&astnode_pat(x))->~str
@@ -150,7 +149,9 @@ fn get_node_info_str(ctxt:&DocContext,node:&[find_ast_node::AstNode])->~str
 //			fn expr_to_str(&astnode_pat(x))->~str
 
 		&astnode_view_item(x)=>~"view_item: ?",
-		&astnode_item(x)=>~"item: "+ctxt.sess.str_of(x.ident)+
+		&astnode_item(x)=>~"item: "+
+			~"id="+x.id.to_str()+~" "+
+			ctxt.sess.str_of(x.ident)+
 			match x.node {
 				ast::item_fn(ref fn_decl,_,_,_,_) =>~" fn_decl",
 				ast::item_struct(ref struct_def,_) =>~" struct_def",
@@ -162,11 +163,13 @@ fn get_node_info_str(ctxt:&DocContext,node:&[find_ast_node::AstNode])->~str
 		&astnode_stmt(x)=>~"stmt: ?",
 		&astnode_arm(x)=>~"arm: ?",
 		&astnode_struct_field(sf)=>
+			~"id="+sf.node.id.to_str()+~" "+
 			match(sf.node.kind){
 				ast::named_field(nf,vis)=>"struct named_field: "+ctxt.sess.str_of(nf)+" ",
 				_=>~"struct anon_field"
 			},
 		&astnode_pat(x)=>~"pattern: "+
+			~"id="+x.id.to_str()+~" "+
 			// todo -factor out and recurse
 			match x.node{
 				ast::pat_ident(bind_mode,ref path, opt)=>~"pat_ident:"+path_to_str(ctxt,path),
@@ -184,6 +187,7 @@ fn get_node_info_str(ctxt:&DocContext,node:&[find_ast_node::AstNode])->~str
 		,
 		&astnode_decl(x)=>~"decl: ?",
 		&astnode_ty(x)=>~"type: "+
+//			~"id="+x.node.id.to_str()+~" "+
 			match x.node{
 				ast::ty_nil=> ~"nil",
 				ast::ty_bot=>~"bottomtype",
@@ -193,7 +197,7 @@ fn get_node_info_str(ctxt:&DocContext,node:&[find_ast_node::AstNode])->~str
 				ast::ty_ptr(ref mt)=>~"ptr",
 				ast::ty_rptr(ref lifetime,ref mt)=>~"rptr",
 				ast::ty_tup(ref types)=>~"tuple[..]", //todo: factor this out, map..
-				ast::ty_path(ref path,ref params,node_id)=>~"path:"+path_to_str(ctxt,path)
+				ast::ty_path(ref path,ref params,node_id)=>~"path:id="+node_id.to_str()+" "+path_to_str(ctxt,path)
 				,
 				
 				ast::ty_infer=>~"infered",
@@ -204,9 +208,12 @@ fn get_node_info_str(ctxt:&DocContext,node:&[find_ast_node::AstNode])->~str
 		_=>	~"unknown"
 	}
 }
+// see: tycx.node_types:node_type_table:HashMap<id,t>
+// 't'=opaque ptr, ty::get(:t)->t_box_ to resolve it
 
-fn dump_ctxt_table(ctxt:DocContext) {
-	logi!("===Test ctxt symbol table..===")
+fn dump_ctxt_table(ctxt:&DocContext) {
+//	let a:()=ctxt.tycx.node_types
+	logi!("===Test ctxt def-map table..===");
 	for ctxt.tycx.def_map.iter().advance |(key,value)|{
 		dump!(key,value);
 	}
