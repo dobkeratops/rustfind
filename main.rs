@@ -117,88 +117,94 @@ fn main() {
  
 	let mut pos=15;
 	while pos<200 {
+		// get the AST node under 'pos', and dump info 
 		let node = find_ast_node::find(ctxt.crate,pos);
-
-		// recover name, we already have this, but lets verify
-		// recover source location from the span
-		//dump!(node.last());
 		dump!(pos);
-		let node_info=
-		match node.last() {
+		let node_info = get_node_info(ctxt,node);
+		dump!(node_info);
+		// TODO - get infered type from ctxt.node_types??
+		// node_id = get_node_id()
+		// node_type=ctxt.node_types./*node_type_table*/.get...
+
+		pos+=10;
+	}
+	//dump_ctxt_table(ctxt:DocContext)
+}
+
+fn get_node_info(ctxt:&DocContext,node:&[find_ast_node::AstNode])->~str
+{
+	match node.last() {
 //			TODO -factor out repeatedly used functions here..
 //			fn astnode_pat_to_str(&astnode_pat(x))->~str
 //			fn path_to_str(&astnode_pat(x))->~str
 //			fn expr_to_str(&astnode_pat(x))->~str
 
-			&astnode_view_item(x)=>~"view_item: ?",
-			&astnode_item(x)=>~"item: "+ctxt.sess.str_of(x.ident)+
-				match x.node {
-					ast::item_fn(ref fn_decl,_,_,_,_) =>~" fn_decl",
-					ast::item_struct(ref struct_def,_) =>~" struct_def",
-					_=>~"item_unknown"
-				},
+		&astnode_view_item(x)=>~"view_item: ?",
+		&astnode_item(x)=>~"item: "+ctxt.sess.str_of(x.ident)+
+			match x.node {
+				ast::item_fn(ref fn_decl,_,_,_,_) =>~" fn_decl",
+				ast::item_struct(ref struct_def,_) =>~" struct_def",
+				_=>~"item_unknown"
+			},
 
-			&astnode_local(x)=>~"local: ?",
-			&astnode_block(x)=>~"block: ?",
-			&astnode_stmt(x)=>~"stmt: ?",
-			&astnode_arm(x)=>~"arm: ?",
-			&astnode_struct_field(sf)=>
-				match(sf.node.kind){
-					ast::named_field(nf,vis)=>"struct named_field: "+ctxt.sess.str_of(nf)+" ",
-					_=>~"struct anon_field"
+		&astnode_local(x)=>~"local: ?",
+		&astnode_block(x)=>~"block: ?",
+		&astnode_stmt(x)=>~"stmt: ?",
+		&astnode_arm(x)=>~"arm: ?",
+		&astnode_struct_field(sf)=>
+			match(sf.node.kind){
+				ast::named_field(nf,vis)=>"struct named_field: "+ctxt.sess.str_of(nf)+" ",
+				_=>~"struct anon_field"
+			},
+		&astnode_pat(x)=>~"pattern: "+
+			// todo -factor out and recurse
+			match x.node{
+				ast::pat_ident(bind_mode,ref path, opt)=>~"pat_ident",
+				ast::pat_enum(ref path,ref efields)=>~"pat_enum",//todo-fields..
+				ast::pat_struct(ref path,ref sfields,b)=>~"pat_struct",
+				ast::pat_tup(ref elems)=>~"pat_tupl",
+				ast::pat_box(ref box)=>~"box",
+				ast::pat_uniq(ref u)=>~"uniq",
+				ast::pat_region(ref p)=>~"rgn",
+				ast::pat_lit(ref e)=>~"literal",
+				ast::pat_range(ref e_start,ref e_end)=>~"range",
+				
+				_=>~"?"
+			}
+		,
+		&astnode_decl(x)=>~"decl: ?",
+		&astnode_ty(x)=>~"type: "+
+			match x.node{
+				ast::ty_nil=> ~"nil",
+				ast::ty_bot=>~"bottomtype",
+				ast::ty_box(ref mt)=>~"box",
+				ast::ty_vec(ref mt)=>~"vec",
+				ast::ty_fixed_length_vec(ref mt,ref expr)=>~"[T,..N]",
+				ast::ty_ptr(ref mt)=>~"ptr",
+				ast::ty_rptr(ref lifetime,ref mt)=>~"rptr",
+				ast::ty_tup(ref types)=>~"tuple[..]", //todo: factor this out, map..
+				ast::ty_path(ref path,ref params,node_id)=>~"path:"+{
+					let mut acc=~"";
+					for path.idents.iter().advance |x|{
+						acc=acc.append(ctxt.sess.str_of(*x))+"."
+					}
+					acc
+					// typeparams too... path.types?
 				},
-			&astnode_pat(x)=>~"pattern: "+
-				// todo -factor out and recurse
-				match x.node{
-					ast::pat_ident(bind_mode,ref path, opt)=>~"pat_ident",
-					ast::pat_enum(ref path,ref efields)=>~"pat_enum",//todo-fields..
-					ast::pat_struct(ref path,ref sfields,b)=>~"pat_struct",
-					ast::pat_tup(ref elems)=>~"pat_tupl",
-					ast::pat_box(ref box)=>~"box",
-					ast::pat_uniq(ref u)=>~"uniq",
-					ast::pat_region(ref p)=>~"rgn",
-					ast::pat_lit(ref e)=>~"literal",
-					ast::pat_range(ref e_start,ref e_end)=>~"range",
-					
-					_=>~"?"
-				}
-			,
-			&astnode_decl(x)=>~"decl: ?",
-			&astnode_ty(x)=>~"type: "+
-				match x.node{
-					ast::ty_nil=> ~"nil",
-					ast::ty_bot=>~"bottomtype",
-					ast::ty_box(ref mt)=>~"box",
-					ast::ty_vec(ref mt)=>~"vec",
-					ast::ty_fixed_length_vec(ref mt,ref expr)=>~"[T,..N]",
-					ast::ty_ptr(ref mt)=>~"ptr",
-					ast::ty_rptr(ref lifetime,ref mt)=>~"rptr",
-					ast::ty_tup(ref types)=>~"tuple[..]", //todo: factor this out, map..
-					ast::ty_path(ref path,ref params,node_id)=>~"path:"+{
-						let mut acc=~"";
-						for path.idents.iter().advance |x|{
-							acc=acc.append(ctxt.sess.str_of(*x))+"."
-						}
-						acc
-						// typeparams too... path.types?
-					},
-					
-					ast::ty_infer=>~"infered",
-					_ =>~"?"
-				}
-			,
-			&astnode_struct_def(sf)=>~"struct def",
-			_=>	~"unknown"
-		};
-		dump!(node_info);
-		// node_id = get_node_id()
-		// node_type=ctxt.node_types./*node_type_table*/.get...
-
-		// todo: dump type
-		pos+=10;
+				
+				ast::ty_infer=>~"infered",
+				_ =>~"?"
+			}
+		,
+		&astnode_struct_def(sf)=>~"struct def",
+		_=>	~"unknown"
 	}
-//	logi!("===Test ctxt symbol table..===")
-//	for ctxt.tycx.def_map.iter().advance |(key,value)|{
-//		dump!(key,value);
-//	}
 }
+
+fn dump_ctxt_table(ctxt:DocContext) {
+	logi!("===Test ctxt symbol table..===")
+	for ctxt.tycx.def_map.iter().advance |(key,value)|{
+		dump!(key,value);
+	}
+}
+
