@@ -19,19 +19,24 @@ pub fn find(c:@crate,_location:uint)->~[AstNode] {
 		result:~[astnode_root], location:_location, stop:false
 	};
 	let vt=mk_vt(@Visitor{
+		//visit_mod
 		visit_view_item:f_view_item,
+		//visit_foreign_item
 		visit_item:f_item,
 		visit_local:f_local,
 		visit_block:f_block,
 		visit_stmt:f_stmt,
 		visit_arm:f_arm,
-		visit_struct_field:f_struct_field,
 		visit_pat:f_pat,
 		visit_decl:f_decl,
-		visit_ty:f_ty,
 		visit_expr:f_expr,
+		//visit_expr_post:f_expr,--called after visit
+		visit_ty:f_ty,
+		//visit_method
+		//visit_trait_method
 //		visit_struct_def:f_struct_def,
-		//visit_ty:f_ty,
+		visit_struct_field:f_struct_field,
+
 
 		.. *default_visitor::<@mut State>()
 		}
