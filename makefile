@@ -4,7 +4,7 @@ test : rustfind
 
 	./main test_input.rs -L ~/gplsrc/rust/x86_64-unknown-linux-gnu/stage2/lib
 
-rustfind: main.rs rustfind.rs astdump.rs
+rustfind: main.rs rustfind.rs astdump.rs text_formatting.rs
 	rustc main.rs
 
 
