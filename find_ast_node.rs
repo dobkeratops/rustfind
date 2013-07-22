@@ -1,9 +1,7 @@
-#[macro_escape]
 
 use syntax::ast::*;
 use syntax::visit::*;
 use syntax::codemap::*;
-use macros::*;
 
 
 macro_rules! dump{ ($($a:expr),*)=>

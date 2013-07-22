@@ -20,11 +20,10 @@ use syntax::codemap::span;
 use std::os;
 use std::local_data;
 use extra::json::ToJson;
-use macros::*;
 
 mod text_formatting;
 mod find_ast_node;
-mod macros;
+
 pub static ctxtkey: local_data::Key<@DocContext> = &local_data::Key;
 
 
