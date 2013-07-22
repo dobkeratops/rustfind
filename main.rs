@@ -125,6 +125,11 @@ fn main() {
 		dump!(pos);
 		let node_info=
 		match node.last() {
+//			TODO -factor out repeatedly used functions here..
+//			fn astnode_pat_to_str(&astnode_pat(x))->~str
+//			fn path_to_str(&astnode_pat(x))->~str
+//			fn expr_to_str(&astnode_pat(x))->~str
+
 			&astnode_view_item(x)=>~"view_item: ?",
 			&astnode_item(x)=>~"item: "+ctxt.sess.str_of(x.ident)+
 				match x.node {
@@ -142,7 +147,22 @@ fn main() {
 					ast::named_field(nf,vis)=>"struct named_field: "+ctxt.sess.str_of(nf)+" ",
 					_=>~"struct anon_field"
 				},
-			&astnode_pat(x)=>~"pattern: ?",
+			&astnode_pat(x)=>~"pattern: "+
+				// todo -factor out and recurse
+				match x.node{
+					ast::pat_ident(bind_mode,ref path, opt)=>~"pat_ident",
+					ast::pat_enum(ref path,ref efields)=>~"pat_enum",//todo-fields..
+					ast::pat_struct(ref path,ref sfields,b)=>~"pat_struct",
+					ast::pat_tup(ref elems)=>~"pat_tupl",
+					ast::pat_box(ref box)=>~"box",
+					ast::pat_uniq(ref u)=>~"uniq",
+					ast::pat_region(ref p)=>~"rgn",
+					ast::pat_lit(ref e)=>~"literal",
+					ast::pat_range(ref e_start,ref e_end)=>~"range",
+					
+					_=>~"?"
+				}
+			,
 			&astnode_decl(x)=>~"decl: ?",
 			&astnode_ty(x)=>~"type: "+
 				match x.node{
@@ -154,7 +174,14 @@ fn main() {
 					ast::ty_ptr(ref mt)=>~"ptr",
 					ast::ty_rptr(ref lifetime,ref mt)=>~"rptr",
 					ast::ty_tup(ref types)=>~"tuple[..]", //todo: factor this out, map..
-					ast::ty_path(ref path,ref params,node_id)=>~"path:",
+					ast::ty_path(ref path,ref params,node_id)=>~"path:"+{
+						let mut acc=~"";
+						for path.idents.iter().advance |x|{
+							acc=acc.append(ctxt.sess.str_of(*x))+"."
+						}
+						acc
+						// typeparams too... path.types?
+					},
 					
 					ast::ty_infer=>~"infered",
 					_ =>~"?"

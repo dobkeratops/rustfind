@@ -40,7 +40,8 @@ pub fn find(c:@crate,_location:uint)->~[AstNode] {
 	s.result.clone()
 }
 
-
+// TODO - is there an official wrapper like this for all nodes in libsyntax::ast?
+// is there a way of acheiving this without one?
 #[deriving(Clone)]
 pub enum AstNode
 {
@@ -201,7 +202,7 @@ fn f_fn(fk:&fn_kind, fd:&fn_decl, body:&blk, sp:span, nid:node_id, (s,v):(@mut S
 // struct Visitor<E>.visit_ty_method: @fn(&ty_method, (E, vt<E>)),
 // struct Visitor<E>.visit_trait_method: @fn(&trait_method, (E, vt<E>)),
 // struct Visitor<E>.visit_struct_def: @fn(@struct_def, ident, &Generics, node_id, (E, vt<E>)),
- //fn f_struct_def(a:@struct_def, (s,v):(@mut State, vt<@mut State>)) {
+ // fn f_struct_def(a:@struct_def, (s,v):(@mut State, vt<@mut State>)) {
  //	if span_contains(s.location, a.span) {
  //		s.result.push(astnode_struct_def(a));
  //	}

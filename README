@@ -1,9 +1,12 @@
-use rust libsyntax to find symbol definitions
+attempt to use rust libsyntax to find symbol definitions
+no where near ready yet..
 
-make to run test program
+"make" to compile and run test program
 
-find_ast_node contains the main algorithm
+find_ast_node contains the node scanning
 borrows code from rustdoc_ng
+
+not sure what the best way is..
 
 roadmap
 [1] a commandline tool rustfind sourcefile.rs:LINE:COLUMN: --> definition.rs:LINE:col
