@@ -1,0 +1,13 @@
+use rust libsyntax to find symbol definitions
+
+make to run test program
+
+find_ast_node contains the main algorithm
+borrows code from rustdoc_ng
+
+roadmap
+[1] a commandline tool rustfind sourcefile.rs:LINE:COLUMN: --> definition.rs:LINE:col
+(to add add hoc navigation tools eg gedit external tools)
+[2] options to dump/pretty print more context for the definitoon
+[3] components for IDE integration
+
