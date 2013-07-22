@@ -115,11 +115,11 @@ fn main() {
 	dump!(find_ast_node::find(ctxt.crate,25))
 	dump!(find_ast_node::find(ctxt.crate,97))
  
-	let mut pos=15;
+	let mut pos=15 as uint;
 	while pos<200 {
 		// get the AST node under 'pos', and dump info 
+		logi!(~"Find AST node at:",pos)
 		let node = find_ast_node::find(ctxt.crate,pos);
-		dump!(pos);
 		let node_info = get_node_info(ctxt,node);
 		dump!(node_info);
 		// TODO - get infered type from ctxt.node_types??
@@ -133,6 +133,16 @@ fn main() {
 
 fn get_node_info(ctxt:&DocContext,node:&[find_ast_node::AstNode])->~str
 {
+	fn get_path_info(ctxt:&DocContext, path:&ast::Path)->~str
+	{
+		let mut acc=~"";
+		for path.idents.iter().advance |x|{
+			acc=acc.append(ctxt.sess.str_of(*x))+"."
+		}
+		acc
+		// typeparams too... path.types?
+	}
+
 	match node.last() {
 //			TODO -factor out repeatedly used functions here..
 //			fn astnode_pat_to_str(&astnode_pat(x))->~str
@@ -159,10 +169,10 @@ fn get_node_info(ctxt:&DocContext,node:&[find_ast_node::AstNode])->~str
 		&astnode_pat(x)=>~"pattern: "+
 			// todo -factor out and recurse
 			match x.node{
-				ast::pat_ident(bind_mode,ref path, opt)=>~"pat_ident",
-				ast::pat_enum(ref path,ref efields)=>~"pat_enum",//todo-fields..
-				ast::pat_struct(ref path,ref sfields,b)=>~"pat_struct",
-				ast::pat_tup(ref elems)=>~"pat_tupl",
+				ast::pat_ident(bind_mode,ref path, opt)=>~"pat_ident:"+get_path_info(ctxt,path),
+				ast::pat_enum(ref path,ref efields)=>~"pat_enum:"+get_path_info(ctxt,path),//todo-fields..
+				ast::pat_struct(ref path,ref sfields,b)=>~"pat_struct:"+get_path_info(ctxt,path),
+				ast::pat_tup(ref elems)=>~"pat_tupl:",//+elems.map(|x|get_pat_info(ctxt,x)),
 				ast::pat_box(ref box)=>~"box",
 				ast::pat_uniq(ref u)=>~"uniq",
 				ast::pat_region(ref p)=>~"rgn",
@@ -183,14 +193,8 @@ fn get_node_info(ctxt:&DocContext,node:&[find_ast_node::AstNode])->~str
 				ast::ty_ptr(ref mt)=>~"ptr",
 				ast::ty_rptr(ref lifetime,ref mt)=>~"rptr",
 				ast::ty_tup(ref types)=>~"tuple[..]", //todo: factor this out, map..
-				ast::ty_path(ref path,ref params,node_id)=>~"path:"+{
-					let mut acc=~"";
-					for path.idents.iter().advance |x|{
-						acc=acc.append(ctxt.sess.str_of(*x))+"."
-					}
-					acc
-					// typeparams too... path.types?
-				},
+				ast::ty_path(ref path,ref params,node_id)=>~"path:"+get_path_info(ctxt,path)
+				,
 				
 				ast::ty_infer=>~"infered",
 				_ =>~"?"
