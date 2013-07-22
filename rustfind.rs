@@ -1,3 +1,4 @@
+#[macro_escape]
 extern mod syntax;
 
 use std::io::*;
