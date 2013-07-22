@@ -5,9 +5,9 @@ use syntax::codemap::*;
 
 
 macro_rules! dump{ ($($a:expr),*)=>
-	(	{	let mut txt=file!()+~":"+line!().to_str()+~": " ; 
+	(	{	let mut txt=file!()+":"+line!().to_str()+": " ; 
 			$( txt=txt.append(
-				fmt!("%s=%?",stringify!($a),$a)+~",") 
+				fmt!("%s=%?",stringify!($a),$a)+",") 
 			);*; 
 			println(txt); 
 		}
@@ -17,7 +17,7 @@ macro_rules! dump{ ($($a:expr),*)=>
 /// main
 pub fn find(c:@crate,_location:uint)->~[AstNode] {
 	let mut s= @mut State{
-		result:~[], location:_location, stop:false
+		result:~[astnode_root], location:_location, stop:false
 	};
 	let vt=mk_vt(@Visitor{
 		visit_item:f_item,
@@ -69,7 +69,7 @@ pub enum AstNode
 	// struct Visitor<E>.visit_struct_field: @fn(@struct_field, (E, vt<E>)),
 	astnode_struct_field(@struct_field),
 
-	astnode_empty	
+	astnode_root	
 }
 
 struct State {

@@ -34,7 +34,7 @@ pub macro_rules! logi{
 macro_rules! dump{ ($($a:expr),*)=>
 	(	{	let mut txt=~""; 
 			$( txt=txt.append(
-				fmt!("%s=%?",stringify!($a),$a)+~",") 
+				fmt!("%s=%?",stringify!($a),$a)+",") 
 			);*; 
 			logi!(txt); 
 		}
@@ -91,6 +91,9 @@ fn main() {
 	dump!(args,matches);
 	dump!(libs);
     let ctxt = @get_ast_and_resolve(&Path(matches.free[0]), libs);
+
+	// TODO: parse commandline source locations,convert to codemap locations
+	//dump!(ctxt.tycx);
 
     local_data::set(ctxtkey, ctxt);
 	logi!("==== Test node search by location...===")
