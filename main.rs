@@ -77,17 +77,7 @@ fn get_ast_and_resolve(cpath: &Path, libs: ~[Path]) -> DocContext {
 	let t=tycx.unwrap();
     DocContext { crate: c, tycx: t, sess: sess }
 }
-struct Foo {
-	i:int,j:int
-}
 
-// CALLING C++ FROM RUST
-// =====================
-//
-// manually rolled vtables for C++.
-// For each virtual method, create a pointer member.
-// create wrapper functions that invoke the vtable and 
-//
 
 fn main() {
     use extra::getopts::*;
@@ -167,7 +157,8 @@ fn get_node_info_str(ctxt:&DocContext,node:&[find_ast_node::AstNode])->~str
 			match(sf.node.kind){
 				ast::named_field(nf,vis)=>"struct named_field: "+ctxt.sess.str_of(nf)+" ",
 				_=>~"struct anon_field"
-			},
+			}+
+			~"Ty="/*sf.node.ty ..parse it.. */,
 		&astnode_pat(x)=>~"pattern: "+
 			~"id="+x.id.to_str()+~" "+
 			// todo -factor out and recurse
