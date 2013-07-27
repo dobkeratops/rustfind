@@ -1,7 +1,7 @@
 
 /// tags: pretty print,code formatting,brace indentation, json braces, brackets,nesting
 pub trait Indent {
-	fn indent(&self,tab:int,line:int)->Self;
+	fn indent(&self,tab_size:int,max_line_size:int)->Self;
 }
 
 impl Indent for ~str {
@@ -30,7 +30,7 @@ impl Indent for ~str {
 			let mut last_open=len;
 			let mut first_base_delim=len;
 			
-			while ii<len && inner_brace_level>=indent {
+			while inner_brace_level>=indent && ii<len  {
 				let c=self[ii];
 				if c=='\n'as u8 {break};
 				if cur_linesize >= linesize {break};
