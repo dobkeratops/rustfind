@@ -78,6 +78,10 @@ fn get_ast_and_resolve(cpath: &Path, libs: ~[Path]) -> DocContext {
     DocContext { crate: c, tycx: t, sess: sess }
 }
 
+enum Object {
+	Ship{pos:(float,float),vel:(float,float),hdg:float},
+	Bullet{pos:(float,float),vel:(float,float)}
+}
 
 fn main() {
     use extra::getopts::*;
@@ -88,6 +92,14 @@ fn main() {
     let opts = ~[
         optmulti("L")
     ];
+	let o1=~Ship{pos:(0.0,0.0),vel:(0.0,0.0),hdg:0.0};
+	let o2=~Ship{pos:(0.0,0.0),vel:(0.0,0.0),hdg:0.0};
+	match (*o1,*o2) {
+		(Ship{pos:p1,vel:v1,hdg:h1},Ship{vel:v2,_}) =>{
+		},
+		(_,_)=>{
+		}
+	}
 
 
     let matches = getopts(args.tail(), opts).get();
@@ -126,12 +138,49 @@ fn get_node_info_str(ctxt:&DocContext,node:&[find_ast_node::AstNode])->~str
 	fn path_to_str(ctxt:&DocContext, path:&ast::Path)->~str
 	{
 		let mut acc=~"";
+		let mut first=true;
 		for path.idents.iter().advance |x|{
-			acc=acc.append(ctxt.sess.str_of(*x))+"."
+			if !first {acc=acc.append(~"::");}
+			acc=acc.append(ctxt.sess.str_of(*x));
+			first=false
 		}
 		acc
 		// typeparams too... path.types?
 	}
+	fn pat_to_str(ctxt:&DocContext,p:&ast::pat)->~str{
+		// todo -factor out and recurse
+		match p.node {
+			ast::pat_ident(bind_mode,ref path, opt)=>~"pat_ident:"+path_to_str(ctxt,path),
+			ast::pat_enum(ref path,ref efields)=>~"pat_enum:"+path_to_str(ctxt,path),//	`todo-fields..
+			ast::pat_struct(ref path,ref sfields,b)=>~"pat_struct:"+path_to_str(ctxt,path)+~"{"+sfields.map(|x|pat_to_str(ctxt,x.pat)+~",").to_str()+~"}",
+			ast::pat_tup(ref elems)=>~"pat_tupl:"+elems.map(|&x|pat_to_str(ctxt,x)).to_str(),
+			ast::pat_box(ref box)=>~"box",
+			ast::pat_uniq(ref u)=>~"uniq",
+			ast::pat_region(ref p)=>~"rgn",
+			ast::pat_lit(ref e)=>~"literal",
+			ast::pat_range(ref e_start,ref e_end)=>~"range",
+		
+			_=>~"?"
+		}
+	};
+	fn ty_to_str(ctxt:&DocContext,t:&ast::Ty)->~str{
+		match t.node{
+			ast::ty_nil=> ~"nil",
+			ast::ty_bot=>~"bottomtype",
+			ast::ty_box(ref mt)=>~"box",
+			ast::ty_vec(ref mt)=>~"vec",
+			ast::ty_fixed_length_vec(ref mt,ref expr)=>~"[T,..N]",
+			ast::ty_ptr(ref mt)=>~"*",
+			ast::ty_rptr(ref lifetime,ref mt)=>~"&",
+			ast::ty_tup(ref types)=>~"("+types.map(|x|ty_to_str(ctxt,x)).to_str()+")", //todo: factor this out, map..
+			ast::ty_path(ref path,ref params,node_id)=>~"path:id="+node_id.to_str()+" "+path_to_str(ctxt,path)
+			,
+		
+			ast::ty_infer=>~"infered",
+			_ =>~"?"
+		}
+	}
+
 	match node.last() {
 //			TODO -factor out repeatedly used functions here..
 //			fn astnode_pat_to_str(&astnode_pat(x))->~str
@@ -158,43 +207,13 @@ fn get_node_info_str(ctxt:&DocContext,node:&[find_ast_node::AstNode])->~str
 				ast::named_field(nf,vis)=>"struct named_field: "+ctxt.sess.str_of(nf)+" ",
 				_=>~"struct anon_field"
 			}+
-			~"Ty="/*sf.node.ty ..parse it.. */,
-		&astnode_pat(x)=>~"pattern: "+
-			~"id="+x.id.to_str()+~" "+
-			// todo -factor out and recurse
-			match x.node{
-				ast::pat_ident(bind_mode,ref path, opt)=>~"pat_ident:"+path_to_str(ctxt,path),
-				ast::pat_enum(ref path,ref efields)=>~"pat_enum:"+path_to_str(ctxt,path),//todo-fields..
-				ast::pat_struct(ref path,ref sfields,b)=>~"pat_struct:"+path_to_str(ctxt,path),
-				ast::pat_tup(ref elems)=>~"pat_tupl:",//+elems.map(|x|get_pat_info(ctxt,x)),
-				ast::pat_box(ref box)=>~"box",
-				ast::pat_uniq(ref u)=>~"uniq",
-				ast::pat_region(ref p)=>~"rgn",
-				ast::pat_lit(ref e)=>~"literal",
-				ast::pat_range(ref e_start,ref e_end)=>~"range",
-				
-				_=>~"?"
-			}
+			~":"+ty_to_str(ctxt,&sf.node.ty)/*sf.node.ty ..parse it.. */,
+		&astnode_pat(p)=>~"pattern: "+
+			~"id="+p.id.to_str()+~" "+
+			pat_to_str(ctxt,p)
 		,
 		&astnode_decl(x)=>~"decl: ?",
-		&astnode_ty(x)=>~"type: "+
-//			~"id="+x.node.id.to_str()+~" "+
-			match x.node{
-				ast::ty_nil=> ~"nil",
-				ast::ty_bot=>~"bottomtype",
-				ast::ty_box(ref mt)=>~"box",
-				ast::ty_vec(ref mt)=>~"vec",
-				ast::ty_fixed_length_vec(ref mt,ref expr)=>~"[T,..N]",
-				ast::ty_ptr(ref mt)=>~"ptr",
-				ast::ty_rptr(ref lifetime,ref mt)=>~"rptr",
-				ast::ty_tup(ref types)=>~"tuple[..]", //todo: factor this out, map..
-				ast::ty_path(ref path,ref params,node_id)=>~"path:id="+node_id.to_str()+" "+path_to_str(ctxt,path)
-				,
-				
-				ast::ty_infer=>~"infered",
-				_ =>~"?"
-			}
-		,
+		&astnode_ty(x)=>~"type: "+ty_to_str(ctxt,x),
 		&astnode_struct_def(sf)=>~"struct def",
 		_=>	~"unknown"
 	}

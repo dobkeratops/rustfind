@@ -48,7 +48,7 @@ pub fn find(c:@crate,_location:uint)->~[AstNode] {
 // TODO - is there an official wrapper like this for all nodes in libsyntax::ast?
 // is there a way of acheiving this without one?
 #[deriving(Clone)]
-pub enum AstNode
+pub enum AstNode 
 {
 	// struct Visitor<E>.visit_mod: @fn(&_mod, span, node_id, (E, vt<E>)),
 	astnode_mod(@_mod),
