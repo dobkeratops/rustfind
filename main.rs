@@ -3,6 +3,7 @@ extern mod syntax;
 extern mod rustc;
 extern mod extra;
 use rustc::{front, metadata, driver, middle};
+use rustc::middle::*;
 
 use syntax::parse;
 use syntax::ast;
@@ -42,6 +43,13 @@ macro_rules! dump{ ($($a:expr),*)=>
 	)
 }
 
+pub fn safe_node_id_to_type(cx: ty::ctxt, id: ast::node_id) -> Option<ty::t> {
+    //io::println(fmt!("%?/%?", id, cx.node_types.len()));
+    match cx.node_types.find(&(id as uint)) {
+       Some(&t) => Some(t),
+       None => None    }
+}
+
 
 /// tags: crate,ast,parse resolve
 /// Parses, resolves the given crate
@@ -65,7 +73,7 @@ fn get_ast_and_resolve(cpath: &Path, libs: ~[Path]) -> DocContext {
 
     let (crate, tycx) = driver::driver::compile_upto(sess, sessopts.cfg.clone(),
                                                      &driver::driver::file_input(cpath.clone()),
-                                                     driver::driver::cu_typeck, None);
+                                                     driver::driver::cu_no_trans, None);
                                                      
 	let c=crate.unwrap();
 	let t=tycx.unwrap();
@@ -100,15 +108,15 @@ fn main() {
     let libs = opt_strs(&matches, "L").map(|s| Path(*s));
 	dump!(args,matches);
 	dump!(libs);
-    let ctxt = @get_ast_and_resolve(&Path(matches.free[0]), libs);
+    let dc = @get_ast_and_resolve(&Path(matches.free[0]), libs);
 
 	// TODO: parse commandline source locations,convert to codemap locations
 	//dump!(ctxt.tycx);
 
 	logi!("==== dump def table.===")
-	dump_ctxt_table(ctxt);
+	dump_ctxt_def_map(dc);
 
-    local_data::set(ctxtkey, ctxt);
+    local_data::set(ctxtkey, dc);
 	logi!("")
 	logi!("==== Test node search by location...===")
  
@@ -116,12 +124,22 @@ fn main() {
 	while pos<250 {
 		// get the AST node under 'pos', and dump info 
 		logi!(~"Find AST node at:",pos)
-		let node = find_ast_node::find(ctxt.crate,pos);
-		let node_info = find_ast_node::get_node_info_str(ctxt,node);
+		let node = find_ast_node::find(dc.crate,pos);
+		let node_info =  find_ast_node::get_node_info_str(dc,node);
 		dump!(node_info);
 		// TODO - get infered type from ctxt.node_types??
 		// node_id = get_node_id()
 		// node_type=ctxt.node_types./*node_type_table*/.get...
+		let nid=node.last().get_node_id() ;
+		if nid!=0 {
+			match(safe_node_id_to_type(dc.tycx, nid)) {
+				Some(t)=>
+					println(fmt!("typeinfo: %?",{let ntt= rustc::middle::ty::get(t); ntt})),
+				None=> logi!("typeinfo:unknown node_type for ",nid)
+			}
+		} else {logi!("typeinfo:-unknown node id")}
+		dump!(nid,dc.tycx.def_map.find(&nid));
+		
 
 		pos+=12;
 	}
@@ -131,10 +149,10 @@ fn main() {
 // see: tycx.node_types:node_type_table:HashMap<id,t>
 // 't'=opaque ptr, ty::get(:t)->t_box_ to resolve it
 
-fn dump_ctxt_table(ctxt:&DocContext) {
+fn dump_ctxt_def_map(dc:&DocContext) {
 //	let a:()=ctxt.tycx.node_types
 	logi!("===Test ctxt def-map table..===");
-	for ctxt.tycx.def_map.iter().advance |(key,value)|{
+	for dc.tycx.def_map.iter().advance |(key,value)|{
 		dump!(key,value);
 	}
 }

@@ -7,6 +7,7 @@ use syntax::visit::{Visitor, fn_kind};
 use syntax::codemap::*;
 use rustc::{front, metadata, driver, middle};
 use syntax::codemap::span;
+use syntax::*;
 use syntax::abi::AbiSet;
 
 
@@ -102,6 +103,70 @@ pub enum AstNode
 	astnode_struct_field(@struct_field),
 
 	astnode_root	
+}
+
+pub trait NodeId {
+	pub fn get_node_id(&self)->node_id;
+}
+impl NodeId for ast::decl_ {
+	pub fn get_node_id(&self)->node_id {
+		match *self{
+			decl_local(ref x)=>x.node.id,
+			decl_item(ref x)=>x.id
+		}
+	}
+}
+impl NodeId for codemap::spanned<decl_> {
+	pub fn get_node_id(&self)->node_id {
+		self.node.get_node_id()
+	}
+}
+impl NodeId for ty_method {
+	pub fn get_node_id(&self)->node_id {
+		self.id
+	}
+}
+impl NodeId for view_item_ {
+	pub fn get_node_id(&self)->node_id {
+		match *self {
+			view_item_extern_mod(_,_,node_id)=>node_id,
+			view_item_use(_)=>0
+		}
+	}
+}
+
+impl NodeId for trait_method {
+	pub fn get_node_id(&self)->node_id {
+		match(*self) {
+			required(ref m)=>m.id,
+			provided(ref m)=>0
+		}
+	}
+}
+
+impl NodeId for AstNode {
+	pub fn get_node_id(&self)->node_id {
+		// todo - should be option<node_id> really..
+		match *self {
+			astnode_mod(ref x) => 0,
+			astnode_view_item(ref x) =>x.node.get_node_id(),
+			astnode_item(ref x) =>x.id,
+			astnode_local(ref x) =>x.node.id,
+			astnode_block(ref x)=>0,
+			astnode_stmt(ref x)=>0,
+			astnode_arm(ref x)=>0,
+			astnode_pat(ref x)=>x.id,
+			astnode_decl(ref x)=>x.get_node_id(),
+			astnode_expr(ref x)=>x.id,
+			astnode_expr_post(ref x)=>x.id,
+			astnode_ty(ref x)=>x.id,
+			astnode_ty_method(ref x)=>x.id,
+			astnode_trait_method(ref x)=>x.get_node_id(),
+			astnode_struct_def(ref x)=>0,
+			astnode_struct_field(ref x)=>x.node.id,
+			astnode_root=>0,		
+		}
+	}
 }
 
 struct State {
@@ -256,7 +321,7 @@ pub fn get_node_info_str(ctxt:&DocContext,node:&[AstNode])->~str
 			ast::pat_enum(ref path,ref efields)=>~"pat_enum:"+path_to_str(ctxt,path),//	`todo-fields..
 			ast::pat_struct(ref path,ref sfields,b)=>~"pat_struct:"+path_to_str(ctxt,path)+~"{"+sfields.map(|x|pat_to_str(ctxt,x.pat)+~",").to_str()+~"}",
 			ast::pat_tup(ref elems)=>~"pat_tupl:"+elems.map(|&x|pat_to_str(ctxt,x)).to_str(),
-			ast::pat_box(ref box)=>~"box",
+			//ast::pat_box(ref box)=>~"box",
 			ast::pat_uniq(ref u)=>~"uniq",
 			ast::pat_region(ref p)=>~"rgn",
 			ast::pat_lit(ref e)=>~"literal",
