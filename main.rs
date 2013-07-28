@@ -2,6 +2,7 @@
 extern mod syntax;
 extern mod rustc;
 extern mod extra;
+
 use rustc::{front, metadata, driver, middle};
 use rustc::middle::*;
 
@@ -97,6 +98,10 @@ fn main() {
 	debug_test(dc,matches.free[0]);
 }
 
+fn option_to_str<T:ToStr>(opt:&Option<T>)->~str {
+	match *opt { Some(ref s)=>~"Some("+s.to_str()+~")",None=>~"None" }
+}
+
 fn debug_test(dc:&DocContext,filename:~str) {
 
 	// TODO: parse commandline source locations,convert to codemap locations
@@ -108,7 +113,10 @@ fn debug_test(dc:&DocContext,filename:~str) {
 	logi!("==== dump def table.===")
 	dump_ctxt_def_map(dc);
 
-	logi!("")
+	logi!("==== Get table of node-spans...===")
+	let node_spans=build_node_spans_table(dc.crate);
+	dump_node_spans_table(node_spans);
+
 	logi!("==== Test node search by location...===")
  
 	let mut source_pos=15 as uint;
@@ -124,6 +132,7 @@ fn debug_test(dc:&DocContext,filename:~str) {
 				// TODO - get infered type from ctxt.node_types??
 				// node_id = get_node_id()
 				// node_type=ctxt.node_types./*node_type_table*/.get...
+				println((do node.map |x| { option_to_str(&x.get_id()) }).to_str());
 				match node.last().get_id() {
 					Some(nid)=> {
 						match(find_ast_node::safe_node_id_to_type(dc.tycx, nid)) {
@@ -141,7 +150,7 @@ fn debug_test(dc:&DocContext,filename:~str) {
 			None=>logi!("position out of range")
 		}		
 
-		source_pos+=12;
+		source_pos+=11;
 	}
 }
 

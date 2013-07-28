@@ -6,10 +6,12 @@ use syntax::visit::*;
 use syntax::visit::{Visitor, fn_kind};
 use syntax::codemap::*;
 use rustc::{front, metadata, driver, middle};
+use rustc::middle::mem_categorization::ast_node;
 use syntax::codemap::span;
 use syntax::*;
 use syntax::abi::AbiSet;
 use rustc::middle::*;
+use std::hashmap::HashMap;
 
 
 // TODO: code here only depends on ty::ctxt, sess:Session is held in there aswell.
@@ -33,31 +35,68 @@ macro_rules! dump{ ($($a:expr),*)=>
 pub fn find(c:@crate,_location:uint)->~[AstNode] {
 	let mut s= @mut FindAstNodeSt{
 		result:~[astnode_root], location:_location, stop:false
+			
 	};
 	let vt=mk_vt(@Visitor{
 		//visit_mod
-		visit_view_item:f_view_item,
+		visit_view_item:find_view_item,
 		//visit_foreign_item
-		visit_item:f_item,
-		visit_local:f_local,
-		visit_block:f_block,
-		visit_stmt:f_stmt,
-		visit_arm:f_arm,
-		visit_pat:f_pat,
-		visit_decl:f_decl,
-		visit_expr:f_expr,
+		visit_item:find_item,
+		visit_local:find_local,
+		visit_block:find_block,
+		visit_stmt:find_stmt,
+		visit_arm:find_arm,
+		visit_pat:find_pat,
+		visit_decl:find_decl,
+		visit_expr:find_expr,
 		//visit_expr_post:f_expr,--called after visit
-		visit_ty:f_ty,
+		visit_ty:find_ty,
 		//visit_method
 		//visit_trait_method
 //		visit_struct_def:f_struct_def,
-		visit_struct_field:f_struct_field,
+		visit_struct_field:find_struct_field,
 
 		.. *default_visitor::<@mut FindAstNodeSt>()
 		}
 	);
 	visit_crate(c, (s,vt));
 	s.result.clone()
+}
+
+pub fn build_node_spans_table(c:@crate)->@mut NodeSpans {
+	// todo-lambdas, big fcuntion but remove the extraneous symbols
+	let node_spans=@mut HashMap::new();
+	let vt=mk_vt(@Visitor{
+		//visit_mod
+		visit_view_item:fcns_view_item,
+		//visit_foreign_item
+		visit_item:fcns_item,
+		visit_local:fcns_local,
+		visit_block:fcns_block,
+		visit_stmt:fcns_stmt,
+		visit_arm:fcns_arm,
+		visit_pat:fcns_pat,
+		visit_decl:fcns_decl,
+		visit_expr:fcns_expr,
+		//visit_expr_post:f_expr,--called after visit
+		visit_ty:fcns_ty,
+		//visit_method
+		//visit_trait_method
+//		visit_struct_def:f_struct_def,
+		visit_struct_field:fcns_struct_field,
+
+		.. *default_visitor::<@mut NodeSpans>()
+		}
+	);
+	visit_crate(c,(node_spans,vt));
+	node_spans
+}
+
+pub fn dump_node_spans_table(ns:&NodeSpans) {
+	for ns.iter().advance |(k,v)| {
+		println(fmt!("nodeid=%i span=%?",*k,v));
+		
+	}
 }
 
 // TODO - is there an official wrapper like this for all nodes in libsyntax::ast?
@@ -85,7 +124,34 @@ pub enum AstNode
 }
 
 pub trait AstNodeAccessors {
-	pub fn get_id(&self)->Option<node_id>;
+	pub fn get_id(&self)->Option<ast::node_id>;
+}
+impl AstNodeAccessors for ast::item {
+	pub fn get_id(&self)->Option<ast::node_id> {
+		Some(self.id)
+	}
+}
+impl AstNodeAccessors for ast::local_ {
+	pub fn get_id(&self)->Option<ast::node_id> {
+		Some(self.id)
+	}
+}
+
+impl AstNodeAccessors for ast::item_ {
+	pub fn get_id(&self)->Option<ast::node_id> {
+		match *self {
+		item_static(_,_,ref e) => Some(e.id),
+		item_fn(ref decl,_,_,_,ref b)=>Some(b.node.id),
+		item_mod(_)=>None,
+		item_foreign_mod(_)=>None,
+		item_ty(ref ty,_)=>Some(ty.id),
+		item_enum(_,_)=>None,
+		item_struct(_,_)=>None,
+		item_trait(_,_,_)=>None,
+		item_impl(_,_,ref ty,_)=>Some(ty.id), //TODO, is this wrong, just node_id of a component?
+		item_mac(_)=>None,
+		}
+	}
 }
 
 impl AstNodeAccessors for ast::decl_ {
@@ -106,12 +172,33 @@ impl AstNodeAccessors for ty_method {
 		Some(self.id)
 	}
 }
+impl AstNodeAccessors for blk_ {
+	pub fn get_id(&self)->Option<node_id> {
+		Some(self.id)
+	}
+}
+impl AstNodeAccessors for stmt_ {
+	pub fn get_id(&self)->Option<node_id> {
+		match *self {
+			stmt_decl(_,x)=>Some(x),
+			stmt_expr(_,x)=>Some(x),
+			stmt_semi(_,x)=>Some(x),
+			stmt_mac(_,_)=>None
+		}
+	}
+}
+
 impl AstNodeAccessors for view_item_ {
 	pub fn get_id(&self)->Option<node_id> {
 		match *self {
 			view_item_extern_mod(_,_,node_id)=>Some(node_id),
 			view_item_use(_)=>None
 		}
+	}
+}
+impl AstNodeAccessors for struct_field_ {
+	pub fn get_id(&self)->Option<node_id> {
+		Some(self.id)
 	}
 }
 
@@ -149,16 +236,89 @@ impl AstNodeAccessors for AstNode {
 	}
 }
 
-struct FindAstNodeSt {
+
+pub struct FindAstNodeSt {
 	result: ~[AstNode],		// todo - full tree path, all the parent nodes.
 	location: uint,
-	stop: bool
+	stop: bool,
+//	node_spans: HashMap<ast::node_id,codemap::span>
 }
-fn span_contains(l:uint,s:span)->bool {
+type NodeSpans= HashMap<ast::node_id,codemap::span>;
+
+pub fn push_span(spt:&mut NodeSpans,n:ast::node_id, s:codemap::span) {
+	spt.insert(n,s);
+}
+
+pub fn push_spanned<T:AstNodeAccessors>(spt:&mut NodeSpans,s:&codemap::spanned<T>) {
+	match s.node.get_id() {
+		Some(id)=>{spt.insert(id,s.span);}
+		None=>{}
+	}
+}
+
+pub fn span_contains(l:uint,s:span)->bool {
 	let BytePos(lo)=s.lo;
 	let BytePos(hi)=s.hi;
 	l>=lo && l<hi
 }
+type NodeSpansSV = (@mut NodeSpans, vt<@mut NodeSpans>);
+fn fcns_view_item(a:&view_item, (s,v):NodeSpansSV) {
+	visit_view_item(a,(s,v))
+}
+fn fcns_item(a:@item, (s,v):NodeSpansSV) {
+	push_span(s,a.id,a.span);
+	visit_item(a,(s,v))
+}
+fn fcns_local(a:@local, (s,v):NodeSpansSV) {
+	push_spanned(s,a);
+	visit_local(a,(s,v))
+}
+fn fcns_block(a:&blk, (s,v):NodeSpansSV) {
+	push_spanned(s,a);
+	visit_block(a,(s,v))
+}
+fn fcns_stmt(a:@stmt, (s,v):NodeSpansSV) {
+	push_spanned(s,a);
+	visit_stmt(a,(s,v))
+}
+fn fcns_arm(a:&arm, (s,v):NodeSpansSV) {
+	push_spanned(s,&a.body);
+	visit_arm(a,(s,v))
+}
+fn fcns_pat(a:@pat, (s,v):NodeSpansSV) {
+	push_span(s,a.id,a.span);
+	visit_pat(a,(s,v))
+}
+fn fcns_decl(a:@decl, (s,v):NodeSpansSV) {
+		push_spanned(s,a);
+	visit_decl(a,(s,v))
+}
+
+
+// struct Visitor<E>.visit_expr: @fn(@expr, (E, vt<E>)),
+fn fcns_expr(a:@expr, (s,v):NodeSpansSV) {
+	push_span(s,a.id,a.span);
+	visit_expr(a,(s,v))
+}
+
+// struct Visitor<E>.visit_expr_post: @fn(@expr, (E, vt<E>)),
+fn fcns_expr_post(a:@expr, (s,v):NodeSpansSV) {
+	visit_expr(a,(s,v))
+}
+
+// struct Visitor<E>.visit_ty: @fn(&Ty, (E, vt<E>)),
+fn fcns_ty(a:&Ty, (s,v):NodeSpansSV) {
+	push_span(s,a.id,a.span);
+	visit_ty(a,(s,v))
+}
+fn fcns_fn(fk:&fn_kind, fd:&fn_decl, body:&blk, sp:span, nid:node_id, (s,v):NodeSpansSV) {
+	visit_fn(fk,fd,body,sp,nid,(s,v))
+}
+fn fcns_struct_field(a:@struct_field, (s,v):NodeSpansSV) {
+	push_spanned(s,a);
+	visit_struct_field(a,(s,v))
+}
+
 
 // struct Visitor<E>.visit_mod: @fn(&_mod, span, node_id, (E, vt<E>)),
  //fn f_mod(a:&_mod, (s,v):(@mut State, vt<@mut State>)) {
@@ -169,21 +329,21 @@ fn span_contains(l:uint,s:span)->bool {
    //}
 // struct Visitor<E>.visit_view_item: @fn(&view_item, (E, vt<E>)),
 type FindAstNodeSV = (@mut FindAstNodeSt, vt<@mut FindAstNodeSt>);
-fn f_view_item(a:&view_item, (s,v):FindAstNodeSV) {
+fn find_view_item(a:&view_item, (s,v):FindAstNodeSV) {
 	if span_contains(s.location, a.span) {
 		s.result.push(astnode_view_item(@ copy *a));
 	}
 	visit_view_item(a,(s,v))
 }// struct Visitor<E>.visit_foreign_item: @fn(@foreign_item, (E, vt<E>)),
 // struct Visitor<E>.visit_item: @fn(@item, (E, vt<E>)),
-fn f_item(a:@item, (s,v):FindAstNodeSV) {
+fn find_item(a:@item, (s,v):FindAstNodeSV) {
 	if span_contains(s.location, a.span) {
 		s.result.push(astnode_item(a));
 	}
 	visit_item(a,(s,v))
 }
 // struct Visitor<E>.visit_local: @fn(@local, (E, vt<E>)),
-fn f_local(a:@local, (s,v):FindAstNodeSV) {
+fn find_local(a:@local, (s,v):FindAstNodeSV) {
 	if span_contains(s.location, a.span) {
 		s.result.push(astnode_local(a));
 	}
@@ -191,7 +351,7 @@ fn f_local(a:@local, (s,v):FindAstNodeSV) {
 }
 
 // struct Visitor<E>.visit_block: @fn(&blk, (E, vt<E>)),
-fn f_block(a:&blk, (s,v):FindAstNodeSV) {
+fn find_block(a:&blk, (s,v):FindAstNodeSV) {
 	if span_contains(s.location, a.span) {
 		s.result.push(astnode_block(@ copy *a));
 	}
@@ -199,7 +359,7 @@ fn f_block(a:&blk, (s,v):FindAstNodeSV) {
 }
 
 // struct Visitor<E>.visit_stmt: @fn(@stmt, (E, vt<E>)),
-fn f_stmt(a:@stmt, (s,v):FindAstNodeSV) {
+fn find_stmt(a:@stmt, (s,v):FindAstNodeSV) {
 	if span_contains(s.location, a.span) {
 		s.result.push(astnode_stmt(a));
 	}
@@ -207,7 +367,7 @@ fn f_stmt(a:@stmt, (s,v):FindAstNodeSV) {
 }
 
 // struct Visitor<E>.visit_arm: @fn(&arm, (E, vt<E>)),
-fn f_arm(a:&arm, (s,v):FindAstNodeSV) {
+fn find_arm(a:&arm, (s,v):FindAstNodeSV) {
 // the whole arm doesn't have a span 
 //	if span_contains(s.location, a.span) {
 //		s.result.push(astnode_arm(@copy *a));
@@ -215,7 +375,7 @@ fn f_arm(a:&arm, (s,v):FindAstNodeSV) {
 	visit_arm(a,(s,v))
 }
 // struct Visitor<E>.visit_pat: @fn(@pat, (E, vt<E>)),
-fn f_pat(a:@pat, (s,v):FindAstNodeSV) {
+fn find_pat(a:@pat, (s,v):FindAstNodeSV) {
 	if span_contains(s.location, a.span) {
 		s.result.push(astnode_pat(a));
 	}
@@ -224,7 +384,7 @@ fn f_pat(a:@pat, (s,v):FindAstNodeSV) {
 
 
 // struct Visitor<E>.visit_decl: @fn(@decl, (E, vt<E>)),
-fn f_decl(a:@decl, (s,v):FindAstNodeSV) {
+fn find_decl(a:@decl, (s,v):FindAstNodeSV) {
 	if span_contains(s.location, a.span) {
 		s.result.push(astnode_decl(a));
 	}
@@ -233,7 +393,7 @@ fn f_decl(a:@decl, (s,v):FindAstNodeSV) {
 
 
 // struct Visitor<E>.visit_expr: @fn(@expr, (E, vt<E>)),
-fn f_expr(a:@expr, (s,v):FindAstNodeSV) {
+fn find_expr(a:@expr, (s,v):FindAstNodeSV) {
 	if span_contains(s.location, a.span) {
 		s.result.push(astnode_expr(a));
 	}
@@ -241,7 +401,7 @@ fn f_expr(a:@expr, (s,v):FindAstNodeSV) {
 }
 
 // struct Visitor<E>.visit_expr_post: @fn(@expr, (E, vt<E>)),
-fn f_expr_post(a:@expr, (s,v):FindAstNodeSV) {
+fn find_expr_post(a:@expr, (s,v):FindAstNodeSV) {
 	if span_contains(s.location, a.span) {
 		s.result.push(astnode_expr_post(a));
 	}
@@ -249,7 +409,7 @@ fn f_expr_post(a:@expr, (s,v):FindAstNodeSV) {
 }
 
 // struct Visitor<E>.visit_ty: @fn(&Ty, (E, vt<E>)),
-fn f_ty(a:&Ty, (s,v):FindAstNodeSV) {
+fn find_ty(a:&Ty, (s,v):FindAstNodeSV) {
 	if span_contains(s.location, a.span) {
 		s.result.push(astnode_ty(@copy *a));
 	}
@@ -258,7 +418,7 @@ fn f_ty(a:&Ty, (s,v):FindAstNodeSV) {
 
 // struct Visitor<E>.visit_generics: @fn(&Generics, (E, vt<E>)),
 // struct Visitor<E>.visit_fn: @fn(&fn_kind, &fn_decl, &blk, span, node_id, (E, vt<E>)),
-fn f_fn(fk:&fn_kind, fd:&fn_decl, body:&blk, sp:span, nid:node_id, (s,v):FindAstNodeSV) {
+fn find_fn(fk:&fn_kind, fd:&fn_decl, body:&blk, sp:span, nid:node_id, (s,v):FindAstNodeSV) {
 	//if span_contains(s.location, span) {
 		//s.result.push(astnode_fn2(a));
 	//}
@@ -274,7 +434,7 @@ fn f_fn(fk:&fn_kind, fd:&fn_decl, body:&blk, sp:span, nid:node_id, (s,v):FindAst
  //	visit_struct_field(a,(s,v))
  //}
 // struct Visitor<E>.visit_struct_field: @fn(@struct_field, (E, vt<E>)),
-fn f_struct_field(a:@struct_field, (s,v):FindAstNodeSV) {
+fn find_struct_field(a:@struct_field, (s,v):FindAstNodeSV) {
 	if span_contains(s.location, a.span) {
 		s.result.push(astnode_struct_field(a));
 	}
