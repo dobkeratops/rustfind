@@ -9,6 +9,8 @@ use rustc::{front, metadata, driver, middle};
 use syntax::codemap::span;
 use syntax::*;
 use syntax::abi::AbiSet;
+use rustc::middle::*;
+
 
 // TODO: code here only depends on ty::ctxt, sess:Session is held in there aswell.
 pub struct DocContext {
@@ -16,7 +18,6 @@ pub struct DocContext {
     tycx: middle::ty::ctxt,
     sess: driver::session::Session
 }
-
 
 macro_rules! dump{ ($($a:expr),*)=>
 	(	{	let mut txt=file!()+":"+line!().to_str()+": " ; 
@@ -375,3 +376,12 @@ pub fn get_node_info_str(dc:&DocContext,node:&[AstNode])->~str
 		_=>	~"unknown"
 	}
 }
+
+pub fn safe_node_id_to_type(cx: ty::ctxt, id: ast::node_id) -> Option<ty::t> {
+    //io::println(fmt!("%?/%?", id, cx.node_types.len()));
+    match cx.node_types.find(&(id as uint)) {
+       Some(&t) => Some(t),
+       None => None    
+	}
+}
+

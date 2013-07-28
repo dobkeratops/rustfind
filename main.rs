@@ -44,14 +44,6 @@ macro_rules! dump{ ($($a:expr),*)=>
 	)
 }
 
-pub fn safe_node_id_to_type(cx: ty::ctxt, id: ast::node_id) -> Option<ty::t> {
-    //io::println(fmt!("%?/%?", id, cx.node_types.len()));
-    match cx.node_types.find(&(id as uint)) {
-       Some(&t) => Some(t),
-       None => None    
-	}
-}
-
 
 /// tags: crate,ast,parse resolve
 /// Parses, resolves the given crate
@@ -98,17 +90,22 @@ fn main() {
 	dump!(args,matches);
 	dump!(libs);
     let dc = @get_ast_and_resolve(&Path(matches.free[0]), libs);
+    local_data::set(ctxtkey, dc);
+
+	debug_test(dc,matches.free[0]);
+}
+
+fn debug_test(dc:&DocContext,filename:~str) {
 
 	// TODO: parse commandline source locations,convert to codemap locations
 	//dump!(ctxt.tycx);
 
-	logi!("loading",matches.free[0]);
-	let source_text = ioutil::fileLoad(matches.free[0]);
+	logi!("loading",filename);
+	let source_text = ioutil::fileLoad(filename);
 
 	logi!("==== dump def table.===")
 	dump_ctxt_def_map(dc);
 
-    local_data::set(ctxtkey, dc);
 	logi!("")
 	logi!("==== Test node search by location...===")
  
@@ -127,7 +124,7 @@ fn main() {
 				// node_type=ctxt.node_types./*node_type_table*/.get...
 				match node.last().get_id() {
 					Some(nid)=> {
-						match(safe_node_id_to_type(dc.tycx, nid)) {
+						match(find_ast_node::safe_node_id_to_type(dc.tycx, nid)) {
 							Some(t)=>{
 								println(fmt!("typeinfo: %?",
 									{let ntt= rustc::middle::ty::get(t); ntt}));
@@ -145,6 +142,7 @@ fn main() {
 		source_pos+=12;
 	}
 }
+
 
 // see: tycx.node_types:node_type_table:HashMap<id,t>
 // 't'=opaque ptr, ty::get(:t)->t_box_ to resolve it
@@ -177,6 +175,7 @@ fn text_line_pos_to_offset(text:&[u8], (line,ofs_in_line):(uint,uint))->Option<u
 	}
 	return None;
 }
+
 fn text_offset_to_line_pos(text:&[u8], src_ofs:uint)->Option<(uint,uint)> {
 	// line as reported by grep & text editors,counted from '1' not '0'
 	let mut pos = 0;
