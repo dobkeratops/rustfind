@@ -47,7 +47,8 @@ pub fn safe_node_id_to_type(cx: ty::ctxt, id: ast::node_id) -> Option<ty::t> {
     //io::println(fmt!("%?/%?", id, cx.node_types.len()));
     match cx.node_types.find(&(id as uint)) {
        Some(&t) => Some(t),
-       None => None    }
+       None => None    
+	}
 }
 
 
@@ -130,15 +131,18 @@ fn main() {
 		// TODO - get infered type from ctxt.node_types??
 		// node_id = get_node_id()
 		// node_type=ctxt.node_types./*node_type_table*/.get...
-		let nid=node.last().get_node_id() ;
-		if nid!=0 {
-			match(safe_node_id_to_type(dc.tycx, nid)) {
-				Some(t)=>
-					println(fmt!("typeinfo: %?",{let ntt= rustc::middle::ty::get(t); ntt})),
-				None=> logi!("typeinfo:unknown node_type for ",nid)
-			}
-		} else {logi!("typeinfo:-unknown node id")}
-		dump!(nid,dc.tycx.def_map.find(&nid));
+		match node.last().get_node_id() {
+			Some(nid)=>
+				match(safe_node_id_to_type(dc.tycx, nid)) {
+					Some(t)=>{
+						println(fmt!("typeinfo: %?",
+							{let ntt= rustc::middle::ty::get(t); ntt}));
+						dump!(nid,dc.tycx.def_map.find(&nid));
+					},
+					None=> logi!("typeinfo:unknown node_type for ",nid)
+				},
+			None=>{logi!("typeinfo:-unknown node id")}
+		}
 		
 
 		pos+=12;

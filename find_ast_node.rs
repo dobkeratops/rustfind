@@ -106,65 +106,65 @@ pub enum AstNode
 }
 
 pub trait NodeId {
-	pub fn get_node_id(&self)->node_id;
+	pub fn get_node_id(&self)->Option<node_id>;
 }
 impl NodeId for ast::decl_ {
-	pub fn get_node_id(&self)->node_id {
+	pub fn get_node_id(&self)->Option<node_id> {
 		match *self{
-			decl_local(ref x)=>x.node.id,
-			decl_item(ref x)=>x.id
+			decl_local(ref x)=>Some(x.node.id),
+			decl_item(ref x)=>Some(x.id)
 		}
 	}
 }
 impl NodeId for codemap::spanned<decl_> {
-	pub fn get_node_id(&self)->node_id {
+	pub fn get_node_id(&self)->Option<node_id> {
 		self.node.get_node_id()
 	}
 }
 impl NodeId for ty_method {
-	pub fn get_node_id(&self)->node_id {
-		self.id
+	pub fn get_node_id(&self)->Option<node_id> {
+		Some(self.id)
 	}
 }
 impl NodeId for view_item_ {
-	pub fn get_node_id(&self)->node_id {
+	pub fn get_node_id(&self)->Option<node_id> {
 		match *self {
-			view_item_extern_mod(_,_,node_id)=>node_id,
-			view_item_use(_)=>0
+			view_item_extern_mod(_,_,node_id)=>Some(node_id),
+			view_item_use(_)=>None
 		}
 	}
 }
 
 impl NodeId for trait_method {
-	pub fn get_node_id(&self)->node_id {
+	pub fn get_node_id(&self)->Option<node_id> {
 		match(*self) {
-			required(ref m)=>m.id,
-			provided(ref m)=>0
+			required(ref m)=>Some(m.id),
+			provided(ref m)=>None
 		}
 	}
 }
 
 impl NodeId for AstNode {
-	pub fn get_node_id(&self)->node_id {
+	pub fn get_node_id(&self)->Option<node_id> {
 		// todo - should be option<node_id> really..
 		match *self {
-			astnode_mod(ref x) => 0,
+			astnode_mod(ref x) => None,
 			astnode_view_item(ref x) =>x.node.get_node_id(),
-			astnode_item(ref x) =>x.id,
-			astnode_local(ref x) =>x.node.id,
-			astnode_block(ref x)=>0,
-			astnode_stmt(ref x)=>0,
-			astnode_arm(ref x)=>0,
-			astnode_pat(ref x)=>x.id,
+			astnode_item(ref x) =>Some(x.id),
+			astnode_local(ref x) =>Some(x.node.id),
+			astnode_block(ref x)=>None,
+			astnode_stmt(ref x)=>None,
+			astnode_arm(ref x)=>None,
+			astnode_pat(ref x)=>Some(x.id),
 			astnode_decl(ref x)=>x.get_node_id(),
-			astnode_expr(ref x)=>x.id,
-			astnode_expr_post(ref x)=>x.id,
-			astnode_ty(ref x)=>x.id,
-			astnode_ty_method(ref x)=>x.id,
+			astnode_expr(ref x)=>Some(x.id),
+			astnode_expr_post(ref x)=>Some(x.id),
+			astnode_ty(ref x)=>Some(x.id),
+			astnode_ty_method(ref x)=>Some(x.id),
 			astnode_trait_method(ref x)=>x.get_node_id(),
-			astnode_struct_def(ref x)=>0,
-			astnode_struct_field(ref x)=>x.node.id,
-			astnode_root=>0,		
+			astnode_struct_def(ref x)=>None,
+			astnode_struct_field(ref x)=>Some(x.node.id),
+			astnode_root=>None,
 		}
 	}
 }
