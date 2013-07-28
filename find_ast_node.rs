@@ -52,7 +52,6 @@ pub fn find(c:@crate,_location:uint)->~[AstNode] {
 //		visit_struct_def:f_struct_def,
 		visit_struct_field:f_struct_field,
 
-
 		.. *default_visitor::<@mut State>()
 		}
 	);
@@ -65,69 +64,49 @@ pub fn find(c:@crate,_location:uint)->~[AstNode] {
 #[deriving(Clone)]
 pub enum AstNode 
 {
-	// struct Visitor<E>.visit_mod: @fn(&_mod, span, node_id, (E, vt<E>)),
 	astnode_mod(@_mod),
-	// struct Visitor<E>.visit_view_item: @fn(&view_item, (E, vt<E>)),
 	astnode_view_item(@view_item),
-	// struct Visitor<E>.visit_foreign_item: @fn(@foreign_item, (E, vt<E>)),
-	// struct Visitor<E>.visit_item: @fn(@item, (E, vt<E>)),
 	astnode_item(@item),
-	// struct Visitor<E>.visit_local: @fn(@local, (E, vt<E>)),
 	astnode_local(@local),
-	//struct Visitor<E>.visit_block: @fn(&blk, (E, vt<E>)),
 	astnode_block(@blk),
-	// struct Visitor<E>.visit_stmt: @fn(@stmt, (E, vt<E>)),
 	astnode_stmt(@stmt),
-	// struct Visitor<E>.visit_arm: @fn(&arm, (E, vt<E>)),
 	astnode_arm(@arm),
-	// struct Visitor<E>.visit_pat: @fn(@pat, (E, vt<E>)),
 	astnode_pat(@pat),
-	// struct Visitor<E>.visit_decl: @fn(@decl, (E, vt<E>)),
 	astnode_decl(@decl),
-	// struct Visitor<E>.visit_expr: @fn(@expr, (E, vt<E>)),
 	astnode_expr(@expr),
-	// struct Visitor<E>.visit_expr_post: @fn(@expr, (E, vt<E>)),
 	astnode_expr_post(@expr),
-	// struct Visitor<E>.visit_ty: @fn(&Ty, (E, vt<E>)),
 	astnode_ty(@Ty),
-	// struct Visitor<E>.visit_generics: @fn(&Generics, (E, vt<E>)),
-	// struct Visitor<E>.visit_fn: @fn(&fn_kind, &fn_decl, &blk, span, node_id, (E, vt<E>)),
-	//asstnode_fn(@fn_kind,@fn_decl,@
-	// struct Visitor<E>.visit_ty_method: @fn(&ty_method, (E, vt<E>)),
 	astnode_ty_method(@ty_method),
-	// struct Visitor<E>.visit_trait_method: @fn(&trait_method, (E, vt<E>)),
 	astnode_trait_method(@trait_method),
-	// struct Visitor<E>.visit_struct_def: @fn(@struct_def, ident, &Generics, node_id, (E, vt<E>)),
 	astnode_struct_def(@struct_def),
-	// struct Visitor<E>.visit_struct_field: @fn(@struct_field, (E, vt<E>)),
 	astnode_struct_field(@struct_field),
-
 	astnode_root	
 }
 
-pub trait NodeId {
-	pub fn get_node_id(&self)->Option<node_id>;
+pub trait AstNodeAccessors {
+	pub fn get_id(&self)->Option<node_id>;
 }
-impl NodeId for ast::decl_ {
-	pub fn get_node_id(&self)->Option<node_id> {
+
+impl AstNodeAccessors for ast::decl_ {
+	pub fn get_id(&self)->Option<node_id> {
 		match *self{
 			decl_local(ref x)=>Some(x.node.id),
 			decl_item(ref x)=>Some(x.id)
 		}
 	}
 }
-impl NodeId for codemap::spanned<decl_> {
-	pub fn get_node_id(&self)->Option<node_id> {
-		self.node.get_node_id()
+impl<T:AstNodeAccessors> AstNodeAccessors for codemap::spanned<T> {
+	pub fn get_id(&self)->Option<node_id> {
+		self.node.get_id()
 	}
 }
-impl NodeId for ty_method {
-	pub fn get_node_id(&self)->Option<node_id> {
+impl AstNodeAccessors for ty_method {
+	pub fn get_id(&self)->Option<node_id> {
 		Some(self.id)
 	}
 }
-impl NodeId for view_item_ {
-	pub fn get_node_id(&self)->Option<node_id> {
+impl AstNodeAccessors for view_item_ {
+	pub fn get_id(&self)->Option<node_id> {
 		match *self {
 			view_item_extern_mod(_,_,node_id)=>Some(node_id),
 			view_item_use(_)=>None
@@ -135,8 +114,8 @@ impl NodeId for view_item_ {
 	}
 }
 
-impl NodeId for trait_method {
-	pub fn get_node_id(&self)->Option<node_id> {
+impl AstNodeAccessors for trait_method {
+	pub fn get_id(&self)->Option<node_id> {
 		match(*self) {
 			required(ref m)=>Some(m.id),
 			provided(ref m)=>None
@@ -144,24 +123,24 @@ impl NodeId for trait_method {
 	}
 }
 
-impl NodeId for AstNode {
-	pub fn get_node_id(&self)->Option<node_id> {
+impl AstNodeAccessors for AstNode {
+	pub fn get_id(&self)->Option<node_id> {
 		// todo - should be option<node_id> really..
 		match *self {
 			astnode_mod(ref x) => None,
-			astnode_view_item(ref x) =>x.node.get_node_id(),
+			astnode_view_item(ref x) =>x.node.get_id(),
 			astnode_item(ref x) =>Some(x.id),
 			astnode_local(ref x) =>Some(x.node.id),
 			astnode_block(ref x)=>None,
 			astnode_stmt(ref x)=>None,
 			astnode_arm(ref x)=>None,
 			astnode_pat(ref x)=>Some(x.id),
-			astnode_decl(ref x)=>x.get_node_id(),
+			astnode_decl(ref x)=>x.get_id(),
 			astnode_expr(ref x)=>Some(x.id),
 			astnode_expr_post(ref x)=>Some(x.id),
 			astnode_ty(ref x)=>Some(x.id),
 			astnode_ty_method(ref x)=>Some(x.id),
-			astnode_trait_method(ref x)=>x.get_node_id(),
+			astnode_trait_method(ref x)=>x.get_id(),
 			astnode_struct_def(ref x)=>None,
 			astnode_struct_field(ref x)=>Some(x.node.id),
 			astnode_root=>None,

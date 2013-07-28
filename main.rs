@@ -81,10 +81,6 @@ fn get_ast_and_resolve(cpath: &Path, libs: ~[Path]) -> DocContext {
     DocContext { crate: c, tycx: t, sess: sess }
 }
 
-enum Object {
-	Ship{pos:(float,float),vel:(float,float),hdg:float},
-	Bullet{pos:(float,float),vel:(float,float)}
-}
 
 fn main() {
     use extra::getopts::*;
@@ -95,15 +91,6 @@ fn main() {
     let opts = ~[
         optmulti("L")
     ];
-	let o1=~Ship{pos:(0.0,0.0),vel:(0.0,0.0),hdg:0.0};
-	let o2=~Ship{pos:(0.0,0.0),vel:(0.0,0.0),hdg:0.0};
-	match (*o1,*o2) {
-		(Ship{pos:p1,vel:v1,hdg:h1},Ship{vel:v2,_}) =>{
-		},
-		(_,_)=>{
-		}
-	}
-
 
     let matches = getopts(args.tail(), opts).get();
     let libs = opt_strs(&matches, "L").map(|s| Path(*s));
@@ -131,8 +118,8 @@ fn main() {
 		// TODO - get infered type from ctxt.node_types??
 		// node_id = get_node_id()
 		// node_type=ctxt.node_types./*node_type_table*/.get...
-		match node.last().get_node_id() {
-			Some(nid)=>
+		match node.last().get_id() {
+			Some(nid)=> {
 				match(safe_node_id_to_type(dc.tycx, nid)) {
 					Some(t)=>{
 						println(fmt!("typeinfo: %?",
@@ -140,7 +127,8 @@ fn main() {
 						dump!(nid,dc.tycx.def_map.find(&nid));
 					},
 					None=> logi!("typeinfo:unknown node_type for ",nid)
-				},
+				};
+			},
 			None=>{logi!("typeinfo:-unknown node id")}
 		}
 		
@@ -148,7 +136,6 @@ fn main() {
 		pos+=12;
 	}
 }
-
 
 // see: tycx.node_types:node_type_table:HashMap<id,t>
 // 't'=opaque ptr, ty::get(:t)->t_box_ to resolve it
