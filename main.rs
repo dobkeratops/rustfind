@@ -24,6 +24,7 @@ use extra::json::ToJson;
 
 mod text_formatting;
 mod find_ast_node;
+mod ioutil;
 
 pub static ctxtkey: local_data::Key<@DocContext> = &local_data::Key;
 
@@ -101,6 +102,9 @@ fn main() {
 	// TODO: parse commandline source locations,convert to codemap locations
 	//dump!(ctxt.tycx);
 
+	logi!("loading",matches.free[0]);
+	let source_text = ioutil::fileLoad(matches.free[0]);
+
 	logi!("==== dump def table.===")
 	dump_ctxt_def_map(dc);
 
@@ -108,32 +112,37 @@ fn main() {
 	logi!("")
 	logi!("==== Test node search by location...===")
  
-	let mut pos=15 as uint;
-	while pos<250 {
-		// get the AST node under 'pos', and dump info 
-		logi!(~"Find AST node at:",pos)
-		let node = find_ast_node::find(dc.crate,pos);
-		let node_info =  find_ast_node::get_node_info_str(dc,node);
-		dump!(node_info);
-		// TODO - get infered type from ctxt.node_types??
-		// node_id = get_node_id()
-		// node_type=ctxt.node_types./*node_type_table*/.get...
-		match node.last().get_id() {
-			Some(nid)=> {
-				match(safe_node_id_to_type(dc.tycx, nid)) {
-					Some(t)=>{
-						println(fmt!("typeinfo: %?",
-							{let ntt= rustc::middle::ty::get(t); ntt}));
-						dump!(nid,dc.tycx.def_map.find(&nid));
+	let mut source_pos=15 as uint;
+	while source_pos<250 {
+		// get the AST node under 'pos', and dump info
+		let pos= text_offset_to_line_pos(source_text,source_pos);
+		match (pos) {
+			Some((line,ofs))=> {
+				logi!(~"Find AST node at: file_ofs=",source_pos," line=",line," ofs=",ofs);
+				let node = find_ast_node::find(dc.crate,source_pos);
+				let node_info =  find_ast_node::get_node_info_str(dc,node);
+				dump!(node_info);
+				// TODO - get infered type from ctxt.node_types??
+				// node_id = get_node_id()
+				// node_type=ctxt.node_types./*node_type_table*/.get...
+				match node.last().get_id() {
+					Some(nid)=> {
+						match(safe_node_id_to_type(dc.tycx, nid)) {
+							Some(t)=>{
+								println(fmt!("typeinfo: %?",
+									{let ntt= rustc::middle::ty::get(t); ntt}));
+								dump!(nid,dc.tycx.def_map.find(&nid));
+							},
+							None=> logi!("typeinfo:unknown node_type for ",nid)
+						};
 					},
-					None=> logi!("typeinfo:unknown node_type for ",nid)
-				};
+					None=>{logi!("typeinfo:-unknown node id")}
+				}
 			},
-			None=>{logi!("typeinfo:-unknown node id")}
-		}
-		
+			None=>logi!("position out of range")
+		}		
 
-		pos+=12;
+		source_pos+=12;
 	}
 }
 
@@ -146,5 +155,49 @@ fn dump_ctxt_def_map(dc:&DocContext) {
 	for dc.tycx.def_map.iter().advance |(key,value)|{
 		dump!(key,value);
 	}
+}
+
+fn text_line_pos_to_offset(text:&[u8], (line,ofs_in_line):(uint,uint))->Option<uint> {
+	// line as reported by grep & text editors,counted from '1' not '0'
+	let mut pos = 0;
+	let tlen=text.len();	
+	let	mut tline=0;
+	let mut line_start_pos=0;
+	while pos<tlen{
+		match text[pos] as char{
+			'\n' => {tline+=1; line_start_pos=pos;},
+//			"\a" => {tpos=0;line_pos=pos;},
+			_ => {}
+		}
+		// todo - clamp line end
+		if tline==(line-1){ 
+			return Some(line_start_pos + ofs_in_line);
+		}
+		pos+=1;
+	}
+	return None;
+}
+fn text_offset_to_line_pos(text:&[u8], src_ofs:uint)->Option<(uint,uint)> {
+	// line as reported by grep & text editors,counted from '1' not '0'
+	let mut pos = 0;
+	let tlen=text.len();	
+	let	mut tline=0;
+	let mut line_start_pos=0;
+	while pos<tlen{
+		match text[pos] as char{
+			'\n' => {
+				if src_ofs<=pos && src_ofs>line_start_pos {
+					return Some((tline+1,src_ofs-line_start_pos));
+				}
+				tline+=1; line_start_pos=pos;
+			},
+//			"\a" => {tpos=0;line_pos=pos;},
+			_ => {}
+		}
+		// todo - clamp line end
+		pos+=1;
+	}
+	return None;
+
 }
 
