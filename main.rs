@@ -48,6 +48,8 @@ macro_rules! dump{ ($($a:expr),*)=>
 /// tags: crate,ast,parse resolve
 /// Parses, resolves the given crate
 fn get_ast_and_resolve(cpath: &Path, libs: ~[Path]) -> DocContext {
+	
+
 
     let parsesess = parse::new_parse_sess(None);
     let sessopts = @driver::session::options {

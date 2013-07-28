@@ -1,0 +1,8 @@
+# common files to open for reference...
+
+gedit main.rs --new-window &
+gedit find_ast_node.rs --new-window &
+gedit $RUST_SRC/libsyntax/ast.rs --new-window &
+gedit $RUST_SRC/libsyntax/visit.rs --new-window &
+gedit $RUST_SRC/librustc/middle/ty.rs --new-window &
+

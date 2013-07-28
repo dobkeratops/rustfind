@@ -31,7 +31,7 @@ macro_rules! dump{ ($($a:expr),*)=>
 
 /// main
 pub fn find(c:@crate,_location:uint)->~[AstNode] {
-	let mut s= @mut State{
+	let mut s= @mut FindAstNodeSt{
 		result:~[astnode_root], location:_location, stop:false
 	};
 	let vt=mk_vt(@Visitor{
@@ -53,7 +53,7 @@ pub fn find(c:@crate,_location:uint)->~[AstNode] {
 //		visit_struct_def:f_struct_def,
 		visit_struct_field:f_struct_field,
 
-		.. *default_visitor::<@mut State>()
+		.. *default_visitor::<@mut FindAstNodeSt>()
 		}
 	);
 	visit_crate(c, (s,vt));
@@ -149,7 +149,7 @@ impl AstNodeAccessors for AstNode {
 	}
 }
 
-struct State {
+struct FindAstNodeSt {
 	result: ~[AstNode],		// todo - full tree path, all the parent nodes.
 	location: uint,
 	stop: bool
@@ -168,21 +168,22 @@ fn span_contains(l:uint,s:span)->bool {
 	//visit_struct_field(a,(s,v))
    //}
 // struct Visitor<E>.visit_view_item: @fn(&view_item, (E, vt<E>)),
-fn f_view_item(a:&view_item, (s,v):(@mut State, vt<@mut State>)) {
+type FindAstNodeSV = (@mut FindAstNodeSt, vt<@mut FindAstNodeSt>);
+fn f_view_item(a:&view_item, (s,v):FindAstNodeSV) {
 	if span_contains(s.location, a.span) {
 		s.result.push(astnode_view_item(@ copy *a));
 	}
 	visit_view_item(a,(s,v))
 }// struct Visitor<E>.visit_foreign_item: @fn(@foreign_item, (E, vt<E>)),
 // struct Visitor<E>.visit_item: @fn(@item, (E, vt<E>)),
-fn f_item(a:@item, (s,v):(@mut State, vt<@mut State>)) {
+fn f_item(a:@item, (s,v):FindAstNodeSV) {
 	if span_contains(s.location, a.span) {
 		s.result.push(astnode_item(a));
 	}
 	visit_item(a,(s,v))
 }
 // struct Visitor<E>.visit_local: @fn(@local, (E, vt<E>)),
-fn f_local(a:@local, (s,v):(@mut State, vt<@mut State>)) {
+fn f_local(a:@local, (s,v):FindAstNodeSV) {
 	if span_contains(s.location, a.span) {
 		s.result.push(astnode_local(a));
 	}
@@ -190,7 +191,7 @@ fn f_local(a:@local, (s,v):(@mut State, vt<@mut State>)) {
 }
 
 // struct Visitor<E>.visit_block: @fn(&blk, (E, vt<E>)),
-fn f_block(a:&blk, (s,v):(@mut State, vt<@mut State>)) {
+fn f_block(a:&blk, (s,v):FindAstNodeSV) {
 	if span_contains(s.location, a.span) {
 		s.result.push(astnode_block(@ copy *a));
 	}
@@ -198,7 +199,7 @@ fn f_block(a:&blk, (s,v):(@mut State, vt<@mut State>)) {
 }
 
 // struct Visitor<E>.visit_stmt: @fn(@stmt, (E, vt<E>)),
-fn f_stmt(a:@stmt, (s,v):(@mut State, vt<@mut State>)) {
+fn f_stmt(a:@stmt, (s,v):FindAstNodeSV) {
 	if span_contains(s.location, a.span) {
 		s.result.push(astnode_stmt(a));
 	}
@@ -206,7 +207,7 @@ fn f_stmt(a:@stmt, (s,v):(@mut State, vt<@mut State>)) {
 }
 
 // struct Visitor<E>.visit_arm: @fn(&arm, (E, vt<E>)),
-fn f_arm(a:&arm, (s,v):(@mut State, vt<@mut State>)) {
+fn f_arm(a:&arm, (s,v):FindAstNodeSV) {
 // the whole arm doesn't have a span 
 //	if span_contains(s.location, a.span) {
 //		s.result.push(astnode_arm(@copy *a));
@@ -214,7 +215,7 @@ fn f_arm(a:&arm, (s,v):(@mut State, vt<@mut State>)) {
 	visit_arm(a,(s,v))
 }
 // struct Visitor<E>.visit_pat: @fn(@pat, (E, vt<E>)),
-fn f_pat(a:@pat, (s,v):(@mut State, vt<@mut State>)) {
+fn f_pat(a:@pat, (s,v):FindAstNodeSV) {
 	if span_contains(s.location, a.span) {
 		s.result.push(astnode_pat(a));
 	}
@@ -223,7 +224,7 @@ fn f_pat(a:@pat, (s,v):(@mut State, vt<@mut State>)) {
 
 
 // struct Visitor<E>.visit_decl: @fn(@decl, (E, vt<E>)),
-fn f_decl(a:@decl, (s,v):(@mut State, vt<@mut State>)) {
+fn f_decl(a:@decl, (s,v):FindAstNodeSV) {
 	if span_contains(s.location, a.span) {
 		s.result.push(astnode_decl(a));
 	}
@@ -232,7 +233,7 @@ fn f_decl(a:@decl, (s,v):(@mut State, vt<@mut State>)) {
 
 
 // struct Visitor<E>.visit_expr: @fn(@expr, (E, vt<E>)),
-fn f_expr(a:@expr, (s,v):(@mut State, vt<@mut State>)) {
+fn f_expr(a:@expr, (s,v):FindAstNodeSV) {
 	if span_contains(s.location, a.span) {
 		s.result.push(astnode_expr(a));
 	}
@@ -240,7 +241,7 @@ fn f_expr(a:@expr, (s,v):(@mut State, vt<@mut State>)) {
 }
 
 // struct Visitor<E>.visit_expr_post: @fn(@expr, (E, vt<E>)),
-fn f_expr_post(a:@expr, (s,v):(@mut State, vt<@mut State>)) {
+fn f_expr_post(a:@expr, (s,v):FindAstNodeSV) {
 	if span_contains(s.location, a.span) {
 		s.result.push(astnode_expr_post(a));
 	}
@@ -248,7 +249,7 @@ fn f_expr_post(a:@expr, (s,v):(@mut State, vt<@mut State>)) {
 }
 
 // struct Visitor<E>.visit_ty: @fn(&Ty, (E, vt<E>)),
-fn f_ty(a:&Ty, (s,v):(@mut State, vt<@mut State>)) {
+fn f_ty(a:&Ty, (s,v):FindAstNodeSV) {
 	if span_contains(s.location, a.span) {
 		s.result.push(astnode_ty(@copy *a));
 	}
@@ -257,7 +258,7 @@ fn f_ty(a:&Ty, (s,v):(@mut State, vt<@mut State>)) {
 
 // struct Visitor<E>.visit_generics: @fn(&Generics, (E, vt<E>)),
 // struct Visitor<E>.visit_fn: @fn(&fn_kind, &fn_decl, &blk, span, node_id, (E, vt<E>)),
-fn f_fn(fk:&fn_kind, fd:&fn_decl, body:&blk, sp:span, nid:node_id, (s,v):(@mut State, vt<@mut State>)) {
+fn f_fn(fk:&fn_kind, fd:&fn_decl, body:&blk, sp:span, nid:node_id, (s,v):FindAstNodeSV) {
 	//if span_contains(s.location, span) {
 		//s.result.push(astnode_fn2(a));
 	//}
@@ -273,7 +274,7 @@ fn f_fn(fk:&fn_kind, fd:&fn_decl, body:&blk, sp:span, nid:node_id, (s,v):(@mut S
  //	visit_struct_field(a,(s,v))
  //}
 // struct Visitor<E>.visit_struct_field: @fn(@struct_field, (E, vt<E>)),
-fn f_struct_field(a:@struct_field, (s,v):(@mut State, vt<@mut State>)) {
+fn f_struct_field(a:@struct_field, (s,v):FindAstNodeSV) {
 	if span_contains(s.location, a.span) {
 		s.result.push(astnode_struct_field(a));
 	}
