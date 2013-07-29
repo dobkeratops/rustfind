@@ -131,7 +131,7 @@ fn debug_test(dc:&DocContext,filename:~str) {
 	logi!("==== Test node search by location...===")
  
 	let mut source_pos=15 as uint;
-	while source_pos<280 {
+	while source_pos<350 {
 		// get the AST node under 'pos', and dump info
 		let pos= text_offset_to_line_pos(source_text,source_pos);
 		match (pos) {

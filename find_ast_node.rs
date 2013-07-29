@@ -107,6 +107,7 @@ pub fn dump_node_spans_table(ns:&NodeSpans) {
 
 // TODO - is there an official wrapper like this for all nodes in libsyntax::ast?
 // is there a way of acheiving this without one?
+// TODO: TRY USING ast_map::ast_node INSTEAD
 #[deriving(Clone)]
 pub enum AstNode 
 {

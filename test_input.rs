@@ -9,6 +9,8 @@ mod fruit {
 fn foo_bar_test_func(mut apples:fruit::SomeStruct,(oranges,lemon):(int,int))->int{
 	let some_var_name=2*oranges;
 	let a=SomeLongStructName{v:0};
+	println("a");println("b");	println("c");
+	veg::another_function(apples.red_value,oranges,lemon);
 	some_var_name-apples.red_value+lemon
 }
 
@@ -25,6 +27,12 @@ fn main() {
 	let j=Foo(2);
 	let k=Foo(2);
 	let l=Foo(2);
+}
+
+mod veg{
+	pub fn another_function(a:int,b:int,c:int)->int {
+		a+b+c
+	}
 }
 
 struct Foo(int);
