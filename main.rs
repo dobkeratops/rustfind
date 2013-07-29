@@ -33,8 +33,11 @@ mod ioutil;
 pub static ctxtkey: local_data::Key<@DocContext> = &local_data::Key;
 
 
+pub macro_rules! tlogi{ 
+	($($a:expr),*)=>(println((file!()+":"+line!().to_str()+": " $(+$a.to_str())*) ))
+}
 pub macro_rules! logi{ 
-	($($a:expr),*)=>(println((file!()+":"+line!().to_str()+": " $(+$a.to_str())*) .indent(2,160)))
+	($($a:expr),*)=>(println(""$(+$a.to_str())*) )
 }
 //macro_rules! dump{ ($a:expr)=>(logi!(fmt!("%s=%?",stringify!($a),$a).indent(2,160));)}
 macro_rules! dump{ ($($a:expr),*)=>
@@ -102,7 +105,7 @@ fn main() {
 }
 
 fn option_to_str<T:ToStr>(opt:&Option<T>)->~str {
-	match *opt { Some(ref s)=>~"Some("+s.to_str()+~")",None=>~"None" }
+	match *opt { Some(ref s)=>~"("+s.to_str()+~")",None=>~"(None)" }
 }
 
 trait MyToStr {  fn my_to_str(&self)->~str; }
@@ -134,17 +137,18 @@ fn debug_test(dc:&DocContext,filename:~str) {
 		match (pos) {
 			None=>logi!("position out of range"),
 			Some((line,ofs))=> {
-				logi!(~"==========Find AST node at: file_ofs=",source_pos," line=",line," ofs=",ofs);
+				logi!(~"\n==========Find AST node at: ",source_pos," line=",line," ofs=",ofs,"=============");
 				let node = find_ast_node::find(dc.crate,source_pos);
 				let node_info =  find_ast_node::get_node_info_str(dc,node);
 				dump!(node_info);
 				// TODO - get infered type from ctxt.node_types??
 				// node_id = get_node_id()
 				// node_type=ctxt.node_types./*node_type_table*/.get...
-				println((do node.map |x| { option_to_str(&x.get_id()) }).to_str());
-				match node.last().get_id() {
+				println("node ast loc:"+(do node.map |x| { option_to_str(&x.get_id()) }).to_str());
+				match node.last().ty_node_id() {
 					None=>{logi!("typeinfo:-unknown node id")},
 					Some(id)=> {
+						dump_node_source(source_text, node_spans, id);
 						match(find_ast_node::safe_node_id_to_type(dc.tycx, id)) {
 							None=> logi!("typeinfo:unknown node_type for ",id),
 							Some(t)=>{
@@ -156,15 +160,35 @@ fn debug_test(dc:&DocContext,filename:~str) {
 						let (def_id,opt_span)= def_span_from_node_id(dc,node_spans,id); 
 						match(opt_span) {
 							None=>{logi!("no def found");}
-							Some(sp)=>{logi!("src node=",id," def node=",def_id," span=",sp.my_to_str()," def=\""+std::str::from_bytes(text_span(source_text,sp))+~"\"");},
+							Some(sp)=>{
+								let BytePos(sp_lo)=sp.lo;
+								let def_line_col=text_offset_to_line_pos(source_text,sp_lo);
+								logi!("src node=",id," def node=",def_id,
+									" span=",sp.my_to_str());
+								dump_span(source_text, sp);
+							},
 						}
 					},
 				}
 			},
 		}		
-
 		source_pos+=11;
 	}
+}
+
+pub fn dump_node_source(text:&[u8], ns:&NodeSpans, id:ast::node_id) {
+	match(ns.find(&id)) {None=>logi!("()"),
+		Some(span)=>{
+			dump_span(text, span);
+		}
+	}
+}
+
+pub fn dump_span(text:&[u8], sp:&codemap::span) {
+	let BytePos(x)=sp.lo;
+	let line_col=text_offset_to_line_pos(text, x);
+	logi!(" line,ofs=",option_to_str(&line_col)," text=\"",
+		std::str::from_bytes(text_span(text,sp)),"\"");
 }
 
 macro_rules! if_valid{

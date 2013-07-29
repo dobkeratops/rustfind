@@ -129,6 +129,21 @@ pub enum AstNode
 	astnode_root	
 }
 
+impl AstNode {
+	// Accessor for the node_id to use for getting definition
+	// TODO - clarify by wrapping access to def_map here?
+	pub fn ty_node_id(&self)->Option<ast::node_id> {
+		match (*self) {
+			astnode_ty(ty)=>
+				match(ty.node) {
+					ty_path(_,_,node_id)=>Some(node_id),
+					_ => self.get_id()
+				},
+			_ => self.get_id()
+		}
+	}
+}
+
 pub trait AstNodeAccessors {
 	pub fn get_id(&self)->Option<ast::node_id>;
 }

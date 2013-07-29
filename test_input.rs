@@ -6,7 +6,7 @@ mod fruit {
 	}
 }
 
-fn foo(mut apples:fruit::SomeStruct,(oranges,lemon):(int,int))->int{
+fn foo_bar_test_func(mut apples:fruit::SomeStruct,(oranges,lemon):(int,int))->int{
 	let some_var_name=2*oranges;
 	let a=SomeLongStructName{v:0};
 	some_var_name-apples.red_value+lemon
@@ -14,7 +14,7 @@ fn foo(mut apples:fruit::SomeStruct,(oranges,lemon):(int,int))->int{
 
 fn main() {	
 	use fruit::*;	
-	io::println(foo(SomeStruct{red_value:1,green_value:2,blue_value:3},(4,5)).to_str());
+	io::println(foo_bar_test_func(SomeStruct{red_value:1,green_value:2,blue_value:3},(4,5)).to_str());
 	let a=Foo(0);
 	let c=Foo(0);
 	let d=Foo(1);
