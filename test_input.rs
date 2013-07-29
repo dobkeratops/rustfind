@@ -8,6 +8,7 @@ mod fruit {
 
 fn foo(mut apples:fruit::SomeStruct,(oranges,lemon):(int,int))->int{
 	let some_var_name=2*oranges;
+	let a=SomeLongStructName{v:0};
 	some_var_name-apples.red_value+lemon
 }
 
@@ -29,4 +30,7 @@ fn main() {
 struct Foo(int);
 struct Bar(int);
 struct Baz(int);
+struct SomeLongStructName {v:int}
+
+
 

@@ -128,7 +128,7 @@ fn debug_test(dc:&DocContext,filename:~str) {
 	logi!("==== Test node search by location...===")
  
 	let mut source_pos=15 as uint;
-	while source_pos<250 {
+	while source_pos<280 {
 		// get the AST node under 'pos', and dump info
 		let pos= text_offset_to_line_pos(source_text,source_pos);
 		match (pos) {
@@ -156,7 +156,7 @@ fn debug_test(dc:&DocContext,filename:~str) {
 						let (def_id,opt_span)= def_span_from_node_id(dc,node_spans,id); 
 						match(opt_span) {
 							None=>{logi!("no def found");}
-							Some(sp)=>{logi!("def node=",id," def=",def_id," span=",sp.my_to_str(),str::from_bytes(text_span(source_text,sp)));},
+							Some(sp)=>{logi!("src node=",id," def node=",def_id," span=",sp.my_to_str()," def=\""+std::str::from_bytes(text_span(source_text,sp))+~"\"");},
 						}
 					},
 				}

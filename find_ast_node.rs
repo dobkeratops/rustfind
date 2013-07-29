@@ -88,7 +88,7 @@ pub fn build_node_spans_table(c:@crate)->@mut NodeSpans {
 		visit_ty:fcns_ty,
 		//visit_method
 		//visit_trait_method
-//		visit_struct_def:f_struct_def,
+		visit_struct_def:fcns_struct_def,
 		visit_struct_field:fcns_struct_field,
 
 		.. *default_visitor::<@mut NodeSpans>()
@@ -297,6 +297,10 @@ fn fcns_pat(a:@pat, (s,v):NodeSpansSV) {
 fn fcns_decl(a:@decl, (s,v):NodeSpansSV) {
 		push_spanned(s,a);
 	visit_decl(a,(s,v))
+}
+fn fcns_struct_def(sd:@struct_def, ide:ident, g:&Generics, id:node_id, (s,b):NodeSpansSV) {
+	println(fmt!("visiting struct-def %i",id as int));
+	visit_struct_def(sd,ide,g,id,(s,b))
 }
 
 
