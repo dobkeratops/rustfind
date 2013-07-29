@@ -51,6 +51,14 @@ macro_rules! dump{ ($($a:expr),*)=>
 	)
 }
 
+pub macro_rules! if_some {
+	($b:ident in $a:expr then $c:expr)=>(
+		match $a {
+			Some($b)=>$c,
+			None=>{}
+		}
+	);
+}
 
 /// tags: crate,ast,parse resolve
 /// Parses, resolves the given crate
@@ -130,51 +138,42 @@ fn debug_test(dc:&DocContext,filename:~str) {
 
 	logi!("==== Test node search by location...===")
  
-	let mut source_pos=15 as uint;
-	while source_pos<350 {
+	// Step a test 'cursor' src_pos through the given source file..
+	let mut src_pos=15 as uint;
+	while src_pos<350 {
 		// get the AST node under 'pos', and dump info
-		let pos= text_offset_to_line_pos(source_text,source_pos);
-		match (pos) {
-			None=>logi!("position out of range"),
-			Some((line,ofs))=> {
-				logi!(~"\n==========Find AST node at: ",source_pos," line=",line," ofs=",ofs,"=============");
-				let node = find_ast_node::find(dc.crate,source_pos);
-				let node_info =  find_ast_node::get_node_info_str(dc,node);
-				dump!(node_info);
-				// TODO - get infered type from ctxt.node_types??
-				// node_id = get_node_id()
-				// node_type=ctxt.node_types./*node_type_table*/.get...
-				println("node ast loc:"+(do node.map |x| { option_to_str(&x.get_id()) }).to_str());
-				match node.last().ty_node_id() {
-					None=>{logi!("typeinfo:-unknown node id")},
-					Some(id)=> {
-						dump_node_source(source_text, node_spans, id);
-						match(find_ast_node::safe_node_id_to_type(dc.tycx, id)) {
-							None=> logi!("typeinfo:unknown node_type for ",id),
-							Some(t)=>{
-								println(fmt!("typeinfo: %?",
-									{let ntt= rustc::middle::ty::get(t); ntt}));
-								dump!(id,dc.tycx.def_map.find(&id));
-							},
-						};
-						let (def_id,opt_span)= def_span_from_node_id(dc,node_spans,id); 
-						match(opt_span) {
-							None=>{logi!("no def found");}
-							Some(sp)=>{
-								let BytePos(sp_lo)=sp.lo;
-								let def_line_col=text_offset_to_line_pos(source_text,sp_lo);
-								logi!("src node=",id," def node=",def_id,
-									" span=",sp.my_to_str());
-								dump_span(source_text, sp);
-							},
-						}
-					},
-				}
-			},
-		}		
-		source_pos+=11;
+		let pos= text_offset_to_line_pos(source_text,src_pos);
+		for pos.iter().advance |&(line,ofs)|{
+			logi!(~"\n=====Find AST node at: ",src_pos," line=",line," ofs=",ofs,"=========");
+			let node = find_ast_node::find(dc.crate,src_pos);
+			let node_info =  find_ast_node::get_node_info_str(dc,node);
+			dump!(node_info);
+			// TODO - get infered type from ctxt.node_types??
+			// node_id = get_node_id()
+			// node_type=ctxt.node_types./*node_type_table*/.get...
+			println("node ast loc:"+(do node.map |x| { option_to_str(&x.get_id()) }).to_str());
+			if_some!(id in node.last().ty_node_id() then {
+				dump_node_source(source_text, node_spans, id);
+				if_some!(t in find_ast_node::safe_node_id_to_type(dc.tycx, id)
+				 then {
+					println(fmt!("typeinfo: %?",
+						{let ntt= rustc::middle::ty::get(t); ntt}));
+					dump!(id,dc.tycx.def_map.find(&id));
+					});
+				let (def_id,opt_span)= def_span_from_node_id(dc,node_spans,id); 
+				if_some!(sp in opt_span then{
+					let BytePos(sp_lo)=sp.lo;
+					let def_line_col=text_offset_to_line_pos(source_text,sp_lo);
+					logi!("src node=",id," def node=",def_id,
+						" span=",sp.my_to_str());
+					dump_span(source_text, sp);
+				})
+			})
+		}
+		src_pos+=11;
 	}
 }
+
 
 pub fn dump_node_source(text:&[u8], ns:&NodeSpans, id:ast::node_id) {
 	match(ns.find(&id)) {None=>logi!("()"),
@@ -191,14 +190,6 @@ pub fn dump_span(text:&[u8], sp:&codemap::span) {
 		std::str::from_bytes(text_span(text,sp)),"\"");
 }
 
-macro_rules! if_valid{
-	($a:expr,$e:expr)=>
-	(match a {
-		Some(aa)=>e,
-		None=>_
-	}
-	)
-}
 fn def_span_from_node_id<'a,'b>(dc:&'a DocContext, node_spans:&'b NodeSpans, id:ast::node_id)->(int,Option<&'b codemap::span>) {
 	let crate_num=0;
 	match dc.tycx.def_map.find(&id) { // finds a def..
