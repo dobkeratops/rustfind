@@ -7,7 +7,6 @@ use syntax::visit::{Visitor, fn_kind};
 use syntax::codemap::*;
 use rustc::{front, metadata, driver, middle};
 use rustc::middle::mem_categorization::ast_node;
-use syntax::codemap::span;
 use syntax::*;
 use syntax::abi::AbiSet;
 use rustc::middle::*;
@@ -21,6 +20,7 @@ pub struct DocContext {
     sess: driver::session::Session
 }
 
+
 macro_rules! dump{ ($($a:expr),*)=>
 	(	{	let mut txt=file!()+":"+line!().to_str()+": " ; 
 			$( txt=txt.append(
@@ -33,6 +33,10 @@ macro_rules! dump{ ($($a:expr),*)=>
 
 /// main
 pub fn find(c:@crate,_location:uint)->~[AstNode] {
+	// TODO: Now that we have a sepereate 'node-spans table'
+	// would it be more efficient to use that?
+	// if we encoded hrc information in the node-spans-table,
+	// we wouldn't need all this iterator malarchy again.
 	let mut s= @mut FindAstNodeSt{
 		result:~[astnode_root], location:_location, stop:false
 			
@@ -62,6 +66,8 @@ pub fn find(c:@crate,_location:uint)->~[AstNode] {
 	visit_crate(c, (s,vt));
 	s.result.clone()
 }
+
+pub type NodeSpans= HashMap<ast::node_id,codemap::span>;
 
 pub fn build_node_spans_table(c:@crate)->@mut NodeSpans {
 	// todo-lambdas, big fcuntion but remove the extraneous symbols
@@ -243,7 +249,6 @@ pub struct FindAstNodeSt {
 	stop: bool,
 //	node_spans: HashMap<ast::node_id,codemap::span>
 }
-type NodeSpans= HashMap<ast::node_id,codemap::span>;
 
 pub fn push_span(spt:&mut NodeSpans,n:ast::node_id, s:codemap::span) {
 	spt.insert(n,s);
@@ -545,4 +550,36 @@ pub fn safe_node_id_to_type(cx: ty::ctxt, id: ast::node_id) -> Option<ty::t> {
        None => None    
 	}
 }
+
+pub fn get_def_id(curr_crate:crate_num,src_def:def)->Option<def_id> {
+	let mk=|x|{Some(def_id{crate:curr_crate, node:x})}; // todo,mmaybe this is best 'None'..
+	// todo-'definition' can be at multiple locations. we should return [def_id] really..
+	match (src_def) {
+		def_fn(d,_)=>Some(d),
+		def_static_method(d,_,_)=>Some(d),
+		def_self(id,_)=>mk(id),
+		def_self_ty(id)=>mk(id),
+		def_mod(d)=>Some(d),
+		def_foreign_mod(d)=>Some(d),
+		def_static(d,_)=>Some(d),
+		def_arg(id,_)=>mk(id),
+		def_local(id,_)=>mk(id),
+		def_variant(d1,d2)=>Some(d2),
+		def_ty(d)=>Some(d),
+		def_trait(d)=>Some(d),
+		def_prim_ty(pt)=>None,
+		def_ty_param(d,_)=>Some(d),
+		def_binding(d,_)=>mk(d),
+		def_use(d)=>Some(d),
+		def_upvar(_,d,_,_)=>get_def_id(curr_crate,*d),
+		def_struct(d)=>Some(d),
+		def_typaram_binder(id)=>mk(id),
+		def_region(id)=>mk(id),
+		def_label(id)=>mk(id),
+		def_method(d,_)=>Some(d)
+	}
+}
+
+
+
 

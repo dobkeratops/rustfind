@@ -14,10 +14,12 @@ use syntax::visit::*;
 use syntax::visit::{Visitor, fn_kind};
 use find_ast_node::*;
 use text_formatting::*;
+use syntax::diagnostic;
 
 use syntax::abi::AbiSet;
 use syntax::ast;
 use syntax::codemap::span;
+
 
 use std::os;
 use std::local_data;
@@ -134,15 +136,16 @@ fn debug_test(dc:&DocContext,filename:~str) {
 				// node_type=ctxt.node_types./*node_type_table*/.get...
 				println((do node.map |x| { option_to_str(&x.get_id()) }).to_str());
 				match node.last().get_id() {
-					Some(nid)=> {
-						match(find_ast_node::safe_node_id_to_type(dc.tycx, nid)) {
+					Some(id)=> {
+						match(find_ast_node::safe_node_id_to_type(dc.tycx, id)) {
 							Some(t)=>{
 								println(fmt!("typeinfo: %?",
 									{let ntt= rustc::middle::ty::get(t); ntt}));
-								dump!(nid,dc.tycx.def_map.find(&nid));
+								dump!(id,dc.tycx.def_map.find(&id));
 							},
-							None=> logi!("typeinfo:unknown node_type for ",nid)
+							None=> logi!("typeinfo:unknown node_type for ",id)
 						};
+						dump!(id,def_span_from_node_id(dc,node_spans,id));
 					},
 					None=>{logi!("typeinfo:-unknown node id")}
 				}
@@ -154,6 +157,27 @@ fn debug_test(dc:&DocContext,filename:~str) {
 	}
 }
 
+macro_rules! if_valid{
+	($a:expr,$e:expr)=>
+	(match a {
+		Some(aa)=>e,
+		None=>_
+	}
+	)
+}
+fn def_span_from_node_id<'a,'b>(dc:&'a DocContext, node_spans:&'b NodeSpans, id:ast::node_id)->(int,Option<&'b span>) {
+	let crate_num=0;
+	match dc.tycx.def_map.find(&id) { // finds a def..
+		Some(a)=>{
+			match get_def_id(crate_num,*a){
+				Some(b)=>(b.node,node_spans.find(&b.node)),
+				None=>(id as int,None)
+			}
+		},
+		None=>(id as int,None)
+	}
+	
+}
 
 // see: tycx.node_types:node_type_table:HashMap<id,t>
 // 't'=opaque ptr, ty::get(:t)->t_box_ to resolve it
