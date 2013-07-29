@@ -15,10 +15,11 @@ use syntax::visit::{Visitor, fn_kind};
 use find_ast_node::*;
 use text_formatting::*;
 use syntax::diagnostic;
+use syntax::codemap::BytePos;
 
 use syntax::abi::AbiSet;
 use syntax::ast;
-use syntax::codemap::span;
+use syntax::codemap;
 
 
 use std::os;
@@ -104,6 +105,11 @@ fn option_to_str<T:ToStr>(opt:&Option<T>)->~str {
 	match *opt { Some(ref s)=>~"Some("+s.to_str()+~")",None=>~"None" }
 }
 
+trait MyToStr {  fn my_to_str(&self)->~str; }
+impl MyToStr for codemap::span {
+	fn my_to_str(&self)->~str { ~"("+self.lo.to_str()+~".."+self.hi.to_str() }
+}
+
 fn debug_test(dc:&DocContext,filename:~str) {
 
 	// TODO: parse commandline source locations,convert to codemap locations
@@ -126,8 +132,9 @@ fn debug_test(dc:&DocContext,filename:~str) {
 		// get the AST node under 'pos', and dump info
 		let pos= text_offset_to_line_pos(source_text,source_pos);
 		match (pos) {
+			None=>logi!("position out of range"),
 			Some((line,ofs))=> {
-				logi!(~"Find AST node at: file_ofs=",source_pos," line=",line," ofs=",ofs);
+				logi!(~"==========Find AST node at: file_ofs=",source_pos," line=",line," ofs=",ofs);
 				let node = find_ast_node::find(dc.crate,source_pos);
 				let node_info =  find_ast_node::get_node_info_str(dc,node);
 				dump!(node_info);
@@ -136,21 +143,24 @@ fn debug_test(dc:&DocContext,filename:~str) {
 				// node_type=ctxt.node_types./*node_type_table*/.get...
 				println((do node.map |x| { option_to_str(&x.get_id()) }).to_str());
 				match node.last().get_id() {
+					None=>{logi!("typeinfo:-unknown node id")},
 					Some(id)=> {
 						match(find_ast_node::safe_node_id_to_type(dc.tycx, id)) {
+							None=> logi!("typeinfo:unknown node_type for ",id),
 							Some(t)=>{
 								println(fmt!("typeinfo: %?",
 									{let ntt= rustc::middle::ty::get(t); ntt}));
 								dump!(id,dc.tycx.def_map.find(&id));
 							},
-							None=> logi!("typeinfo:unknown node_type for ",id)
 						};
-						dump!(id,def_span_from_node_id(dc,node_spans,id));
+						let (def_id,opt_span)= def_span_from_node_id(dc,node_spans,id); 
+						match(opt_span) {
+							None=>{logi!("no def found");}
+							Some(sp)=>{logi!("def node=",id," def=",def_id," span=",sp.my_to_str(),str::from_bytes(text_span(source_text,sp)));},
+						}
 					},
-					None=>{logi!("typeinfo:-unknown node id")}
 				}
 			},
-			None=>logi!("position out of range")
 		}		
 
 		source_pos+=11;
@@ -165,7 +175,7 @@ macro_rules! if_valid{
 	}
 	)
 }
-fn def_span_from_node_id<'a,'b>(dc:&'a DocContext, node_spans:&'b NodeSpans, id:ast::node_id)->(int,Option<&'b span>) {
+fn def_span_from_node_id<'a,'b>(dc:&'a DocContext, node_spans:&'b NodeSpans, id:ast::node_id)->(int,Option<&'b codemap::span>) {
 	let crate_num=0;
 	match dc.tycx.def_map.find(&id) { // finds a def..
 		Some(a)=>{
@@ -232,6 +242,14 @@ fn text_offset_to_line_pos(text:&[u8], src_ofs:uint)->Option<(uint,uint)> {
 		pos+=1;
 	}
 	return None;
-
 }
+
+fn text_span<'a,'b>(text:&'a [u8],s:&'b codemap::span)->&'a[u8] {
+	let codemap::BytePos(lo)=s.lo;
+	let codemap::BytePos(hi)=s.hi;
+	text.slice(lo,hi)
+}
+
+
+
 
