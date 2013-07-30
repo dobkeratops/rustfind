@@ -15,6 +15,8 @@ use rustc::middle::trans::context::*;
 use std::hashmap::HashMap;
 
 
+// TODO Check with rust people what here can be replaced with existing code in the compilers
+// once this tool works i'll have less need to rewrite things
 
 // TODO: code here only depends on ty::ctxt, sess:Session is held in there aswell.
 pub struct DocContext {
@@ -70,7 +72,11 @@ pub fn find(c:@crate,_location:uint)->~[AstNode] {
 	s.result.clone()
 }
 
-pub type NodeSpans= HashMap<ast::node_id,codemap::span>;
+pub struct NodeInfo {
+	kind:~str,
+	span:codemap::span
+}
+pub type NodeSpans= HashMap<ast::node_id,NodeInfo>;
 
 pub fn build_node_spans_table(c:@crate)->@mut NodeSpans {
 	// todo-lambdas, big fcuntion but remove the extraneous symbols
@@ -106,7 +112,7 @@ pub fn node_spans_table_to_json_sub(ns:&NodeSpans)->~str {
 	// map (|x| fmt...).flatten_to_str() or something like that..
 	let mut r=~"";
 	for ns.iter().advance |(k,v)| {
-		r.push_str(fmt!("\t{node_id:%i,\tspan:{lo:%u,\thi:%u}},\n",*k,*v.lo,*v.hi));
+		r.push_str(fmt!("\t{node_id:%i,\tkind:\"%s\",\tspan:{lo:%u,\thi:%u}},\n",*k,v.kind,*v.span.lo,*v.span.hi));
 	}
 	r
 }
@@ -116,10 +122,11 @@ pub fn node_spans_table_to_json(ns:&NodeSpans)->~str {
 }
 
 pub fn node_def_node_table_to_json(s:&HashMap<ast::node_id,ast::def_id>)->~str {
-	let mut r=~"";
+	let mut r=~"[\n";
 	for 	s.iter().advance|(&key,&value)| {
-		r.push_str(fmt!("\t{node_id:%?,\tdef_id:{crate:%?,node:%?}}\n", key, value.crate,value.node));
+		r.push_str(fmt!("\t{node_id:%?,\tdef_id:{crate:%?,node:%?}},\n", key, value.crate,value.node));
 	}
+	r.push_str("]\n");
 	r
 }
 
@@ -139,7 +146,6 @@ pub enum AstNode
 	astnode_pat(@pat),
 	astnode_decl(@decl),
 	astnode_expr(@expr),
-	astnode_expr_post(@expr),
 	astnode_ty(@Ty),
 	astnode_ty_method(@ty_method),
 	astnode_trait_method(@trait_method),
@@ -148,17 +154,131 @@ pub enum AstNode
 	astnode_root	
 }
 
+trait KindToStr {
+	fn kind_to_str(&self)->&'static str;
+}
+impl KindToStr for ast::expr {
+	fn kind_to_str(&self)->&'static str {
+		match self.node {
+		expr_vstore(_,_)=>"vstore",
+		expr_vec(_,_)=>"vec",
+		expr_call(_,_,_)=>"call",
+		expr_method_call(_,_,_,_,_,_)=>"method_call",
+		expr_tup(_)=>"tup",
+	    expr_binary(_, binop, _,_)=>match binop {
+			add=>"add",
+			subtract=>"sub",
+			mul=>"mul",
+			div=>"div",
+			rem=>"rem",
+			and=>"and",
+			or=>"or",
+			bitxor=>"bitxor",
+			bitand=>"bitand",
+			bitor=>"bitor",
+			shl=>"shl",
+			shr=>"shr",
+			eq=>"eq",
+			lt=>"lt",
+			le=>"le",
+			ne=>"ne",
+			ge=>"ge",
+			gt=>"gt",
+
+		},
+	    expr_unary(_, unop, _)=>match unop {
+			box(mt)=>"box",
+			uniq=>"uniq",
+			deref=>"deref",
+			not=>"not",
+			neg=>"neg"
+		},
+	    expr_lit(_)=>"lit",
+	    expr_cast(_, _)=>"cast",
+    	expr_if(_,_,_)=>"if",
+
+	    expr_while(_, _)=>"while",
+	    expr_loop(_, _)=>"loop",
+	    expr_match(_, _)=>"match",
+	    expr_fn_block(_, _)=>"fn blk",
+	    expr_loop_body(_)=>"loop_body",
+	    expr_do_body(_)=>"do_body",
+	    expr_block(_)=>"blk",
+	    expr_copy(_)=>"copy,",
+	    expr_assign(_,_)=>"assign",
+	    expr_assign_op(_, binop, _, _)=>match binop {
+			add=>"assign_add",
+			subtract=>"assign_sub",
+			mul=>"assign_mul",
+			div=>"assign_div",
+			rem=>"assign_rem",
+			and=>"assign_and",
+			or=>"assign_or",
+			bitxor=>"assign_bitxor",
+			bitand=>"assign_bitand",
+			bitor=>"assign_bitor",
+			shl=>"assign_shl",
+			shr=>"assign_shr",
+			eq=>"assign_eq",
+			lt=>"assign_lt",
+			le=>"assign_le",
+			ne=>"assign_ne",
+			ge=>"assign_ge",
+			gt=>"assign_gt"
+		},
+	    expr_field(_, _, _)=>"field",
+	    expr_index(_,_,_)=>"index",
+	    expr_path(_)=>"path",
+	    expr_self=>"self",
+	    expr_addr_of(_, _)=>"addr_of",
+	    expr_break(_)=>"break",
+		expr_again(_)=>"again",
+	    expr_ret(ret)=>"ret",
+	    expr_log(_,_)=>"log",
+	    expr_inline_asm(_)=>"inline_asm",
+	    expr_mac(_)=>"mac",
+	    expr_struct(_,_,_)=>"struct",
+	    expr_repeat(_,_,_)=>"repeat",
+	    expr_paren(_)=>"paren",
+		}
+	}
+}
+
 impl AstNode {
 	// Accessor for the node_id to use for getting definition
 	// TODO - clarify by wrapping access to def_map here?
 	pub fn ty_node_id(&self)->Option<ast::node_id> {
-		match (*self) {
+		match *self {
 			astnode_ty(ty)=>
 				match(ty.node) {
 					ty_path(_,_,node_id)=>Some(node_id),
 					_ => self.get_id()
 				},
 			_ => self.get_id()
+		}
+	}
+}
+impl KindToStr for AstNode {
+	pub fn kind_to_str(&self)->&'static str {
+		//TODO subsets of view_item?
+		match *self {
+			astnode_mod(_)=>"mod",
+			astnode_view_item(_)=>"view_item",
+			astnode_item(_)=>"item",
+			astnode_local(_)=>"local",
+			astnode_block(_)=>"block",
+			astnode_stmt(_)=>"stmt",
+			astnode_arm(_)=>"arm",
+			astnode_pat(_)=>"pat",
+			astnode_decl(_)=>"decl",
+			astnode_expr(_)=>"decl",
+			astnode_ty(_)=>"ty",
+			astnode_ty_method(_)=>"ty_method",
+			astnode_trait_method(_)=>"trait_method",
+			astnode_struct_def(_)=>"struct_def",
+			astnode_struct_field(_)=>"struct_field",
+			astnode_root=>"root",
+
 		}
 	}
 }
@@ -265,7 +385,7 @@ impl AstNodeAccessors for AstNode {
 			astnode_pat(ref x)=>Some(x.id),
 			astnode_decl(ref x)=>x.get_id(),
 			astnode_expr(ref x)=>Some(x.id),
-			astnode_expr_post(ref x)=>Some(x.id),
+//			astnode_expr_post(ref x)=>Some(x.id),
 			astnode_ty(ref x)=>Some(x.id),
 			astnode_ty_method(ref x)=>Some(x.id),
 			astnode_trait_method(ref x)=>x.get_id(),
@@ -284,13 +404,13 @@ pub struct FindAstNodeSt {
 //	node_spans: HashMap<ast::node_id,codemap::span>
 }
 
-pub fn push_span(spt:&mut NodeSpans,n:ast::node_id, s:codemap::span) {
-	spt.insert(n,s);
+pub fn push_span(spt:&mut NodeSpans,n:ast::node_id,k:&str, s:codemap::span) {
+	spt.insert(n,NodeInfo{kind:k.to_str(),span:s});
 }
 
-pub fn push_spanned<T:AstNodeAccessors>(spt:&mut NodeSpans,s:&codemap::spanned<T>) {
+pub fn push_spanned<T:AstNodeAccessors>(spt:&mut NodeSpans,k:&str,s:&codemap::spanned<T>) {
 	match s.node.get_id() {
-		Some(id)=>{spt.insert(id,s.span);}
+		Some(id)=>{spt.insert(id,NodeInfo{kind:k.to_str(),span:s.span});}
 		None=>{}
 	}
 }
@@ -305,42 +425,40 @@ fn fcns_view_item(a:&view_item, (s,v):NodeSpansSV) {
 	visit_view_item(a,(s,v))
 }
 fn fcns_item(a:@item, (s,v):NodeSpansSV) {
-	push_span(s,a.id,a.span);
+	push_span(s,a.id,"item",a.span);
 	visit_item(a,(s,v))
 }
 fn fcns_local(a:@local, (s,v):NodeSpansSV) {
-	push_spanned(s,a);
+	push_spanned(s,"local",a);
 	visit_local(a,(s,v))
 }
 fn fcns_block(a:&blk, (s,v):NodeSpansSV) {
-	push_spanned(s,a);
+	push_spanned(s,"block",a);
 	visit_block(a,(s,v))
 }
 fn fcns_stmt(a:@stmt, (s,v):NodeSpansSV) {
-	push_spanned(s,a);
+	push_spanned(s,"stmt",a);
 	visit_stmt(a,(s,v))
 }
 fn fcns_arm(a:&arm, (s,v):NodeSpansSV) {
-	push_spanned(s,&a.body);
+	push_spanned(s,"arm",&a.body);
 	visit_arm(a,(s,v))
 }
 fn fcns_pat(a:@pat, (s,v):NodeSpansSV) {
-	push_span(s,a.id,a.span);
+	push_span(s,a.id,"pat",a.span);
 	visit_pat(a,(s,v))
 }
 fn fcns_decl(a:@decl, (s,v):NodeSpansSV) {
-		push_spanned(s,a);
+	push_spanned(s,"decl",a);
 	visit_decl(a,(s,v))
 }
 fn fcns_struct_def(sd:@struct_def, ide:ident, g:&Generics, id:node_id, (s,b):NodeSpansSV) {
-	println(fmt!("visiting struct-def %i",id as int));
 	visit_struct_def(sd,ide,g,id,(s,b))
 }
 
-
 // struct Visitor<E>.visit_expr: @fn(@expr, (E, vt<E>)),
 fn fcns_expr(a:@expr, (s,v):NodeSpansSV) {
-	push_span(s,a.id,a.span);
+	push_span(s,a.id,a.kind_to_str(),a.span);
 	visit_expr(a,(s,v))
 }
 
@@ -351,14 +469,14 @@ fn fcns_expr_post(a:@expr, (s,v):NodeSpansSV) {
 
 // struct Visitor<E>.visit_ty: @fn(&Ty, (E, vt<E>)),
 fn fcns_ty(a:&Ty, (s,v):NodeSpansSV) {
-	push_span(s,a.id,a.span);
+	push_span(s,a.id,"ty",a.span);
 	visit_ty(a,(s,v))
 }
 fn fcns_fn(fk:&fn_kind, fd:&fn_decl, body:&blk, sp:span, nid:node_id, (s,v):NodeSpansSV) {
 	visit_fn(fk,fd,body,sp,nid,(s,v))
 }
 fn fcns_struct_field(a:@struct_field, (s,v):NodeSpansSV) {
-	push_spanned(s,a);
+	push_spanned(s,"struct_field",a);
 	visit_struct_field(a,(s,v))
 }
 
@@ -445,9 +563,10 @@ fn find_expr(a:@expr, (s,v):FindAstNodeSV) {
 
 // struct Visitor<E>.visit_expr_post: @fn(@expr, (E, vt<E>)),
 fn find_expr_post(a:@expr, (s,v):FindAstNodeSV) {
-	if span_contains(s.location, a.span) {
-		s.result.push(astnode_expr_post(a));
-	}
+	// aparently this is just a hook, not a node type.
+	//if span_contains(s.location, a.span) {
+		//s.result.push(astnode_expr_post(a));
+	//}
 	visit_expr(a,(s,v))
 }
 

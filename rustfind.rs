@@ -17,6 +17,7 @@ use text_formatting::*;
 use syntax::diagnostic;
 use syntax::codemap::BytePos;
 
+
 use syntax::abi::AbiSet;
 use syntax::ast;
 use syntax::codemap;
@@ -110,19 +111,27 @@ fn main() {
     ];
 
     let matches = getopts(args.tail(), opts).get();
-    let libs = opt_strs(&matches, "L").map(|s| Path(*s));
-	if (opt_present(&matches,"h")) {
+    let libs1 = opt_strs(&matches, "L").map(|s| Path(*s));
+	let libs=if libs1.len()>0 {libs1} else {
+		match (os::getenv(&"RUST_LIBS")) {
+			Some(x)=>~[Path(x)],
+			None=>~[]
+		}		
+	};
+
+	if opt_present(&matches,"h") {
 		println("rustfind: arguments:-");
 		println(" filename.rs -L<library path>  : dump JSON map of the ast nodes & defintions");
 		println(" filename.rs:line:col : TODO return definition reference of symbol at given position");
-		println(" -d filename.rs -L<lib path> : debug for this tool")
+		println(" -d filename.rs -L<lib path> : debug for this tool");
 
-	}
+	};
+	dump!(libs);
 	if matches.free.len()>0 {
 		let filename=&matches.free[0];
 		let dc = @get_ast_and_resolve(&Path(*filename), libs);
 		local_data::set(ctxtkey, dc);
-		else
+	
 		if (opt_present(&matches,"d")) {
 			debug_test(dc,*filename);
 		} else if (opt_present(&matches,"j")){
@@ -131,6 +140,7 @@ fn main() {
 			dump_json(dc,*filename);
 		}
 	}
+
 }
 
 fn option_to_str<T:ToStr>(opt:&Option<T>)->~str {
@@ -157,6 +167,8 @@ pub fn some_else<T,X,Y>(o:&Option<T>,f:&fn(t:&T)->Y,default_value:Y)->Y {
 }
 
 fn dump_json(dc:&DocContext,filename:&str) {
+	// TODO: full/partial options - we currently wwrite out all the nodes we find.
+	// need option to only write out nodes that map to definitons. 
 	println("{");
 	println("\tnode_spans:");
 	let node_spans=build_node_spans_table(dc.crate);
