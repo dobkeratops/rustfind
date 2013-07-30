@@ -16,7 +16,7 @@ use find_ast_node::*;
 use text_formatting::*;
 use syntax::diagnostic;
 use syntax::codemap::BytePos;
-
+use std::io;
 
 use syntax::abi::AbiSet;
 use syntax::ast;
@@ -30,6 +30,7 @@ use extra::json::ToJson;
 mod text_formatting;
 mod find_ast_node;
 mod ioutil;
+
 
 pub static ctxtkey: local_data::Key<@DocContext> = &local_data::Key;
 
@@ -107,7 +108,7 @@ fn main() {
     let args = os::args();
 
     let opts = ~[
-        optmulti("L"),optflag("d"),optflag("j"),optflag("h")
+        optmulti("L"),optflag("d"),optflag("j"),optflag("h"),optflag("i")
     ];
 
     let matches = getopts(args.tail(), opts).get();
@@ -120,13 +121,14 @@ fn main() {
 	};
 
 	if opt_present(&matches,"h") {
-		println("rustfind: arguments:-");
-		println(" filename.rs -L<library path>  : dump JSON map of the ast nodes & defintions");
+		println("rustfind: useage:-");
+		println(" filename.rs [-L<library path>]  : dump JSON map of the ast nodes & defintions");
 		println(" filename.rs:line:col : TODO return definition reference of symbol at given position");
-		println(" -d filename.rs -L<lib path> : debug for this tool");
+		println(" -i filename.rs [-L<lib path>] : interactive mode");
+		println(" -d filename.rs [-L<lib path>] : debug for this tool");
+		println(" set RUST_LIBS for a default library search path");
 
 	};
-	dump!(libs);
 	if matches.free.len()>0 {
 		let filename=&matches.free[0];
 		let dc = @get_ast_and_resolve(&Path(*filename), libs);
@@ -138,6 +140,9 @@ fn main() {
 			dump_json(dc,*filename);
 		} else {	// default, dump json map of nodes,defs,spans
 			dump_json(dc,*filename);
+		}
+		if opt_present(&matches,"i") {
+			interactive(dc,*filename)
 		}
 	}
 
@@ -356,6 +361,39 @@ pub fn def_node_id_from_node_id(dc:&DocContext, id:ast::node_id)->ast::node_id {
 		None=>(id as int)	// no definition? say its its own definition
 	}
 }
+
+pub fn interactive(dc:&DocContext, filename:&str) {
+	let node_spans=build_node_spans_table(dc.crate);
+	println(node_spans_table_to_json(node_spans));
+
+	logi!("==== Node Definition mappings...===")
+	let node_def_node = build_node_def_node_table(dc);
+	println(node_def_node_table_to_json(node_def_node));
+	let tbls=(node_spans,node_def_node);
+
+	println(fmt!("loading %s",filename));
+	let source_text = ioutil::fileLoad(filename);
+
+	loop {
+		print("rustfind>");
+		let input_line=io::stdin().read_line();
+		let toks:~[&str]=input_line.split_iter(' ').collect();
+		if toks.len()>0 {
+			match toks[0] {
+				"h"=> println("interactive mode - enter symbol name o\n q-quit\n"),
+				"q"=> break,
+				_ =>{
+					println(def_of_symbol_to_str(dc,tbls,source_text, toks[0]));
+				}
+			}
+		}
+	}
+}
+
+pub fn def_of_symbol_to_str(dc,&DocContext, (ns,nd))->~str {
+	~"TODO"
+}
+
 
 
 
