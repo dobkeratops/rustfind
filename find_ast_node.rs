@@ -17,6 +17,8 @@ use std::hashmap::HashMap;
 
 // TODO Check with rust people what here can be replaced with existing code in the compilers
 // once this tool works i'll have less need to rewrite things
+// if ctxt_ had accessors for everything indexed by node_id we could remove most of this.
+// (AstNode here could be replaced with a refernce to ctxt_ keeping the interface..)
 
 // TODO: code here only depends on ty::ctxt, sess:Session is held in there aswell.
 pub struct DocContext {

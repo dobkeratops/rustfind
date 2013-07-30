@@ -100,7 +100,6 @@ fn get_ast_and_resolve(cpath: &Path, libs: ~[Path]) -> DocContext {
     DocContext { crate: c, tycx: t, sess: sess }
 }
 
-
 fn main() {
     use extra::getopts::*;
     use std::hashmap::HashMap;
@@ -142,7 +141,7 @@ fn main() {
 			dump_json(dc,*filename);
 		}
 		if opt_present(&matches,"i") {
-			interactive(dc,*filename)
+			rustfind_interactive(dc,*filename)
 		}
 	}
 
@@ -217,9 +216,6 @@ fn debug_test(dc:&DocContext,filename:&str) {
 			let node = find_ast_node::find(dc.crate,src_pos);
 			let node_info =  find_ast_node::get_node_info_str(dc,node);
 			dump!(node_info);
-			// TODO - get infered type from ctxt.node_types??
-			// node_id = get_node_id()
-			// node_type=ctxt.node_types./*node_type_table*/.get...
 			println("node ast loc:"+(do node.map |x| { option_to_str(&x.get_id()) }).to_str());
 			if_some!(id in node.last().ty_node_id() then {
 				dump_node_source(source_text, node_spans, id);
@@ -362,14 +358,14 @@ pub fn def_node_id_from_node_id(dc:&DocContext, id:ast::node_id)->ast::node_id {
 	}
 }
 
-pub fn interactive(dc:&DocContext, filename:&str) {
+pub fn rustfind_interactive(dc:&DocContext, filename:&str) {
+	// TODO - check if RUSTI can already do this.. it would be better there IMO
 	let node_spans=build_node_spans_table(dc.crate);
 	println(node_spans_table_to_json(node_spans));
 
-	logi!("==== Node Definition mappings...===")
+	logi!("==== Node Definition mappings...===");
 	let node_def_node = build_node_def_node_table(dc);
 	println(node_def_node_table_to_json(node_def_node));
-	let tbls=(node_spans,node_def_node);
 
 	println(fmt!("loading %s",filename));
 	let source_text = ioutil::fileLoad(filename);
@@ -383,15 +379,15 @@ pub fn interactive(dc:&DocContext, filename:&str) {
 				"h"=> println("interactive mode - enter symbol name o\n q-quit\n"),
 				"q"=> break,
 				_ =>{
-					println(def_of_symbol_to_str(dc,tbls,source_text, toks[0]));
+					println(def_of_symbol_to_str(dc,node_spans,node_def_node,toks[0]));
 				}
 			}
 		}
 	}
 }
 
-pub fn def_of_symbol_to_str(dc,&DocContext, (ns,nd))->~str {
-	~"TODO"
+pub fn def_of_symbol_to_str(dc:&DocContext, ns:&NodeSpans,ds:&HashMap<ast::node_id, ast::def_id>,s:&str)->~str {
+	~"TODO"	
 }
 
 
