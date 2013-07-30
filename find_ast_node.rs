@@ -10,7 +10,10 @@ use rustc::middle::mem_categorization::ast_node;
 use syntax::*;
 use syntax::abi::AbiSet;
 use rustc::middle::*;
+use rustc::metadata::*;
+use rustc::middle::trans::context::*;
 use std::hashmap::HashMap;
+
 
 
 // TODO: code here only depends on ty::ctxt, sess:Session is held in there aswell.
@@ -98,11 +101,26 @@ pub fn build_node_spans_table(c:@crate)->@mut NodeSpans {
 	node_spans
 }
 
-pub fn dump_node_spans_table(ns:&NodeSpans) {
+pub fn node_spans_table_to_json_sub(ns:&NodeSpans)->~str {
+	// TODO - is there a cleaner functional way,
+	// map (|x| fmt...).flatten_to_str() or something like that..
+	let mut r=~"";
 	for ns.iter().advance |(k,v)| {
-		println(fmt!("nodeid=%i span=%?",*k,v));
-		
+		r.push_str(fmt!("\t{node_id:%i,\tspan:{lo:%u,\thi:%u}},\n",*k,*v.lo,*v.hi));
 	}
+	r
+}
+pub fn node_spans_table_to_json(ns:&NodeSpans)->~str {
+	// todo-default param opt if they get it..
+	~"[\n"+node_spans_table_to_json_sub(ns)+~"]\n"
+}
+
+pub fn node_def_node_table_to_json(s:&HashMap<ast::node_id,ast::def_id>)->~str {
+	let mut r=~"";
+	for 	s.iter().advance|(&key,&value)| {
+		r.push_str(fmt!("\t{node_id:%?,\tdef_id:{crate:%?,node:%?}}\n", key, value.crate,value.node));
+	}
+	r
 }
 
 // TODO - is there an official wrapper like this for all nodes in libsyntax::ast?
@@ -443,12 +461,16 @@ fn find_ty(a:&Ty, (s,v):FindAstNodeSV) {
 
 // struct Visitor<E>.visit_generics: @fn(&Generics, (E, vt<E>)),
 // struct Visitor<E>.visit_fn: @fn(&fn_kind, &fn_decl, &blk, span, node_id, (E, vt<E>)),
+
+
 fn find_fn(fk:&fn_kind, fd:&fn_decl, body:&blk, sp:span, nid:node_id, (s,v):FindAstNodeSV) {
 	//if span_contains(s.location, span) {
 		//s.result.push(astnode_fn2(a));
 	//}
 	visit_fn(fk,fd,body,sp,nid,(s,v))
 }
+
+
 // struct Visitor<E>.visit_ty_method: @fn(&ty_method, (E, vt<E>)),
 // struct Visitor<E>.visit_trait_method: @fn(&trait_method, (E, vt<E>)),
 // struct Visitor<E>.visit_struct_def: @fn(@struct_def, ident, &Generics, node_id, (E, vt<E>)),
@@ -599,6 +621,10 @@ pub fn get_def_id(curr_crate:crate_num,src_def:def)->Option<def_id> {
 		def_method(d,_)=>Some(d)
 	}
 }
+
+
+
+
 
 
 

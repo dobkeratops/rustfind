@@ -11,6 +11,12 @@ not sure what the best way is..
 roadmap
 [1] a commandline tool rustfind sourcefile.rs:LINE:COLUMN: --> definition.rs:LINE:col
 (to add add hoc navigation tools eg gedit external tools)
+  [.1] possibly an interactive commandline tool (enter symbol-> dump location)
+  [.2] possibly queries like "list all the functions that use this type, list all the impls' for this type.."
+[1.1] dump definition links in json or something .. incase this can be used s n indexer for existing tools
 [2] options to dump/pretty print more context for the definitoon
-[3] components for IDE integration
+[2.5] maybe one of those html hyperlinked source generators, like woboq?
+[3] use components for IDE integration?
+
+
 

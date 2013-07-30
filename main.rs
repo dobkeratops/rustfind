@@ -21,7 +21,7 @@ use syntax::abi::AbiSet;
 use syntax::ast;
 use syntax::codemap;
 
-
+use std::hashmap::*;
 use std::os;
 use std::local_data;
 use extra::json::ToJson;
@@ -32,7 +32,14 @@ mod ioutil;
 
 pub static ctxtkey: local_data::Key<@DocContext> = &local_data::Key;
 
-
+pub macro_rules! if_some {
+	($b:ident in $a:expr then $c:expr)=>(
+		match $a {
+			Some($b)=>$c,
+			None=>{}
+		}
+	);
+}
 pub macro_rules! tlogi{ 
 	($($a:expr),*)=>(println((file!()+":"+line!().to_str()+": " $(+$a.to_str())*) ))
 }
@@ -121,6 +128,20 @@ impl MyToStr for codemap::span {
 	fn my_to_str(&self)->~str { ~"("+self.lo.to_str()+~".."+self.hi.to_str() }
 }
 
+/// Todo , couldn't quite see how to declare this as a generic method of Option<T>
+pub fn some<T>(o:&Option<T>,f:&fn(t:&T)) {
+	match *o {
+		Some(ref x)=>f(x),
+		None=>{}
+	}
+}
+pub fn some_else<T,X,Y>(o:&Option<T>,f:&fn(t:&T)->Y,default_value:Y)->Y {
+	match *o {
+		Some(ref x)=>f(x),
+		None=>default_value
+	}
+}
+
 fn debug_test(dc:&DocContext,filename:~str) {
 
 	// TODO: parse commandline source locations,convert to codemap locations
@@ -134,7 +155,11 @@ fn debug_test(dc:&DocContext,filename:~str) {
 
 	logi!("==== Get table of node-spans...===")
 	let node_spans=build_node_spans_table(dc.crate);
-	dump_node_spans_table(node_spans);
+	println(node_spans_table_to_json(node_spans));
+
+	logi!("==== Node Definition mappings...===")
+	let node_def_node = build_node_def_node_table(dc);
+	println(node_def_node_table_to_json(node_def_node));
 
 	logi!("==== Test node search by location...===")
  
@@ -154,16 +179,14 @@ fn debug_test(dc:&DocContext,filename:~str) {
 			println("node ast loc:"+(do node.map |x| { option_to_str(&x.get_id()) }).to_str());
 			if_some!(id in node.last().ty_node_id() then {
 				dump_node_source(source_text, node_spans, id);
-				if_some!(t in find_ast_node::safe_node_id_to_type(dc.tycx, id)
-				 then {
+				if_some!(t in find_ast_node::safe_node_id_to_type(dc.tycx, id) then {
 					println(fmt!("typeinfo: %?",
 						{let ntt= rustc::middle::ty::get(t); ntt}));
 					dump!(id,dc.tycx.def_map.find(&id));
 					});
 				let (def_id,opt_span)= def_span_from_node_id(dc,node_spans,id); 
 				if_some!(sp in opt_span then{
-					let BytePos(sp_lo)=sp.lo;
-					let def_line_col=text_offset_to_line_pos(source_text,sp_lo);
+					let def_line_col=text_offset_to_line_pos(source_text,*sp.lo);
 					logi!("src node=",id," def node=",def_id,
 						" span=",sp.my_to_str());
 					dump_span(source_text, sp);
@@ -184,13 +207,13 @@ pub fn dump_node_source(text:&[u8], ns:&NodeSpans, id:ast::node_id) {
 }
 
 pub fn dump_span(text:&[u8], sp:&codemap::span) {
-	let BytePos(x)=sp.lo;
-	let line_col=text_offset_to_line_pos(text, x);
+
+	let line_col=text_offset_to_line_pos(text, *sp.lo);
 	logi!(" line,ofs=",option_to_str(&line_col)," text=\"",
 		std::str::from_bytes(text_span(text,sp)),"\"");
 }
 
-fn def_span_from_node_id<'a,'b>(dc:&'a DocContext, node_spans:&'b NodeSpans, id:ast::node_id)->(int,Option<&'b codemap::span>) {
+pub fn def_span_from_node_id<'a,'b>(dc:&'a DocContext, node_spans:&'b NodeSpans, id:ast::node_id)->(int,Option<&'b codemap::span>) {
 	let crate_num=0;
 	match dc.tycx.def_map.find(&id) { // finds a def..
 		Some(a)=>{
@@ -207,7 +230,7 @@ fn def_span_from_node_id<'a,'b>(dc:&'a DocContext, node_spans:&'b NodeSpans, id:
 // see: tycx.node_types:node_type_table:HashMap<id,t>
 // 't'=opaque ptr, ty::get(:t)->t_box_ to resolve it
 
-fn dump_ctxt_def_map(dc:&DocContext) {
+pub fn dump_ctxt_def_map(dc:&DocContext) {
 //	let a:()=ctxt.tycx.node_types
 	logi!("===Test ctxt def-map table..===");
 	for dc.tycx.def_map.iter().advance |(key,value)|{
@@ -215,7 +238,7 @@ fn dump_ctxt_def_map(dc:&DocContext) {
 	}
 }
 
-fn text_line_pos_to_offset(text:&[u8], (line,ofs_in_line):(uint,uint))->Option<uint> {
+pub fn text_line_pos_to_offset(text:&[u8], (line,ofs_in_line):(uint,uint))->Option<uint> {
 	// line as reported by grep & text editors,counted from '1' not '0'
 	let mut pos = 0;
 	let tlen=text.len();	
@@ -236,7 +259,7 @@ fn text_line_pos_to_offset(text:&[u8], (line,ofs_in_line):(uint,uint))->Option<u
 	return None;
 }
 
-fn text_offset_to_line_pos(text:&[u8], src_ofs:uint)->Option<(uint,uint)> {
+pub fn text_offset_to_line_pos(text:&[u8], src_ofs:uint)->Option<(uint,uint)> {
 	// line as reported by grep & text editors,counted from '1' not '0'
 	let mut pos = 0;
 	let tlen=text.len();	
@@ -259,11 +282,46 @@ fn text_offset_to_line_pos(text:&[u8], src_ofs:uint)->Option<(uint,uint)> {
 	return None;
 }
 
-fn text_span<'a,'b>(text:&'a [u8],s:&'b codemap::span)->&'a[u8] {
-	let codemap::BytePos(lo)=s.lo;
-	let codemap::BytePos(hi)=s.hi;
-	text.slice(lo,hi)
+pub fn text_span<'a,'b>(text:&'a [u8],s:&'b codemap::span)->&'a[u8] {
+	text.slice(*s.lo,*s.hi)
 }
+
+pub fn build_node_def_node_table(dc:&DocContext)->~HashMap<ast::node_id, ast::def_id>
+{
+	let mut r=~HashMap::new();
+	let curr_crate_id_hack=0;	// TODO WHAT IS CRATE ID REALLY?!
+	// todo .. for range(0,c.next_id) || ??
+	let mut id:ast::node_id=0;
+	while id<*(dc.tycx.next_id) as ast::node_id {
+		if_some!(t in safe_node_id_to_type(dc.tycx,id as int) then {
+			if_some!(def in dc.tycx.def_map.find(&(id as int)) then { // finds a def..
+				if_some!(did in get_def_id(curr_crate_id_hack,*def) then {
+					r.insert(id as ast::node_id,did);
+				})
+				
+			});
+			
+			
+		});
+		id+=1;
+	}
+	r
+}
+
+pub fn def_node_id_from_node_id(dc:&DocContext, id:ast::node_id)->ast::node_id {
+	let crate_num=0;	// TODO - whats crate Id really???
+	match dc.tycx.def_map.find(&id) { // finds a def..
+		Some(a)=>{
+			match get_def_id(crate_num,*a) {
+				Some(b)=>b.node,
+				None=>id as int
+			}
+		},
+		None=>(id as int)	// no definition? say its its own definition
+	}
+}
+
+
 
 
 
