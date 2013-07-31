@@ -85,13 +85,17 @@ fn get_ast_and_resolve(cpath: &Path, libs: ~[Path]) -> DocContext {
         addl_lib_search_paths: @mut libs,
         .. copy (*rustc::driver::session::basic_options())
     };
+	let quiet=true;
+	fn no_emit(cmsp: Option<(@codemap::CodeMap, codemap::span)>, msg: &str, lvl: syntax::diagnostic::level) {
+	}
 
     let diagnostic_handler = syntax::diagnostic::mk_handler(None);
     let span_diagnostic_handler =
-        syntax::diagnostic::mk_span_handler(diagnostic_handler, parsesess.cm);
+        syntax::diagnostic::mk_span_handler(if quiet{no_emit}else{diagnostic_handler}, parsesess.cm);
+
 
     let mut sess = driver::driver::build_session_(sessopts, parsesess.cm,
-                                                  syntax::diagnostic::emit,
+                                                  if quiet{no_emit}else{syntax::diagnostic::emit},
                                                   span_diagnostic_handler);
 
     let (crate, tycx) = driver::driver::compile_upto(sess, sessopts.cfg.clone(),
@@ -110,7 +114,7 @@ fn main() {
     let args = os::args();
 
     let opts = ~[
-        optmulti("L"),optflag("d"),optflag("j"),optflag("h"),optflag("i")
+        optmulti("L"),optflag("d"),optflag("j"),optflag("h"),optflag("i"),optflag("g")
     ];
 
     let matches = getopts(args.tail(), opts).get();
@@ -131,6 +135,7 @@ fn main() {
 		println(" filename.rs:line:col : TODO return definition reference of symbol at given position");
 		println(" -i filename.rs [-L<lib path>] : interactive mode");
 		println(" -d filename.rs [-L<lib path>] : debug for this tool");
+		println(" -g format output as gedit filepos +line filename");
 		println(" set RUST_LIBS for a default library search path");
 	};
 	if matches.free.len()>0 {
@@ -145,7 +150,8 @@ fn main() {
 		}
 		let mut i=0;
 		while i<matches.free.len() {
-			print(lookup_def_of_file_line_pos(dc,matches.free[i],SDM_Source));
+			let mode=if opt_present(&matches,"g"){SDM_GeditCmd} else {SDM_Source};
+			print(lookup_def_of_file_line_pos(dc,matches.free[i],mode));
 			i+=1;
 		}
 		if opt_present(&matches,"i") {
@@ -294,6 +300,7 @@ enum ShowDefMode {
 	SDM_Line=0,
 	SDM_LineCol=1,
 	SDM_Source=2,
+	SDM_GeditCmd=3
 }
 
 fn lookup_def_of_byte_pos(dc:&DocContext, bp:BytePos, m:ShowDefMode)->~str {
@@ -307,16 +314,19 @@ fn lookup_def_of_byte_pos(dc:&DocContext, bp:BytePos, m:ShowDefMode)->~str {
 
 		let (def_id,opt_info)= def_info_from_node_id(dc,node_spans,id); 
 		if_some!(info in opt_info then{
-			let def_pos_str=match node_spans.find(&def_id) {
+			match node_spans.find(&def_id) {
 				None=>~"",
 				Some(def_info)=>{
 					let loc=get_source_loc(dc,def_info.span.lo);
-					loc.file.name + ":"+loc.line.to_str()+":"+
-						match m { SDM_LineCol=>loc.col.to_str()+":", _ =>~"" }+"\n"
-				}
+					let def_pos_str=
+						loc.file.name + ":"+loc.line.to_str()+":"+
+							match m { SDM_LineCol=>loc.col.to_str()+":", _ =>~"" }+"\n";
+					return	match m{
+						SDM_Source=>def_pos_str+get_node_source(dc.tycx,node_spans, def_id)+"\n",
+						SDM_GeditCmd=>"+"+loc.line.to_str()+" "+loc.file.name+" ",
+						_ => def_pos_str};
+						}
 			};		
-			return
-				match m{SDM_Source=>def_pos_str+get_node_source(dc.tycx,node_spans, def_id)+"\n", _ => def_pos_str};
 		})
 
 	})

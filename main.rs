@@ -85,8 +85,12 @@ fn get_ast_and_resolve(cpath: &Path, libs: ~[Path]) -> DocContext {
     let span_diagnostic_handler =
         syntax::diagnostic::mk_span_handler(diagnostic_handler, parsesess.cm);
 
+	let bool quiet=true;
+	fn no_emit(cmsp: Option<(@codemap::CodeMap, span)>, msg: &str, lvl: level) {
+	}
+
     let mut sess = driver::driver::build_session_(sessopts, parsesess.cm,
-                                                  syntax::diagnostic::emit,
+                                                  if quiet{no_emit}else{syntax::diagnostic::emit},
                                                   span_diagnostic_handler);
 
     let (crate, tycx) = driver::driver::compile_upto(sess, sessopts.cfg.clone(),
