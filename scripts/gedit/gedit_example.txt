@@ -1,0 +1,8 @@
+#external tool invocation for gedit
+#requires patched functions.py for GEDIT_CURRENT_COLUMN_NUMBER (see scripts)
+#!/bin/sh
+cd $GEDIT_CURRENT_DOCUMENT_DIR
+echo "rustfind:- "
+~/i7rustfind/rustfind test_input.rs $GEDIT_CURRENT_DOCUMENT_NAME:$GEDIT_CURRENT_LINE_NUMBER:$GEDIT_CURRENT_COLUMN_NUMBER
+
+
