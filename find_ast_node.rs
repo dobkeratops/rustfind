@@ -8,6 +8,7 @@ use syntax::codemap::*;
 use rustc::{front, metadata, driver, middle};
 use rustc::middle::mem_categorization::ast_node;
 use syntax::*;
+use syntax::ast_util;
 use syntax::abi::AbiSet;
 use rustc::middle::*;
 use rustc::metadata::*;
@@ -15,8 +16,7 @@ use rustc::middle::trans::context::*;
 use std::hashmap::HashMap;
 
 
-// TODO Check with rust people what here can be replaced with existing code in the compilers
-// once this tool works i'll have less need to rewrite things
+// TODO Check with rust people what here can be replaced with existing code in from the compiler libs..
 // if ctxt_ had accessors for everything indexed by node_id we could remove most of this.
 // (AstNode here could be replaced with a refernce to ctxt_ keeping the interface..)
 
@@ -75,6 +75,7 @@ pub fn find(c:@crate,_location:uint)->~[AstNode] {
 }
 
 pub struct NodeInfo {
+	//name:ident, .. TODO - does it make sense to cache an ident here? not all nodes have..
 	kind:~str,
 	span:codemap::span
 }
@@ -168,6 +169,7 @@ impl KindToStr for ast::expr {
 		expr_method_call(_,_,_,_,_,_)=>"method_call",
 		expr_tup(_)=>"tup",
 	    expr_binary(_, binop, _,_)=>match binop {
+//			ast_util::binop_to_*(binop) todo - we donnt use this because of ambiguity
 			add=>"add",
 			subtract=>"sub",
 			mul=>"mul",
@@ -202,7 +204,7 @@ impl KindToStr for ast::expr {
 	    expr_while(_, _)=>"while",
 	    expr_loop(_, _)=>"loop",
 	    expr_match(_, _)=>"match",
-	    expr_fn_block(_, _)=>"fn blk",
+	    expr_fn_block(_, _)=>"fn_blk",
 	    expr_loop_body(_)=>"loop_body",
 	    expr_do_body(_)=>"do_body",
 	    expr_block(_)=>"blk",
@@ -280,7 +282,6 @@ impl KindToStr for AstNode {
 			astnode_struct_def(_)=>"struct_def",
 			astnode_struct_field(_)=>"struct_field",
 			astnode_root=>"root",
-
 		}
 	}
 }
@@ -397,7 +398,18 @@ impl AstNodeAccessors for AstNode {
 		}
 	}
 }
+fn item_get_ident(a:&item)->Option<ident> { Some(a.ident) }
 
+fn decl_get_ident(a:&decl)->Option<ident> {
+	match a.node {
+		decl_local(ref l)=> None, // todo - will we need the ident ?a local isn't always 1, due to tuples
+		decl_item(i)=> item_get_ident(i)
+	}
+}
+fn expr_get_ident(a:&expr)->Option<ident> {
+	None
+}
+ 
 
 pub struct FindAstNodeSt {
 	result: ~[AstNode],		// todo - full tree path, all the parent nodes.
@@ -406,7 +418,7 @@ pub struct FindAstNodeSt {
 //	node_spans: HashMap<ast::node_id,codemap::span>
 }
 
-pub fn push_span(spt:&mut NodeSpans,n:ast::node_id,k:&str, s:codemap::span) {
+pub fn push_span(spt:&mut NodeSpans,n:ast::node_id,idt:Option<ident>,k:&str, s:codemap::span) {
 	spt.insert(n,NodeInfo{kind:k.to_str(),span:s});
 }
 
@@ -427,7 +439,7 @@ fn fcns_view_item(a:&view_item, (s,v):NodeSpansSV) {
 	visit_view_item(a,(s,v))
 }
 fn fcns_item(a:@item, (s,v):NodeSpansSV) {
-	push_span(s,a.id,"item",a.span);
+	push_span(s,a.id,item_get_ident(a),"item",a.span);
 	visit_item(a,(s,v))
 }
 fn fcns_local(a:@local, (s,v):NodeSpansSV) {
@@ -447,7 +459,7 @@ fn fcns_arm(a:&arm, (s,v):NodeSpansSV) {
 	visit_arm(a,(s,v))
 }
 fn fcns_pat(a:@pat, (s,v):NodeSpansSV) {
-	push_span(s,a.id,"pat",a.span);
+	push_span(s,a.id,None,"pat",a.span);
 	visit_pat(a,(s,v))
 }
 fn fcns_decl(a:@decl, (s,v):NodeSpansSV) {
@@ -460,7 +472,7 @@ fn fcns_struct_def(sd:@struct_def, ide:ident, g:&Generics, id:node_id, (s,b):Nod
 
 // struct Visitor<E>.visit_expr: @fn(@expr, (E, vt<E>)),
 fn fcns_expr(a:@expr, (s,v):NodeSpansSV) {
-	push_span(s,a.id,a.kind_to_str(),a.span);
+	push_span(s,a.id,expr_get_ident(a),a.kind_to_str(),a.span);
 	visit_expr(a,(s,v))
 }
 
@@ -471,7 +483,7 @@ fn fcns_expr_post(a:@expr, (s,v):NodeSpansSV) {
 
 // struct Visitor<E>.visit_ty: @fn(&Ty, (E, vt<E>)),
 fn fcns_ty(a:&Ty, (s,v):NodeSpansSV) {
-	push_span(s,a.id,"ty",a.span);
+	push_span(s,a.id,None,"ty",a.span);
 	visit_ty(a,(s,v))
 }
 fn fcns_fn(fk:&fn_kind, fd:&fn_decl, body:&blk, sp:span, nid:node_id, (s,v):NodeSpansSV) {

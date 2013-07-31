@@ -1,12 +1,18 @@
 # common files to open for reference...
 
-gedit main.rs --new-window &
+gedit rustfind.rs --new-window &
 gedit find_ast_node.rs --new-window &
+gedit $RUST_SRC/libsyntax/ast_util.rs --new-window &
 gedit $RUST_SRC/libsyntax/ast.rs --new-window &
 gedit $RUST_SRC/libsyntax/visit.rs --new-window &
 gedit $RUST_SRC/librustc/middle/ty.rs --new-window &
+gedit $RUST_SRC/libsyntax/codemap.rs --new-window &
+gedit $RUST_SRC/librustc/driver/session.rs --new-window &
 
 gedit $RUST_SRC/librustc/metadata/decoder.rs --new-window &
 echo "fn maybe_get_item_ast -> found_ast:::found(ast::inlined_item), found_parent(ast::def_id,ast::inlined_item,not_found)  -> inlined_item::ii_item(@item) ->@item
 
+echo "libsyntax/codemap.rs::FileMap --contains source....BytePos,full source text ->"
+echo "FileMap contained in CodeMap, CodeMap contained in Session.."
+echo "the codemap/filemap are also accesible from ctxt::.sess.codemap.files:~[@FILEMAP]"
 

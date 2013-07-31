@@ -246,12 +246,14 @@ pub fn dump_node_source(text:&[u8], ns:&NodeSpans, id:ast::node_id) {
 	}
 }
 
+
 pub fn dump_span(text:&[u8], sp:&codemap::span) {
 
 	let line_col=text_offset_to_line_pos(text, *sp.lo);
 	logi!(" line,ofs=",option_to_str(&line_col)," text=\"",
 		std::str::from_bytes(text_span(text,sp)),"\"");
 }
+
 
 pub fn def_info_from_node_id<'a,'b>(dc:&'a DocContext, node_spans:&'b NodeSpans, id:ast::node_id)->(int,Option<&'b NodeInfo>) {
 	let crate_num=0;
