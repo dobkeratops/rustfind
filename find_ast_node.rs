@@ -114,6 +114,10 @@ pub fn build_node_spans_table(c:@crate)->@mut NodeSpans {
 	node_spans
 }
 
+pub trait ToJsonStr {
+	fn to_json_str(&self)->~str;
+}
+
 pub fn node_spans_table_to_json_sub(ns:&NodeSpans)->~str {
 	// TODO - is there a cleaner functional way,
 	// map (|x| fmt...).flatten_to_str() or something like that..
@@ -123,18 +127,20 @@ pub fn node_spans_table_to_json_sub(ns:&NodeSpans)->~str {
 	}
 	r
 }
-pub fn node_spans_table_to_json(ns:&NodeSpans)->~str {
-	// todo-default param opt if they get it..
-	~"[\n"+node_spans_table_to_json_sub(ns)+~"]\n"
-}
-
-pub fn node_def_node_table_to_json(s:&HashMap<ast::node_id,ast::def_id>)->~str {
-	let mut r=~"[\n";
-	for 	s.iter().advance|(&key,&value)| {
-		r.push_str(fmt!("\t{node_id:%?,\tdef_id:{crate:%?,node:%?}},\n", key, value.crate,value.node));
+impl ToJsonStr for NodeSpans {
+	pub fn to_json_str(&self)->~str {
+		~"[\n"+node_spans_table_to_json_sub(self)+~"]\n"
 	}
-	r.push_str("]\n");
-	r
+}
+impl ToJsonStr for HashMap<ast::node_id,ast::def_id> {
+	pub fn to_json_str(&self)->~str {
+		let mut r=~"[\n";
+		for self.iter().advance|(&key,&value)| {
+			r.push_str(fmt!("\t{node_id:%?,\tdef_id:{crate:%?,node:%?}},\n", key, value.crate,value.node));
+		}
+		r.push_str("]\n");
+		r
+	}
 }
 
 // TODO - is there an official wrapper like this for all nodes in libsyntax::ast?

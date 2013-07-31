@@ -194,86 +194,15 @@ fn dump_json(dc:&DocContext) {
 	println("{");
 	println("\tnode_spans:");
 	let node_spans=build_node_spans_table(dc.crate);
-	println(node_spans_table_to_json(node_spans));	
+	println(node_spans.to_json_str());	
 	println(",");
 	println("\tnode_defs:");
 	let node_def_node = build_node_def_node_table(dc);
-	println(node_def_node_table_to_json(node_def_node));
+	println(node_def_node.to_json_str());
 	println("}");
 
 }
 
-fn debug_test(dc:&DocContext) {
-
-	// TODO: parse commandline source locations,convert to codemap locations
-	//dump!(ctxt.tycx);
-	logi!("==== Get table of node-spans...===")
-	let node_spans=build_node_spans_table(dc.crate);
-	println(node_spans_table_to_json(node_spans));
-
-	logi!("==== Node Definition mappings...===")
-	let node_def_node = build_node_def_node_table(dc);
-	println(node_def_node_table_to_json(node_def_node));
-
-
-	logi!("==== dump def table.===");
-	dump_ctxt_def_map(dc);
-
-	logi!("==== Test node search by location...===");
-
-	// Step a test 'cursor' src_pos through the given source file..
-	let mut test_cursor=15 as uint;
-
-	
-
-	while test_cursor<500 {
-		let loc = get_source_loc(dc,BytePos(test_cursor));
-
-		logi!(~"\n=====Find AST node at: ",loc.file.name,":",loc.line,":",loc.col,":"," =========");
-
-		let node = find_ast_node::find_in_tree(dc.crate,BytePos(test_cursor));
-		let node_info =  find_ast_node::get_node_info_str(dc,node);
-		dump!(node_info);
-		println("node ast loc:"+(do node.map |x| { option_to_str(&x.get_id()) }).to_str());
-
-
-		if_some!(id in node.last().ty_node_id() then {
-			logi!("source=",get_node_source(dc.tycx, node_spans,id));
-			if_some!(t in find_ast_node::safe_node_id_to_type(dc.tycx, id) then {
-				println(fmt!("typeinfo: %?",
-					{let ntt= rustc::middle::ty::get(t); ntt}));
-				dump!(id,dc.tycx.def_map.find(&id));
-				});
-			let (def_id,opt_info)= def_info_from_node_id(dc,node_spans,id); 
-			if_some!(info in opt_info then{
-				logi!("src node=",id," def node=",def_id,
-					" span=",info.span.my_to_str());
-				logi!("def source=", get_node_source(dc.tycx, node_spans, def_id));
-			})
-		})
-
-		test_cursor+=20;
-	}
-
-	// test byte pos from file...
-	logi!("====test file:pos source lookup====");
-	dump!(get_file_line_col_len_str(dc.tycx,&"test_input.rs",3,0,10));
-	dump!(get_file_line_col_len_str(dc.tycx,&"test_input.rs",9,0,10));
-	dump!(get_file_line_col_len_str(dc.tycx,&"test_input2.rs",4,0,10));
-	dump!(get_file_line_col_len_str(dc.tycx,&"test_input2.rs",11,0,10));
-	let ospan=file_line_col_len_to_byte_pos(dc.tycx, &"test_input2.rs", 10,0,32);
-	if_some!(x in ospan then {
-		let (lo,hi)=x;
-		logi!(get_span_str(dc.tycx, &codemap::span{lo:lo,hi:hi,expn_info:None} ));
-	});
-	dump!(get_file_line(dc.tycx,"test_input2.rs",5));
-	dump!(get_file_line(dc.tycx,"test_input.rs",9));
-	
-	logi!("\n====test full file:pos lookup====");
-	dump!(lookup_def_of_file_line_pos(dc, &"test_input.rs:9:20",SDM_Source));
-	dump!(lookup_def_of_file_line_pos(dc, &"test_input2.rs:3:12",SDM_Source));
-	
-}
 
 fn lookup_def_of_file_line_pos(dc:&DocContext,filepos:&str, show_all:ShowDefMode)->~str {
 
@@ -342,7 +271,7 @@ fn get_file_line_col_len_str(cx:ty::ctxt, filename:&str, line:uint, col:uint,len
 		None=>~""
 	}
 }
-fn get_file_line(cx:ty::ctxt, filename:&str, src_line:uint)->~str {
+fn get_file_line_str(cx:ty::ctxt, filename:&str, src_line:uint)->~str {
 //	for c.sess.codemap.files.rev_iter().advance |fm:&codemap::FileMap| {
 	let mut i=cx.sess.codemap.files.len();
 	while i>0 {	// caution, need loop because we return, wait for new foreach ..in..
@@ -356,7 +285,7 @@ fn get_file_line(cx:ty::ctxt, filename:&str, src_line:uint)->~str {
 			} else {
 				*fm.lines[src_line]
 			};
-			return get_span_str(cx, &codemap::span{lo:BytePos(s),hi: BytePos(e), expn_info:None} )
+
 		}
 	}
 	return ~"";
@@ -471,6 +400,7 @@ pub fn file_line_col_len_to_byte_pos(c:ty::ctxt,src_filename:&str,src_line:uint 
 	}
 	return None;
 }
+
 pub fn file_line_col_to_byte_pos(c:ty::ctxt,src_filename:&str,src_line:uint ,src_col:uint )->Option<codemap::BytePos>
 
 {
@@ -548,14 +478,87 @@ pub fn def_node_id_from_node_id(dc:&DocContext, id:ast::node_id)->ast::node_id {
 	}
 }
 
+
+fn debug_test(dc:&DocContext) {
+
+	// TODO: parse commandline source locations,convert to codemap locations
+	//dump!(ctxt.tycx);
+	logi!("==== Get table of node-spans...===")
+	let node_spans=build_node_spans_table(dc.crate);
+	println(node_spans.to_json_str());
+
+	logi!("==== Node Definition mappings...===")
+	let node_def_node = build_node_def_node_table(dc);
+	println(node_def_node.to_json_str());
+
+
+	logi!("==== dump def table.===");
+	dump_ctxt_def_map(dc);
+
+	logi!("==== Test node search by location...===");
+
+	// Step a test 'cursor' src_pos through the given source file..
+	let mut test_cursor=15 as uint;
+
+	while test_cursor<500 {
+		let loc = get_source_loc(dc,BytePos(test_cursor));
+
+		logi!(~"\n=====Find AST node at: ",loc.file.name,":",loc.line,":",loc.col,":"," =========");
+
+		let node = find_ast_node::find_in_tree(dc.crate,BytePos(test_cursor));
+		let node_info =  find_ast_node::get_node_info_str(dc,node);
+		dump!(node_info);
+		println("node ast loc:"+(do node.map |x| { option_to_str(&x.get_id()) }).to_str());
+
+
+		if_some!(id in node.last().ty_node_id() then {
+			logi!("source=",get_node_source(dc.tycx, node_spans,id));
+			if_some!(t in find_ast_node::safe_node_id_to_type(dc.tycx, id) then {
+				println(fmt!("typeinfo: %?",
+					{let ntt= rustc::middle::ty::get(t); ntt}));
+				dump!(id,dc.tycx.def_map.find(&id));
+				});
+			let (def_id,opt_info)= def_info_from_node_id(dc,node_spans,id); 
+			if_some!(info in opt_info then{
+				logi!("src node=",id," def node=",def_id,
+					" span=",info.span.my_to_str());
+				logi!("def source=", get_node_source(dc.tycx, node_spans, def_id));
+			})
+		})
+
+		test_cursor+=20;
+	}
+
+	// test byte pos from file...
+	logi!("====test file:pos source lookup====");
+	dump!(get_file_line_col_len_str(dc.tycx,&"test_input.rs",3,0,10));
+	dump!(get_file_line_col_len_str(dc.tycx,&"test_input.rs",9,0,10));
+	dump!(get_file_line_col_len_str(dc.tycx,&"test_input2.rs",4,0,10));
+	dump!(get_file_line_col_len_str(dc.tycx,&"test_input2.rs",11,0,10));
+	let ospan=file_line_col_len_to_byte_pos(dc.tycx, &"test_input2.rs", 10,0,32);
+	if_some!(x in ospan then {
+		let (lo,hi)=x;
+		logi!(get_span_str(dc.tycx, &codemap::span{lo:lo,hi:hi,expn_info:None} ));
+	});
+	dump!(get_file_line_str(dc.tycx,"test_input2.rs",5));
+	dump!(get_file_line_str(dc.tycx,"test_input.rs",9));
+	
+	logi!("\n====test full file:pos lookup====");
+	dump!(lookup_def_of_file_line_pos(dc, &"test_input.rs:9:20",SDM_Source));
+	dump!(lookup_def_of_file_line_pos(dc, &"test_input2.rs:3:12",SDM_Source));
+	
+}
+
+fn first_file_name(dc:&DocContext)->~str {
+	dc.tycx.sess.codemap.files[0].name.to_str() // clone?
+}
+
 pub fn rustfind_interactive(dc:&DocContext) {
 	// TODO - check if RUSTI can already do this.. it would be better there IMO
 	let node_spans=build_node_spans_table(dc.crate);
-	println(node_spans_table_to_json(node_spans));
 
-	logi!("==== Node Definition mappings...===");
 	let node_def_node = build_node_def_node_table(dc);
-	println(node_def_node_table_to_json(node_def_node));
+	let mut curr_file=first_file_name(dc);
 
 	loop {
 		print("rustfind>");
@@ -563,10 +566,26 @@ pub fn rustfind_interactive(dc:&DocContext) {
 		let toks:~[&str]=input_line.split_iter(' ').collect();
 		if toks.len()>0 {
 			match toks[0] {
-				"h"=> println("interactive mode - enter symbol name o\n q-quit\n"),
+				"h"|""=> println("interactive mode - enter file:line:pos or line:pos for current fileo\n j-dump json q-quit i-info\n"),
+				"i"=> {
+					println("files in current crate:-\n");
+					for dc.tycx.sess.codemap.files.iter().advance |x| {
+						println("\t"+x.name);
+					}
+				}
+				"j"=> dump_json(dc),
 				"q"=> break,
 				_ =>{
-					println(def_of_symbol_to_str(dc,node_spans,node_def_node,toks[0]));
+					// todo - if you just supply line, lookup defs on that line
+					// todo - lookup defs from symbol, remembering context of previous lookups?
+					let cmd=toks[0];
+					let cmd1=match cmd[0] as char { '0'..'9'=>curr_file+":"+cmd,_=>cmd.to_str() };
+					let subtoks:~[&str]=cmd1.split_iter(':').collect();
+					curr_file=subtoks[0].to_str();
+					dump!(cmd1,subtoks,curr_file);
+					let def=lookup_def_of_file_line_pos(dc, cmd1,SDM_Source);
+					print(def);
+					//println(def_of_symbol_to_str(dc,node_spans,node_def_node,toks[0]));
 				}
 			}
 		}
