@@ -205,7 +205,10 @@ fn debug_test(dc:&DocContext) {
 
 	// Step a test 'cursor' src_pos through the given source file..
 	let mut test_cursor=15 as uint;
-	while test_cursor<350 {
+
+	
+
+	while test_cursor<500 {
 		let loc = get_source_loc(dc,BytePos(test_cursor));
 
 		logi!(~"\n=====Find AST node at: ",loc.file.name,":",loc.line,":",loc.col,":"," =========");
@@ -214,6 +217,8 @@ fn debug_test(dc:&DocContext) {
 		let node_info =  find_ast_node::get_node_info_str(dc,node);
 		dump!(node_info);
 		println("node ast loc:"+(do node.map |x| { option_to_str(&x.get_id()) }).to_str());
+
+
 		if_some!(id in node.last().ty_node_id() then {
 			logi!("source=",get_node_source(dc.tycx, node_spans,id));
 			if_some!(t in find_ast_node::safe_node_id_to_type(dc.tycx, id) then {
@@ -229,12 +234,60 @@ fn debug_test(dc:&DocContext) {
 			})
 		})
 
-		test_cursor+=11;
+		test_cursor+=20;
 	}
+
+	// test byte pos from file...
+	logi!("====test file:pos source lookup====");
+	dump!(get_file_line_col_len_str(dc.tycx,&"test_input.rs",3,0,10));
+	dump!(get_file_line_col_len_str(dc.tycx,&"test_input.rs",9,0,10));
+	dump!(get_file_line_col_len_str(dc.tycx,&"test_input2.rs",4,0,10));
+	dump!(get_file_line_col_len_str(dc.tycx,&"test_input2.rs",11,0,10));
+	let ospan=file_line_col_len_to_byte_pos(dc.tycx, &"test_input2.rs", 10,0,32);
+	if_some!(x in ospan then {
+		let (lo,hi)=x;
+		logi!(get_span_str(dc.tycx, &codemap::span{lo:lo,hi:hi,expn_info:None} ));
+	});
+	dump!(get_file_line(dc.tycx,"test_input2.rs",5));
+	dump!(get_file_line(dc.tycx,"test_input.rs",9));
+
+}
+
+fn get_file_line_col_len_str(cx:ty::ctxt, filename:&str, line:uint, col:uint,len:uint)->~str {
+	let x=file_line_col_len_to_byte_pos(cx, filename, line,col,len);
+	match  x  {
+		Some((bp_lo,bp_hi))=>get_span_str(cx,
+			&codemap::span{lo:bp_lo,hi:bp_hi,expn_info:None}
+		),
+		None=>~""
+	}
+}
+fn get_file_line(cx:ty::ctxt, filename:&str, src_line:uint)->~str {
+//	for c.sess.codemap.files.rev_iter().advance |fm:&codemap::FileMap| {
+	let mut i=cx.sess.codemap.files.len();
+	while i>0 {	// caution, need loop because we return, wait for new foreach ..in..
+		i-=1;
+		let fm=&cx.sess.codemap.files[i];
+		let filemap_filename:&str=fm.name;	
+		if filename==filemap_filename {
+			let s=*fm.lines[src_line-1];
+			let e=if src_line>=fm.lines.len() {
+				*fm.start_pos+fm.src.len()
+			} else {
+				*fm.lines[src_line]
+			};
+			return get_span_str(cx, &codemap::span{lo:BytePos(s),hi: BytePos(e), expn_info:None} )
+		}
+	}
+	return ~"";
+	
 }
 
 fn get_source_loc(dc:&DocContext, pos:codemap::BytePos)->codemap::Loc {
 	dc.tycx.sess.codemap.lookup_char_pos(pos)
+}
+fn loc_to_str(loc:codemap::Loc)->~str {
+	loc.file.name+":"+loc.line.to_str()+":"+loc.col.to_str()+":"
 }
 
 pub fn dump_node_source_for_single_file_only(text:&[u8], ns:&NodeSpans, id:ast::node_id) {
@@ -247,19 +300,23 @@ pub fn dump_node_source_for_single_file_only(text:&[u8], ns:&NodeSpans, id:ast::
 
 // TODO- this should return a slice
 pub fn get_node_source(c:ty::ctxt, ns:&NodeSpans, id:ast::node_id)->~str {
-	match (ns.find(&id)){None=>~"",
+	match (ns.find(&id)){
+		None=>~"",
 		Some(info)=>{
-			let loc_lo=c.sess.codemap.lookup_char_pos(info.span.lo);
-			let loc_hi=c.sess.codemap.lookup_char_pos(info.span.hi);
-			// TODO-assert both in same file!
-			let file_org=*loc_lo.file.start_pos;
-			let slice=loc_lo.file.src.slice(*info.span.lo-file_org, *info.span.hi-file_org );
-//			~"source yada"
-			slice.to_str()
+			get_span_str(c,&info.span)
 		}
 	}
 }
 
+
+pub fn get_span_str(c:ty::ctxt, sp:&codemap::span)->~str {
+	let loc_lo=c.sess.codemap.lookup_char_pos(sp.lo);
+	let loc_hi=c.sess.codemap.lookup_char_pos(sp.hi);
+	// TODO-assert both in same file!
+	let file_org=*loc_lo.file.start_pos;
+	let slice=loc_lo.file.src.slice(*sp.lo-file_org, *sp.hi-file_org );
+	slice.to_str()
+}
 
 pub fn dump_span(text:&[u8], sp:&codemap::span) {
 
@@ -311,6 +368,26 @@ pub fn text_line_pos_to_offset(text:&[u8], (line,ofs_in_line):(uint,uint))->Opti
 			return Some(line_start_pos + ofs_in_line);
 		}
 		pos+=1;
+	}
+	return None;
+}
+
+/// Get from text editor's description of location to inlined-crate byte-offset
+pub fn file_line_col_len_to_byte_pos(c:ty::ctxt,src_filename:&str,src_line:uint ,src_col:uint,len:uint )->Option<(codemap::BytePos,codemap::BytePos)>
+
+{
+//	for c.sess.codemap.files.rev_iter().advance |fm:&codemap::FileMap| {
+	let mut i=c.sess.codemap.files.len();
+	while i>0 {	// caution, need loop because we return, wait for new foreach ..in..
+		i-=1;
+		let fm=&c.sess.codemap.files[i];
+		let filemap_filename:&str=fm.name;	
+		if src_filename==filemap_filename {
+			let line_pos=*fm.lines[src_line-1];
+			let bp_start=*fm.lines[src_line-1]+src_col;
+			let bp_end=(bp_start+len).min(&(*fm.start_pos+fm.src.len()));
+			return Some((BytePos(bp_start), BytePos(bp_end)))
+		}
 	}
 	return None;
 }
