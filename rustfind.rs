@@ -211,7 +211,7 @@ fn dump_json(dc:&DocContext) {
 	for dc.sess.codemap.files.iter().advance |f| {
 		print("\t\t{ name:\""+f.name+"\",\tstart_pos:"+f.start_pos.to_str()+
 			",\tlines:[\n"+ flatten_to_str(*f.lines, |&x|{*x} ,",") +
-			"\n\t\t]\n\t\t\t},");
+			"\n\t\t]\n\t},\n");
 	}
 	println("\t]");
 	println("\tnode_spans:");
