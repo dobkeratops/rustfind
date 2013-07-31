@@ -1,12 +1,24 @@
 attempt to use rust libsyntax to find symbol definitions
-no where near ready yet..
+just about workable now
 
 "make" to compile and run test program
+./rustfind -h to display options
 
-find_ast_node contains the node scanning
-borrows code from rustdoc_ng
+./rustfind cratename.rs sourcefile.rs:line:col
+   ... compiles 'cratename.rs',then shows the location 
+   & definitoin of the symbol at sourcefile.rs:line:col
+   so long as sourcefile.rs is in the crate
 
-not sure what the best way is..
+./rustfind -j cratename.rs -- dump spans & node definition links as JSON
+
+Notes on sourcecode:-
+--------------------
+-find_ast_node contains the node scanning
+-borrows code from rustdoc_ng
+-there might be a fair amoount of repition with the compiler internals eg ast node wrappers,
+this can be cleaned up..
+-a lot would factor out if ctxt had a node_id:span map
+
 
 roadmap
 [1] a commandline tool rustfind sourcefile.rs:LINE:COLUMN: --> definition.rs:LINE:col
