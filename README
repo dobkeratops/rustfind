@@ -19,6 +19,7 @@ Notes on sourcecode:-
 this can be cleaned up..
 -a lot would factor out if ctxt had a node_id:span map
 
+improved syntax highlighting rust.lang & required styles (for gtksourceview) included in scripts
 
 roadmap
 [1] a commandline tool rustfind sourcefile.rs:LINE:COLUMN: --> definition.rs:LINE:col
