@@ -39,7 +39,11 @@ macro_rules! dump{ ($($a:expr),*)=>
 }
 
 /// main
-pub fn find(c:@crate,_location:codemap::BytePos)->~[AstNode] {
+pub fn find_node_at_byte_pos(c:@crate,_location:codemap::BytePos)->AstNode {
+	let tree_loc=find_in_tree(c,_location);
+	return tree_loc.last().clone();
+}
+pub fn find_in_tree(c:@crate,_location:codemap::BytePos)->~[AstNode] {
 	// TODO: Now that we have a sepereate 'node-spans table'
 	// would it be more efficient to use that?
 	// if we encoded hrc information in the node-spans-table,

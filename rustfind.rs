@@ -6,6 +6,9 @@ extern mod extra;
 use rustc::{front, metadata, driver, middle};
 use rustc::middle::*;
 
+use std::num;
+use std::num::*;
+
 use syntax::parse;
 use syntax::ast;
 use syntax::ast_map;
@@ -121,30 +124,39 @@ fn main() {
 
 	if opt_present(&matches,"h") {
 		println("rustfind: useage:-");
-		println(" filename.rs [-L<library path>]  : dump JSON map of the ast nodes & defintions");
+		println(" -j filename.rs [-L<library path>]  : dump JSON map of the ast nodes & defintions");
+		println(" cratename.rs anotherfile.rs:line:col:");
+		println("    - load cratename.rs; look for definition at anotherfile.rs:line:col");
+		println("    - where anotherfile.rs is assumed to be a module of the crate");
 		println(" filename.rs:line:col : TODO return definition reference of symbol at given position");
 		println(" -i filename.rs [-L<lib path>] : interactive mode");
 		println(" -d filename.rs [-L<lib path>] : debug for this tool");
 		println(" set RUST_LIBS for a default library search path");
-
 	};
 	if matches.free.len()>0 {
-		let filename=&matches.free[0];
-		let dc = @get_ast_and_resolve(&Path(*filename), libs);
+		let filename=get_filename_only(matches.free[0]);
+		let dc = @get_ast_and_resolve(&Path(filename), libs);
 		local_data::set(ctxtkey, dc);
 	
 		if (opt_present(&matches,"d")) {
 			debug_test(dc);
 		} else if (opt_present(&matches,"j")){
 			dump_json(dc);
-		} else {	// default, dump json map of nodes,defs,spans
-			dump_json(dc);
+		}
+		let mut i=0;
+		while i<matches.free.len() {
+			print(lookup_def_of_file_line_pos(dc,matches.free[i],SDM_Source));
+			i+=1;
 		}
 		if opt_present(&matches,"i") {
 			rustfind_interactive(dc)
 		}
 	}
+}
 
+fn get_filename_only(fnm:&str)->~str {
+	let toks:~[&str]=fnm.split_iter(':').collect();
+	return toks[0].to_str();
 }
 
 fn option_to_str<T:ToStr>(opt:&Option<T>)->~str {
@@ -213,7 +225,7 @@ fn debug_test(dc:&DocContext) {
 
 		logi!(~"\n=====Find AST node at: ",loc.file.name,":",loc.line,":",loc.col,":"," =========");
 
-		let node = find_ast_node::find(dc.crate,BytePos(test_cursor));
+		let node = find_ast_node::find_in_tree(dc.crate,BytePos(test_cursor));
 		let node_info =  find_ast_node::get_node_info_str(dc,node);
 		dump!(node_info);
 		println("node ast loc:"+(do node.map |x| { option_to_str(&x.get_id()) }).to_str());
@@ -250,7 +262,65 @@ fn debug_test(dc:&DocContext) {
 	});
 	dump!(get_file_line(dc.tycx,"test_input2.rs",5));
 	dump!(get_file_line(dc.tycx,"test_input.rs",9));
+	
+	logi!("\n====test full file:pos lookup====");
+	dump!(lookup_def_of_file_line_pos(dc, &"test_input.rs:9:20",SDM_Source));
+	dump!(lookup_def_of_file_line_pos(dc, &"test_input2.rs:3:12",SDM_Source));
+	
+}
 
+fn lookup_def_of_file_line_pos(dc:&DocContext,filepos:&str, show_all:ShowDefMode)->~str {
+
+	let toks:~[&str]=filepos.split_iter(':').collect();
+	if toks.len()<3 { return ~"" }
+
+//	let line:Option<uint> = FromStr::from_str(toks[1]);
+	if_some!(line in FromStr::from_str(toks[1]) then {
+		if_some!(col in FromStr::from_str(toks[2]) then {
+			//todo - if no column specified, just lookup everything on that line!
+
+			match file_line_col_to_byte_pos(dc.tycx,toks[0],line,col) {
+				None=>return ~"error: file not in crate or position out of range",
+				Some(bp)=>{
+					return lookup_def_of_byte_pos(dc,bp,show_all)
+				}
+			}
+		})
+	})
+	return ~"";
+}
+
+enum ShowDefMode {
+	SDM_Line=0,
+	SDM_LineCol=1,
+	SDM_Source=2,
+}
+
+fn lookup_def_of_byte_pos(dc:&DocContext, bp:BytePos, m:ShowDefMode)->~str {
+	// TODO - cache these outside!!
+	let node_spans=build_node_spans_table(dc.crate);
+	let node_def_node = build_node_def_node_table(dc);
+
+	let node = find_ast_node::find_node_at_byte_pos(dc.crate,bp);
+
+	if_some!(id in node.ty_node_id() then {
+
+		let (def_id,opt_info)= def_info_from_node_id(dc,node_spans,id); 
+		if_some!(info in opt_info then{
+			let def_pos_str=match node_spans.find(&def_id) {
+				None=>~"",
+				Some(def_info)=>{
+					let loc=get_source_loc(dc,def_info.span.lo);
+					loc.file.name + ":"+loc.line.to_str()+":"+
+						match m { SDM_LineCol=>loc.col.to_str()+":", _ =>~"" }+"\n"
+				}
+			};		
+			return
+				match m{SDM_Source=>def_pos_str+get_node_source(dc.tycx,node_spans, def_id)+"\n", _ => def_pos_str};
+		})
+
+	})
+	return ~"";
 }
 
 fn get_file_line_col_len_str(cx:ty::ctxt, filename:&str, line:uint, col:uint,len:uint)->~str {
@@ -387,6 +457,23 @@ pub fn file_line_col_len_to_byte_pos(c:ty::ctxt,src_filename:&str,src_line:uint 
 			let bp_start=*fm.lines[src_line-1]+src_col;
 			let bp_end=(bp_start+len).min(&(*fm.start_pos+fm.src.len()));
 			return Some((BytePos(bp_start), BytePos(bp_end)))
+		}
+	}
+	return None;
+}
+pub fn file_line_col_to_byte_pos(c:ty::ctxt,src_filename:&str,src_line:uint ,src_col:uint )->Option<codemap::BytePos>
+
+{
+//	for c.sess.codemap.files.rev_iter().advance |fm:&codemap::FileMap| {
+	let mut i=c.sess.codemap.files.len();
+	while i>0 {	// caution, need loop because we return, wait for new foreach ..in..
+		i-=1;
+		let fm=&c.sess.codemap.files[i];
+		let filemap_filename:&str=fm.name;	
+		if src_filename==filemap_filename {
+			let line_pos=*fm.lines[src_line-1];
+			let bp_start=*fm.lines[src_line-1]+src_col;
+			return Some(BytePos(bp_start))
 		}
 	}
 	return None;
