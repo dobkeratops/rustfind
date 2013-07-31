@@ -188,10 +188,32 @@ pub fn some_else<T,X,Y>(o:&Option<T>,f:&fn(t:&T)->Y,default_value:Y)->Y {
 	}
 }
 
+/// todo - collect stage.
+
+fn flatten_to_str<T,U:ToStr>(xs:&[T],f:&fn(x:&T)->U, sep:&str)->~str {
+	let mut acc=~"";
+	let mut i=0; // TODO - functional way.
+	while i<xs.len() {
+		if i>0 {acc.push_str(sep);}
+		acc.push_str( f(&xs[i]).to_str() );
+	
+		i+=1;
+	}
+	acc
+
+}
+
 fn dump_json(dc:&DocContext) {
 	// TODO: full/partial options - we currently wwrite out all the nodes we find.
 	// need option to only write out nodes that map to definitons. 
 	println("{");
+	println("\tcode_map:[");
+	for dc.sess.codemap.files.iter().advance |f| {
+		print("\t\t{ name:\""+f.name+"\",\tstart_pos:"+f.start_pos.to_str()+
+			",\tlines:[\n"+ flatten_to_str(*f.lines, |&x|{*x} ,",") +
+			"\n\t\t]\n\t\t\t},");
+	}
+	println("\t]");
 	println("\tnode_spans:");
 	let node_spans=build_node_spans_table(dc.crate);
 	println(node_spans.to_json_str());	

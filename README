@@ -1,15 +1,29 @@
-attempt to use rust libsyntax to find symbol definitions
+Attempt to use rust libsyntax to find symbol definitions
 just about workable now
 
 "make" to compile and run test program
 ./rustfind -h to display options
 
 ./rustfind cratename.rs sourcefile.rs:line:col
-   ... compiles 'cratename.rs',then shows the location 
-   & definitoin of the symbol at sourcefile.rs:line:col
-   so long as sourcefile.rs is in the crate
+   ... compiles 'cratename.rs',then shows the
+   location&definition referenced by sourcefile:line:col
 
 ./rustfind -j cratename.rs -- dump spans & node definition links as JSON
+
+roadmap
+[1] a commandline tool rustfind sourcefile.rs:LINE:COLUMN: --> definition.rs:LINE:col
+(to add add hoc navigation tools eg gedit external tools)
+  [.1] CTAGS generation  ??
+  [.1] possibly an interactive commandline tool (enter symbol-> dump location)
+  [.2] possibly queries like "list all the functions that use this type, list all the impls' for this type.."
+
+[2] JSON / or other dump .. are there any formats IDE's read for their indexers?
+
+[3] options to dump/pretty print more context for the definitoon
+  
+[3.5] maybe one of those html hyperlinked source generators, like woboq?
+
+[4] use components for IDE integration?
 
 Notes on sourcecode:-
 --------------------
@@ -19,17 +33,8 @@ Notes on sourcecode:-
 this can be cleaned up..
 -a lot would factor out if ctxt had a node_id:span map
 
+Other:-
+-------
 improved syntax highlighting rust.lang & required styles (for gtksourceview) included in scripts
-
-roadmap
-[1] a commandline tool rustfind sourcefile.rs:LINE:COLUMN: --> definition.rs:LINE:col
-(to add add hoc navigation tools eg gedit external tools)
-  [.1] possibly an interactive commandline tool (enter symbol-> dump location)
-  [.2] possibly queries like "list all the functions that use this type, list all the impls' for this type.."
-[1.1] dump definition links in json or something .. incase this can be used s n indexer for existing tools
-[2] options to dump/pretty print more context for the definitoon
-[2.5] maybe one of those html hyperlinked source generators, like woboq?
-[3] use components for IDE integration?
-
 
 

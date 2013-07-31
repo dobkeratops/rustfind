@@ -279,7 +279,7 @@ impl KindToStr for AstNode {
 			astnode_mod(_)=>"mod",
 			astnode_view_item(_)=>"view_item",
 			astnode_item(_)=>"item",
-			astnode_local(_)=>"local",cp 
+			astnode_local(_)=>"local", 
 			astnode_block(_)=>"block",
 			astnode_stmt(_)=>"stmt",
 			astnode_arm(_)=>"arm",
