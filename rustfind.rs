@@ -134,14 +134,14 @@ fn main() {
 		local_data::set(ctxtkey, dc);
 	
 		if (opt_present(&matches,"d")) {
-			debug_test(dc,*filename);
+			debug_test(dc);
 		} else if (opt_present(&matches,"j")){
-			dump_json(dc,*filename);
+			dump_json(dc);
 		} else {	// default, dump json map of nodes,defs,spans
-			dump_json(dc,*filename);
+			dump_json(dc);
 		}
 		if opt_present(&matches,"i") {
-			rustfind_interactive(dc,*filename)
+			rustfind_interactive(dc)
 		}
 	}
 
@@ -170,7 +170,7 @@ pub fn some_else<T,X,Y>(o:&Option<T>,f:&fn(t:&T)->Y,default_value:Y)->Y {
 	}
 }
 
-fn dump_json(dc:&DocContext,filename:&str) {
+fn dump_json(dc:&DocContext) {
 	// TODO: full/partial options - we currently wwrite out all the nodes we find.
 	// need option to only write out nodes that map to definitons. 
 	println("{");
@@ -185,7 +185,7 @@ fn dump_json(dc:&DocContext,filename:&str) {
 
 }
 
-fn debug_test(dc:&DocContext,filename:&str) {
+fn debug_test(dc:&DocContext) {
 
 	// TODO: parse commandline source locations,convert to codemap locations
 	//dump!(ctxt.tycx);
@@ -197,51 +197,65 @@ fn debug_test(dc:&DocContext,filename:&str) {
 	let node_def_node = build_node_def_node_table(dc);
 	println(node_def_node_table_to_json(node_def_node));
 
-	logi!("loading",filename);
-	let source_text = ioutil::fileLoad(filename);
 
-	logi!("==== dump def table.===")
+	logi!("==== dump def table.===");
 	dump_ctxt_def_map(dc);
 
+	logi!("==== Test node search by location...===");
 
-	logi!("==== Test node search by location...===")
- 
 	// Step a test 'cursor' src_pos through the given source file..
-	let mut src_pos=15 as uint;
-	while src_pos<350 {
-		// get the AST node under 'pos', and dump info
-		let pos= text_offset_to_line_pos(source_text,src_pos);
-		for pos.iter().advance |&(line,ofs)|{
-			logi!(~"\n=====Find AST node at: ",src_pos," line=",line," ofs=",ofs,"=========");
-			let node = find_ast_node::find(dc.crate,src_pos);
-			let node_info =  find_ast_node::get_node_info_str(dc,node);
-			dump!(node_info);
-			println("node ast loc:"+(do node.map |x| { option_to_str(&x.get_id()) }).to_str());
-			if_some!(id in node.last().ty_node_id() then {
-				dump_node_source(source_text, node_spans, id);
-				if_some!(t in find_ast_node::safe_node_id_to_type(dc.tycx, id) then {
-					println(fmt!("typeinfo: %?",
-						{let ntt= rustc::middle::ty::get(t); ntt}));
-					dump!(id,dc.tycx.def_map.find(&id));
-					});
-				let (def_id,opt_info)= def_info_from_node_id(dc,node_spans,id); 
-				if_some!(info in opt_info then{
-					let def_line_col=text_offset_to_line_pos(source_text,*info.span.lo);
-					logi!("src node=",id," def node=",def_id,
-						" span=",info.span.my_to_str());
-					dump_span(source_text, &info.span);
-				})
+	let mut test_cursor=15 as uint;
+	while test_cursor<350 {
+		let loc = get_source_loc(dc,BytePos(test_cursor));
+
+		logi!(~"\n=====Find AST node at: ",loc.file.name,":",loc.line,":",loc.col,":"," =========");
+
+		let node = find_ast_node::find(dc.crate,BytePos(test_cursor));
+		let node_info =  find_ast_node::get_node_info_str(dc,node);
+		dump!(node_info);
+		println("node ast loc:"+(do node.map |x| { option_to_str(&x.get_id()) }).to_str());
+		if_some!(id in node.last().ty_node_id() then {
+			logi!("source=",get_node_source(dc.tycx, node_spans,id));
+			if_some!(t in find_ast_node::safe_node_id_to_type(dc.tycx, id) then {
+				println(fmt!("typeinfo: %?",
+					{let ntt= rustc::middle::ty::get(t); ntt}));
+				dump!(id,dc.tycx.def_map.find(&id));
+				});
+			let (def_id,opt_info)= def_info_from_node_id(dc,node_spans,id); 
+			if_some!(info in opt_info then{
+				logi!("src node=",id," def node=",def_id,
+					" span=",info.span.my_to_str());
+				logi!("def source=", get_node_source(dc.tycx, node_spans, def_id));
 			})
-		}
-		src_pos+=11;
+		})
+
+		test_cursor+=11;
 	}
 }
 
+fn get_source_loc(dc:&DocContext, pos:codemap::BytePos)->codemap::Loc {
+	dc.tycx.sess.codemap.lookup_char_pos(pos)
+}
 
-pub fn dump_node_source(text:&[u8], ns:&NodeSpans, id:ast::node_id) {
+pub fn dump_node_source_for_single_file_only(text:&[u8], ns:&NodeSpans, id:ast::node_id) {
 	match(ns.find(&id)) {None=>logi!("()"),
 		Some(info)=>{
 			dump_span(text, &info.span);
+		}
+	}
+}
+
+// TODO- this should return a slice
+pub fn get_node_source(c:ty::ctxt, ns:&NodeSpans, id:ast::node_id)->~str {
+	match (ns.find(&id)){None=>~"",
+		Some(info)=>{
+			let loc_lo=c.sess.codemap.lookup_char_pos(info.span.lo);
+			let loc_hi=c.sess.codemap.lookup_char_pos(info.span.hi);
+			// TODO-assert both in same file!
+			let file_org=*loc_lo.file.start_pos;
+			let slice=loc_lo.file.src.slice(*info.span.lo-file_org, *info.span.hi-file_org );
+//			~"source yada"
+			slice.to_str()
 		}
 	}
 }
@@ -360,7 +374,7 @@ pub fn def_node_id_from_node_id(dc:&DocContext, id:ast::node_id)->ast::node_id {
 	}
 }
 
-pub fn rustfind_interactive(dc:&DocContext, filename:&str) {
+pub fn rustfind_interactive(dc:&DocContext) {
 	// TODO - check if RUSTI can already do this.. it would be better there IMO
 	let node_spans=build_node_spans_table(dc.crate);
 	println(node_spans_table_to_json(node_spans));
@@ -368,9 +382,6 @@ pub fn rustfind_interactive(dc:&DocContext, filename:&str) {
 	logi!("==== Node Definition mappings...===");
 	let node_def_node = build_node_def_node_table(dc);
 	println(node_def_node_table_to_json(node_def_node));
-
-	println(fmt!("loading %s",filename));
-	let source_text = ioutil::fileLoad(filename);
 
 	loop {
 		print("rustfind>");

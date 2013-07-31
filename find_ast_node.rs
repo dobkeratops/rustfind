@@ -39,13 +39,13 @@ macro_rules! dump{ ($($a:expr),*)=>
 }
 
 /// main
-pub fn find(c:@crate,_location:uint)->~[AstNode] {
+pub fn find(c:@crate,_location:codemap::BytePos)->~[AstNode] {
 	// TODO: Now that we have a sepereate 'node-spans table'
 	// would it be more efficient to use that?
 	// if we encoded hrc information in the node-spans-table,
 	// we wouldn't need all this iterator malarchy again.
 	let mut s= @mut FindAstNodeSt{
-		result:~[astnode_root], location:_location, stop:false
+		result:~[astnode_root], location:*_location, stop:false
 			
 	};
 	let vt=mk_vt(@Visitor{

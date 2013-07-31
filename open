@@ -15,4 +15,4 @@ echo "fn maybe_get_item_ast -> found_ast:::found(ast::inlined_item), found_paren
 echo "libsyntax/codemap.rs::FileMap --contains source....BytePos,full source text ->"
 echo "FileMap contained in CodeMap, CodeMap contained in Session.."
 echo "the codemap/filemap are also accesible from ctxt::.sess.codemap.files:~[@FILEMAP]"
-
+echo "codemap::Loc = @filename, @sourcetext, pos/offset"
