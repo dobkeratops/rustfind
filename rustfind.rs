@@ -91,7 +91,7 @@ fn get_ast_and_resolve(cpath: &Path, libs: ~[Path]) -> DocContext {
 
     let diagnostic_handler = syntax::diagnostic::mk_handler(None);
     let span_diagnostic_handler =
-        syntax::diagnostic::mk_span_handler(if quiet{no_emit}else{diagnostic_handler}, parsesess.cm);
+        syntax::diagnostic::mk_span_handler(diagnostic_handler, parsesess.cm);
 
 
     let mut sess = driver::driver::build_session_(sessopts, parsesess.cm,
