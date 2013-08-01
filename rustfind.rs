@@ -302,12 +302,27 @@ fn lookup_def_of_node_in_tree(dc:&DocContext,node_in_tree:&[AstNode],m:ShowDefMo
 	let node=node_in_tree.last();
 
 	// TODO:
+	/// see "librustc/driver/driver.rs" for how to get 'CrateCtxt' ....
+	//
 	// it seems "librustc/middle/typeck/check.rs:lookup(..)" would do what we want,
 	// but we need to figure out the context.. FnCtxt? CrateCtxt ?
 	// 'CrateCtxt' has 'method_map' ...
 	//
 	//rustc::middle::typeck::check::mod::blank_fn_ctxt(???
 	//rustc::middle::typeck::check::lookup(??, e, receiver, ??, ident, self_t, ty_params, DontDerefArgs, CheckTraitsAndInherentMNethods);
+
+	// this might do it ???
+	//	pub fn check_crate(tcx: ty::ctxt,
+	//              trait_map: resolve::TraitMap,
+    //              crate: &ast::crate)
+    //            -> (method_map, vtable_map) {
+
+
+	//pub fn resolve_crate(session: Session,
+    //                 lang_items: LanguageItems,
+    //                 crate: @crate)
+    //              -> CrateMap {
+
 
 	match *node {
 		astnode_expr(e)=>match e.node {
