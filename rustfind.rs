@@ -70,6 +70,12 @@ pub macro_rules! if_some {
 			None=>{}
 		}
 	);
+	($b:ident in $a:expr then $c:expr _else $d:expr)=>(
+		match $a {
+			Some($b)=>$c,
+			None=>{$d}
+		}
+	);
 }
 
 /// tags: crate,ast,parse resolve
@@ -255,32 +261,103 @@ enum ShowDefMode {
 }
 
 fn lookup_def_of_byte_pos(dc:&DocContext, bp:BytePos, m:ShowDefMode)->~str {
-	// TODO - cache these outside!!
+	let ndt=find_ast_node::find_node_in_tree_at_byte_pos(dc.crate,bp);
+	lookup_def_of_node_in_tree(dc,ndt,m)
+}
+
+fn dump_node_in_tree(ndt:&[AstNode]) {
+	for ndt.iter().advance |x| {print(x.kind_to_str()+".");} print("\n");
+}
+
+fn lookup_def_of_node_in_tree(dc:&DocContext,node_in_tree:&[AstNode],m:ShowDefMode)->~str {
+	// TODO - cache outside?
 	let node_spans=build_node_spans_table(dc.crate);
 	let node_def_node = build_node_def_node_table(dc);
 
-	let node = find_ast_node::find_node_at_byte_pos(dc.crate,bp);
+	let node=node_in_tree.last();
 
-	if_some!(id in node.ty_node_id() then {
+	match node.ty_node_id() {
+		Some(id) =>{
 
-		let (def_id,opt_info)= def_info_from_node_id(dc,node_spans,id); 
-		if_some!(info in opt_info then{
-			match node_spans.find(&def_id) {
-				None=>~"",
-				Some(def_info)=>{
-					let loc=get_source_loc(dc,def_info.span.lo);
-					let def_pos_str=
-						loc.file.name + ":"+loc.line.to_str()+":"+
-							match m { SDM_LineCol=>loc.col.to_str()+":", _ =>~"" }+"\n";
-					return	match m{
-						SDM_Source=>def_pos_str+get_node_source(dc.tycx,node_spans, def_id)+"\n",
-						SDM_GeditCmd=>"+"+loc.line.to_str()+" "+loc.file.name+" ",
-						_ => def_pos_str};
+			let (def_id,opt_info)= def_info_from_node_id(dc,node_spans,id); 
+			match opt_info {
+				Some(info)=> {
+					match node_spans.find(&def_id) {
+						None=>~"{no defining span for "+def_id.to_str()+"}",
+						Some(def_info)=>{
+							let loc=get_source_loc(dc,def_info.span.lo);
+							let def_pos_str=
+								loc.file.name + ":"+loc.line.to_str()+":"+
+									match m { SDM_LineCol=>loc.col.to_str()+":", _ =>~"" }+"\n";
+							return	match m{
+								SDM_Source=>def_pos_str+get_node_source(dc.tycx,node_spans, def_id)+"\n",
+								SDM_GeditCmd=>"+"+loc.line.to_str()+" "+loc.file.name+" ",
+								_ => def_pos_str
+							};
+	
 						}
-			};		
-		})
+					}
+				},
+				None=>{//return ~"none info for type"
+			// todo-factor out
+					dump_node_in_tree(node_in_tree);
+					println("{no ty_info for this node "
+		//				+" kind="+ 
+		//				if_some!(ni in node_spans.find(&id) then ni.kind.to_str() _else ~"no_info" )+"}"
+					);
+					println("try again with the actual node? kind=");
+					let oid=node.get_id();
+					match oid {
+						Some(id)=>{
+		//					let oinfo=node_spans.find(&id);
+		//				match oinfo {
+							let (def_id,opt_info)= def_info_from_node_id(dc,node_spans,id); 
+							match opt_info{
+								Some(i)=>{
+									// todo-factor out..
+									return "found info"+get_node_source(dc.tycx,node_spans, def_id)+"\n";
+								},
+								None=>{
+									return ~"none";
+								}
+							}
+						},
+						None=>{return~"node doesn't have id even";}
+				
+					}
+				}
+			}
+		}
+		None=> {
+			// todo-factor out
+			dump_node_in_tree(node_in_tree);
+			println("{no ty_info for this node "
+//				+" kind="+ 
+//				if_some!(ni in node_spans.find(&id) then ni.kind.to_str() _else ~"no_info" )+"}"
+			);
+			println("try again with the actual node?");
+			let oid=node.get_id();
+			match oid {
+				Some(id)=>{
+//					let oinfo=node_spans.find(&id);
+//				match oinfo {
+					let (def_id,opt_info)= def_info_from_node_id(dc,node_spans,id); 
+					match opt_info{
+						Some(i)=>{
+							// todo-factor out..
+							return "found info"+get_node_source(dc.tycx,node_spans, def_id)+"\n";
+						},
+						None=>{
+							return ~"none";
+						}
+					}
+				},
+				None=>{return~"node doesn't have id even";}
+				
+			}
+		}
+	};
 
-	})
 	return ~"";
 }
 
@@ -527,7 +604,7 @@ fn debug_test(dc:&DocContext) {
 
 		logi!(~"\n=====Find AST node at: ",loc.file.name,":",loc.line,":",loc.col,":"," =========");
 
-		let node = find_ast_node::find_in_tree(dc.crate,BytePos(test_cursor));
+		let node = find_ast_node::find_node_in_tree_at_byte_pos(dc.crate,BytePos(test_cursor));
 		let node_info =  find_ast_node::get_node_info_str(dc,node);
 		dump!(node_info);
 		println("node ast loc:"+(do node.map |x| { option_to_str(&x.get_id()) }).to_str());
@@ -604,7 +681,7 @@ pub fn rustfind_interactive(dc:&DocContext) {
 					let cmd1=match cmd[0] as char { '0'..'9'=>curr_file+":"+cmd,_=>cmd.to_str() };
 					let subtoks:~[&str]=cmd1.split_iter(':').collect();
 					curr_file=subtoks[0].to_str();
-					dump!(cmd1,subtoks,curr_file);
+					//dump!(cmd1,subtoks,curr_file);
 					let def=lookup_def_of_file_line_pos(dc, cmd1,SDM_Source);
 					print(def);
 					//println(def_of_symbol_to_str(dc,node_spans,node_def_node,toks[0]));

@@ -40,10 +40,11 @@ macro_rules! dump{ ($($a:expr),*)=>
 
 /// main
 pub fn find_node_at_byte_pos(c:@crate,_location:codemap::BytePos)->AstNode {
-	let tree_loc=find_in_tree(c,_location);
+	let tree_loc=find_node_in_tree_at_byte_pos(c,_location);
 	return tree_loc.last().clone();
 }
-pub fn find_in_tree(c:@crate,_location:codemap::BytePos)->~[AstNode] {
+
+pub fn find_node_in_tree_at_byte_pos(c:@crate,_location:codemap::BytePos)->~[AstNode] {
 	// TODO: Now that we have a sepereate 'node-spans table'
 	// would it be more efficient to use that?
 	// if we encoded hrc information in the node-spans-table,
@@ -164,11 +165,36 @@ pub enum AstNode
 	astnode_trait_method(@trait_method),
 	astnode_struct_def(@struct_def),
 	astnode_struct_field(@struct_field),
-	astnode_root	
+	astnode_root,
+	astnode_none
 }
 
-trait KindToStr {
+pub trait KindToStr {
 	fn kind_to_str(&self)->&'static str;
+}
+impl KindToStr for ast::decl {
+	fn kind_to_str(&self)->&'static str {
+		match self.node {
+		decl_local(l)=>"decl_local",
+		decl_item(x)=>x.kind_to_str(),
+		}
+	}	
+}
+impl KindToStr for ast::item {
+	fn kind_to_str(&self)->&'static str {
+		match (self.node) {
+		item_static(*)=>"static",
+		item_fn(*)=>"fn",
+		item_mod(*)=>"mod",
+		item_foreign_mod(*)=>"foreign_mod",
+		item_ty(*)=>"ty",
+		item_enum(*)=>"enum",
+		item_struct(*)=>"struct",
+		item_trait(*)=>"trait",
+		item_impl(*)=>"impl",
+		item_mac(*)=>"mac",
+		}
+	}
 }
 impl KindToStr for ast::expr {
 	fn kind_to_str(&self)->&'static str {
@@ -278,20 +304,21 @@ impl KindToStr for AstNode {
 		match *self {
 			astnode_mod(_)=>"mod",
 			astnode_view_item(_)=>"view_item",
-			astnode_item(_)=>"item",
+			astnode_item(x)=>x.kind_to_str(),
 			astnode_local(_)=>"local", 
 			astnode_block(_)=>"block",
 			astnode_stmt(_)=>"stmt",
 			astnode_arm(_)=>"arm",
 			astnode_pat(_)=>"pat",
-			astnode_decl(_)=>"decl",
-			astnode_expr(_)=>"decl",
+			astnode_decl(x)=>x.kind_to_str(),
+			astnode_expr(x)=>x.kind_to_str(),
 			astnode_ty(_)=>"ty",
 			astnode_ty_method(_)=>"ty_method",
 			astnode_trait_method(_)=>"trait_method",
 			astnode_struct_def(_)=>"struct_def",
 			astnode_struct_field(_)=>"struct_field",
 			astnode_root=>"root",
+			astnode_none=>"none"
 		}
 	}
 }
@@ -404,7 +431,8 @@ impl AstNodeAccessors for AstNode {
 			astnode_trait_method(ref x)=>x.get_id(),
 			astnode_struct_def(ref x)=>None,
 			astnode_struct_field(ref x)=>Some(x.node.id),
-			astnode_root=>None,
+			astnode_none|astnode_root=>None,
+			
 		}
 	}
 }
