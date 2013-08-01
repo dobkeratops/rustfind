@@ -269,12 +269,67 @@ fn dump_node_in_tree(ndt:&[AstNode]) {
 	for ndt.iter().advance |x| {print(x.kind_to_str()+".");} print("\n");
 }
 
+fn dump_methods_of_type(tycx:&ty::ctxt_, type_node_id:ast::node_id) {
+	let ot = tycx.node_types.find(&(type_node_id as uint));
+	match ot {
+		None=> {}, 
+		Some(t)=> {
+			for tycx.methods.iter().advance |(&k,&method)| {
+				dump!(method.transformed_self_ty, ot);
+				if method.transformed_self_ty==Some(*t) {
+					dump!(method);
+				}
+			}
+		}
+	}
+}
+fn dump_methods_of_t(tycx:&ty::ctxt_, t:*ty::t_opaque) {
+	for tycx.methods.iter().advance |(&k,&method)| {
+		dump!(method.transformed_self_ty, t);
+		if method.transformed_self_ty==Some(t) {
+			dump!(method);
+		}
+	}
+
+}
+
+
 fn lookup_def_of_node_in_tree(dc:&DocContext,node_in_tree:&[AstNode],m:ShowDefMode)->~str {
 	// TODO - cache outside?
 	let node_spans=build_node_spans_table(dc.crate);
 	let node_def_node = build_node_def_node_table(dc);
 
 	let node=node_in_tree.last();
+
+	// TODO:
+	// it seems "librustc/middle/typeck/check.rs:lookup(..)" would do what we want,
+	// but we need to figure out the context.. FnCtxt? CrateCtxt ?
+	// 'CrateCtxt' has 'method_map' ...
+	//
+	//rustc::middle::typeck::check::mod::blank_fn_ctxt(???
+	//rustc::middle::typeck::check::lookup(??, e, receiver, ??, ident, self_t, ty_params, DontDerefArgs, CheckTraitsAndInherentMNethods);
+
+	match *node {
+		astnode_expr(e)=>match e.node {
+			ast::expr_method_call(ref id,ref receiver,ref ident,ref ty_params,ref arg_exprs,ref call_sugar)=>{
+				io::println("TODO: lookup def of method call:... ");
+
+				dump!(id,receiver,ident,ty_params,arg_exprs,call_sugar);
+				let rec_ty_node= astnode_expr(*receiver).ty_node_id();
+				let rec_ty_node1= dc.tycx.node_types.find(&(*id as uint)); //astnode_expr(*receiver).ty_node_id();
+
+
+				if_some!(self_t in rec_ty_node then { dump_methods_of_type(dc.tycx, self_t)
+					//rustc::middle::typeck::check::lookup(??, e, receiver, ??, ident, self_t, ty_params, DontDerefArgs, CheckTraitsAndInherentMNethods);
+				});
+				dump!(rec_ty_node1);
+				if_some!(t in rec_ty_node1 then { dump_methods_of_t(dc.tycx, *t)});
+			}
+			_=>{}
+		},
+
+		_=>{}
+	}
 
 	match node.ty_node_id() {
 		Some(id) =>{
@@ -500,6 +555,7 @@ pub fn file_line_col_len_to_byte_pos(c:ty::ctxt,src_filename:&str,src_line:uint 
 	return None;
 }
 
+
 pub fn file_line_col_to_byte_pos(c:ty::ctxt,src_filename:&str,src_line:uint ,src_col:uint )->Option<codemap::BytePos>
 
 {
@@ -643,8 +699,9 @@ fn debug_test(dc:&DocContext) {
 	dump!(get_file_line_str(dc.tycx,"test_input.rs",9));
 	
 	logi!("\n====test full file:pos lookup====");
-	dump!(lookup_def_of_file_line_pos(dc, &"test_input.rs:9:20",SDM_Source));
-	dump!(lookup_def_of_file_line_pos(dc, &"test_input2.rs:3:12",SDM_Source));
+	dump!(lookup_def_of_file_line_pos(dc, &"test_input.rs:8:21",SDM_Source));println("");
+	dump!(lookup_def_of_file_line_pos(dc, &"test_input2.rs:3:12",SDM_Source));println("");
+	dump!(lookup_def_of_file_line_pos(dc, &"test_input.rs:10:8",SDM_Source));println("");
 	
 }
 
