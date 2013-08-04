@@ -334,57 +334,7 @@ fn lookup_def_of_node_in_tree(dc:&DocContext,node_in_tree:&[AstNode],m:ShowDefMo
 		}
 	}
 
-	// TODO:
-	// see "librustc/driver/driver.rs" for how to get 'CrateCtxt' ....
-	//
-	// it seems "librustc/middle/typeck/check.rs:lookup(..)" would do what we want,
-	// but we need to figure out the context.. FnCtxt? CrateCtxt ?
-	// 'CrateCtxt' has 'method_map' ...
-	//
-	//rustc::middle::typeck::check::mod::blank_fn_ctxt(???
-	//rustc::middle::typeck::check::lookup(??, e, receiver, ??, ident, self_t, ty_params, DontDerefArgs, CheckTraitsAndInherentMNethods);
-
-	// this might do it ???
-	//	pub fn check_crate(tcx: ty::ctxt,
-	//              trait_map: resolve::TraitMap,
-    //              crate: &ast::crate)
-    //            -> (method_map, vtable_map) {
-
-
-	//pub fn resolve_crate(session: Session,
-    //                 lang_items: LanguageItems,
-    //                 crate: @crate)
-    //              -> CrateMap {
-
-
-// librustc/middle/typeck/mod.rs:135:	
-// pub type method_map = @mut HashMap<ast::node_id, method_map_entry>;
-// method comes from 'method_map[expr.id]  ...
-
-
-        // no need to check for bot/err -- callee does that
-//        let expr_t = structurally_resolved_type(fcx,
-//                                                expr.span,
-//                                                fcx.expr_ty(rcvr));
-
-//       let tps = tps.map(|ast_ty| fcx.to_ty(ast_ty));
-//        match method::lookup(fcx,
-//                             expr,
-//                             rcvr,
-//                             callee_id,
-//                             method_name,
-//                             expr_t,
-//                             tps,
-//                             DontDerefArgs,
-//                             CheckTraitsAndInherentMethods,
-//                             AutoderefReceiver) {
-//            Some(ref entry) => {
-//               let method_map = fcx.inh.method_map;
-//                method_map.insert(expr.id, (*entry));
-//            }
-
-// currently phase_3_run_analysis_passes will return the method_map
-
+	// handle methods-calls
 	match *node {
 		astnode_expr(e)=>match e.node {
 			ast::expr_method_call(ref id,ref receiver,ref ident,ref ty_params,ref arg_exprs,ref call_sugar)=>{
@@ -418,86 +368,19 @@ fn lookup_def_of_node_in_tree(dc:&DocContext,node_in_tree:&[AstNode],m:ShowDefMo
 
 	}
 
+	// handle everything else
 	match node.ty_node_id() {
 		Some(id) =>{
 
 			let (def_id,opt_info)= def_info_from_node_id(dc,node_spans,id); 
 			match opt_info {
 				Some(info)=> {
-					match node_spans.find(&def_id) {
-						None=>~"{no defining span for "+def_id.to_str()+"}",
-						Some(def_info)=>{
-							let loc=get_source_loc(dc,def_info.span.lo);
-							let def_pos_str=
-								loc.file.name + ":"+loc.line.to_str()+":"+
-									match m { SDM_LineCol=>loc.col.to_str()+":", _ =>~"" }+"\n";
-							return	match m{
-								SDM_Source=>def_pos_str+get_node_source(dc.tycx,node_spans, def_id)+"\n",
-								SDM_GeditCmd=>"+"+loc.line.to_str()+" "+loc.file.name+" ",
-								_ => def_pos_str
-							};
-	
-						}
-					}
+					return mk_return_str(dc,m,node_spans,def_id);
 				},
-				None=>{//return ~"none info for type"
-			// todo-factor out
-					dump_node_in_tree(node_in_tree);
-					println("{no ty_info for this node "
-		//				+" kind="+ 
-		//				if_some!(ni in node_spans.find(&id) then ni.kind.to_str() _else ~"no_info" )+"}"
-					);
-					println("try again with the actual node? kind=");
-					let oid=node.get_id();
-					match oid {
-						Some(id)=>{
-		//					let oinfo=node_spans.find(&id);
-		//				match oinfo {
-							let (def_id,opt_info)= def_info_from_node_id(dc,node_spans,id); 
-							match opt_info{
-								Some(i)=>{
-									// todo-factor out..
-									return "found info"+get_node_source(dc.tycx,node_spans, def_id)+"\n";
-								},
-								None=>{
-									return ~"none";
-								}
-							}
-						},
-						None=>{return~"node doesn't have id even";}
-				
-					}
-				}
+				None=>return~"no_def_found"
 			}
 		}
-		None=> {
-			// todo-factor out
-			dump_node_in_tree(node_in_tree);
-			println("{no ty_info for this node "
-//				+" kind="+ 
-//				if_some!(ni in node_spans.find(&id) then ni.kind.to_str() _else ~"no_info" )+"}"
-			);
-			println("try again with the actual node?");
-			let oid=node.get_id();
-			match oid {
-				Some(id)=>{
-//					let oinfo=node_spans.find(&id);
-//				match oinfo {
-					let (def_id,opt_info)= def_info_from_node_id(dc,node_spans,id); 
-					match opt_info{
-						Some(i)=>{
-							// todo-factor out..
-							return "found info"+get_node_source(dc.tycx,node_spans, def_id)+"\n";
-						},
-						None=>{
-							return ~"none";
-						}
-					}
-				},
-				None=>{return~"node doesn't have id even";}
-				
-			}
-		}
+		None=> { return ~"no_def_found";}
 	};
 
 	return ~"";
