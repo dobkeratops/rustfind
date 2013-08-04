@@ -368,22 +368,35 @@ fn lookup_def_of_node_in_tree(dc:&DocContext,node_in_tree:&[AstNode],m:ShowDefMo
 	match *node {
 		astnode_expr(e)=>match e.node {
 			ast::expr_method_call(ref id,ref receiver,ref ident,ref ty_params,ref arg_exprs,ref call_sugar)=>{
-				io::println("TODO: lookup def of method call:... ");
+//				io::println("TODO: lookup def of method call:... ");
 //				dump!(id,receiver,ident,ty_params,arg_exprs,call_sugar);
 				let rec_ty_node= astnode_expr(*receiver).ty_node_id();
 				let rec_ty_node1= dc.tycx.node_types.find(&(*id as uint));
-				logi!( "ident=",ident.name,":",syntax::parse::token::ident_to_str(ident));
+//				logi!( "ident=",ident.name,":",syntax::parse::token::ident_to_str(ident));
 
 				match dc.ca.maps.method_map.find(&e.id) {
-					None=>logi!("no method map entry for",e.id),
+					None=> {},//logi!("no method map entry for",e.id),
 					Some(mme)=>{
-						logi!("Method Map entry for",e.id);
+						//logi!("Method Map entry for",e.id);
 						match mme.origin {
 							typeck::method_static(def_id)=> {
-								dump!(def_id );
-								print(get_node_source(dc.tycx, node_spans, def_id.node));
+								match node_spans.find(&def_id.node) {
+									None=>return ~"{no defining span for "+def_id.node.to_str()+"}",
+									Some(def_info)=>{
+										let loc=get_source_loc(dc,def_info.span.lo);
+										let def_pos_str=
+											loc.file.name + ":"+loc.line.to_str()+":"+
+												match m { SDM_LineCol=>loc.col.to_str()+":", _ =>~"" }+"\n";
+										return	match m{
+											SDM_Source=>def_pos_str+get_node_source(dc.tycx,node_spans, def_id.node)+"\n",
+											SDM_GeditCmd=>"+"+loc.line.to_str()+" "+loc.file.name+" ",
+											_ => def_pos_str
+										};
+	
+									}
+								}
 							},
-							_=>logi!("unhandled case")
+							_=>{}//logi!("unhandled case")
 						}
 					}
 				}
