@@ -554,8 +554,6 @@ fn fcns_struct_field(a:@struct_field, (s,v):NodeSpansSV) {
 }
 
 fn fcns_type_method(a:&TypeMethod, (s,v):NodeSpansSV) {
-	println("FOUND TYPE METHOD");
-	dump!(a);
 	push_span(s,a.id,Some(a.ident),"type_method",a.span);
 	visit_ty_method(a,(s,v))
 }
