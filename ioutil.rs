@@ -67,7 +67,8 @@ impl<T> VoidPtr for T {
 pub fn printStr<T:ToStr>(a:&T){println(a.to_str());}
 
 pub fn c_str(rustStr:&str)->*c_char {
-	as_c_str(rustStr,|x|x)
+//	as_c_str(rustStr,|x|x)
+	rustStr.as_c_str(|x|x)
 }
 pub unsafe fn fileOpen(filename:&str,mode:&str)-> *FILE {
 	fopen(c_str(filename),c_str(mode))
@@ -88,7 +89,7 @@ pub unsafe fn fileWriteStruct<T>(fp:*FILE, s:&T) {
 	fwrite(as_void_ptr(s),size_of::<T>() as Size_t,1,fp);
 }
 
-pub unsafe fn fileRead<T:Zero+Copy>(fp:*FILE,numElems:Size_t)->~[T] {
+pub unsafe fn fileRead<T:Zero+Clone>(fp:*FILE,numElems:Size_t)->~[T] {
 	let buffer=from_elem(numElems as uint, Zero::zero());
 	fread(as_mut_void_ptr(&buffer[0]),numElems,size_of::<T>() as Size_t,fp);
 	buffer
@@ -96,7 +97,7 @@ pub unsafe fn fileRead<T:Zero+Copy>(fp:*FILE,numElems:Size_t)->~[T] {
 
 pub unsafe fn fileReadBytes(fp:*FILE,numBytes:Size_t)->~[u8] {
 	// todo - simply express as the above..
-	let buffer=from_elem(numBytes as uint,0);
+	let buffer=from_elem(numBytes as uint,0 as u8);
 	fread(as_mut_void_ptr(&buffer[0]),numBytes,1,fp);
 	buffer
 }

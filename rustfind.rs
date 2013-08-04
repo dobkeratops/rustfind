@@ -89,11 +89,12 @@ fn get_ast_and_resolve(cpath: &Path, libs: ~[Path]) -> DocContext {
         binary: @"rustdoc",
         maybe_sysroot: Some(@std::os::self_exe_path().get().pop()),
         addl_lib_search_paths: @mut libs,
-        .. copy (*rustc::driver::session::basic_options())
+        ..  (*rustc::driver::session::basic_options()).clone()
     };
 	let quiet=true;
 	fn no_emit(cmsp: Option<(@codemap::CodeMap, codemap::span)>, msg: &str, lvl: syntax::diagnostic::level) {
 	}
+
 
     let diagnostic_handler = syntax::diagnostic::mk_handler(None);
     let span_diagnostic_handler =
@@ -104,13 +105,20 @@ fn get_ast_and_resolve(cpath: &Path, libs: ~[Path]) -> DocContext {
                                                   if quiet{no_emit}else{syntax::diagnostic::emit},
                                                   span_diagnostic_handler);
 
-    let (crate, tycx) = driver::driver::compile_upto(sess, sessopts.cfg.clone(),
+/*    let (crate, tycx) = driver::driver::compile_upto(sess, sessopts.cfg.clone(),
                                                      &driver::driver::file_input(cpath.clone()),
                                                      driver::driver::cu_no_trans, None);
-                                                     
-	let c=crate.unwrap();
-	let t=tycx.unwrap();
-    DocContext { crate: c, tycx: t, sess: sess }
+*/
+	let input=driver::driver::file_input(cpath.clone());
+	let cfg= driver::driver::build_configuration(sess, @"", &input);
+
+	let crate1=driver::driver::phase_1_parse_input(sess,cfg.clone(),&input);
+	let crate2=driver::driver::phase_2_configure_and_expand(sess,cfg,crate1);
+	
+	let ca=driver::driver::phase_3_run_analysis_passes(sess,crate2);  
+//	let c=crate.unwrap();
+//	let t=tycx.unwrap();
+    DocContext { crate: crate2, tycx: ca.ty_cx, sess: sess, ca:ca }
 }
 
 fn main() {
@@ -214,7 +222,8 @@ fn dump_json(dc:&DocContext) {
 	// need option to only write out nodes that map to definitons. 
 	println("{");
 	println("\tcode_map:[");
-	for dc.sess.codemap.files.iter().advance |f| {
+//	for dc.sess.codemap.files.iter().advance |f| {
+	for f in dc.sess.codemap.files.iter() {
 		print("\t\t{ name:\""+f.name+"\",\tstart_pos:"+f.start_pos.to_str()+
 			",\tlines:[\n"+ flatten_to_str(*f.lines, |&x|{*x} ,",") +
 			"\n\t\t]\n\t},\n");
@@ -266,15 +275,17 @@ fn lookup_def_of_byte_pos(dc:&DocContext, bp:BytePos, m:ShowDefMode)->~str {
 }
 
 fn dump_node_in_tree(ndt:&[AstNode]) {
-	for ndt.iter().advance |x| {print(x.kind_to_str()+".");} print("\n");
+//	for ndt.iter().advance |x|
+	for x in ndt.iter()
+	 {print(x.kind_to_str()+".");} print("\n");
 }
 
-fn dump_methods_of_type(tycx:&ty::ctxt_, type_node_id:ast::node_id) {
+fn dump_methods_of_type(tycx:&ty::ctxt_, type_node_id:ast::NodeId) {
 	let ot = tycx.node_types.find(&(type_node_id as uint));
 	match ot {
 		None=> {}, 
 		Some(t)=> {
-			for tycx.methods.iter().advance |(&k,&method)| {
+			for (&k,&method) in tycx.methods.iter() {
 				dump!(method.transformed_self_ty, ot);
 				if method.transformed_self_ty==Some(*t) {
 					dump!(method);
@@ -284,7 +295,7 @@ fn dump_methods_of_type(tycx:&ty::ctxt_, type_node_id:ast::node_id) {
 	}
 }
 fn dump_methods_of_t(tycx:&ty::ctxt_, t:*ty::t_opaque) {
-	for tycx.methods.iter().advance |(&k,&method)| {
+	for (&k,&method) in tycx.methods.iter() {
 		dump!(method.transformed_self_ty, t);
 		if method.transformed_self_ty==Some(t) {
 			dump!(method);
@@ -302,7 +313,7 @@ fn lookup_def_of_node_in_tree(dc:&DocContext,node_in_tree:&[AstNode],m:ShowDefMo
 	let node=node_in_tree.last();
 
 	// TODO:
-	/// see "librustc/driver/driver.rs" for how to get 'CrateCtxt' ....
+	// see "librustc/driver/driver.rs" for how to get 'CrateCtxt' ....
 	//
 	// it seems "librustc/middle/typeck/check.rs:lookup(..)" would do what we want,
 	// but we need to figure out the context.. FnCtxt? CrateCtxt ?
@@ -322,6 +333,35 @@ fn lookup_def_of_node_in_tree(dc:&DocContext,node_in_tree:&[AstNode],m:ShowDefMo
     //                 lang_items: LanguageItems,
     //                 crate: @crate)
     //              -> CrateMap {
+
+
+// librustc/middle/typeck/mod.rs:135:	
+// pub type method_map = @mut HashMap<ast::node_id, method_map_entry>;
+// method comes from 'method_map[expr.id]  ...
+
+
+        // no need to check for bot/err -- callee does that
+//        let expr_t = structurally_resolved_type(fcx,
+//                                                expr.span,
+//                                                fcx.expr_ty(rcvr));
+
+//       let tps = tps.map(|ast_ty| fcx.to_ty(ast_ty));
+//        match method::lookup(fcx,
+//                             expr,
+//                             rcvr,
+//                             callee_id,
+//                             method_name,
+//                             expr_t,
+//                             tps,
+//                             DontDerefArgs,
+//                             CheckTraitsAndInherentMethods,
+//                             AutoderefReceiver) {
+//            Some(ref entry) => {
+//               let method_map = fcx.inh.method_map;
+//                method_map.insert(expr.id, (*entry));
+//            }
+
+// currently phase_3_run_analysis_passes will return the method_map
 
 
 	match *node {
@@ -468,7 +508,7 @@ fn loc_to_str(loc:codemap::Loc)->~str {
 	loc.file.name+":"+loc.line.to_str()+":"+loc.col.to_str()+":"
 }
 
-pub fn dump_node_source_for_single_file_only(text:&[u8], ns:&NodeSpans, id:ast::node_id) {
+pub fn dump_node_source_for_single_file_only(text:&[u8], ns:&NodeSpans, id:ast::NodeId) {
 	match(ns.find(&id)) {None=>logi!("()"),
 		Some(info)=>{
 			dump_span(text, &info.span);
@@ -477,7 +517,7 @@ pub fn dump_node_source_for_single_file_only(text:&[u8], ns:&NodeSpans, id:ast::
 }
 
 // TODO- this should return a slice
-pub fn get_node_source(c:ty::ctxt, ns:&NodeSpans, id:ast::node_id)->~str {
+pub fn get_node_source(c:ty::ctxt, ns:&NodeSpans, id:ast::NodeId)->~str {
 	match (ns.find(&id)){
 		None=>~"",
 		Some(info)=>{
@@ -504,7 +544,7 @@ pub fn dump_span(text:&[u8], sp:&codemap::span) {
 }
 
 
-pub fn def_info_from_node_id<'a,'b>(dc:&'a DocContext, node_spans:&'b NodeSpans, id:ast::node_id)->(int,Option<&'b NodeInfo>) {
+pub fn def_info_from_node_id<'a,'b>(dc:&'a DocContext, node_spans:&'b NodeSpans, id:ast::NodeId)->(int,Option<&'b NodeInfo>) {
 	let crate_num=0;
 	match dc.tycx.def_map.find(&id) { // finds a def..
 		Some(a)=>{
@@ -524,7 +564,7 @@ pub fn def_info_from_node_id<'a,'b>(dc:&'a DocContext, node_spans:&'b NodeSpans,
 pub fn dump_ctxt_def_map(dc:&DocContext) {
 //	let a:()=ctxt.tycx.node_types
 	logi!("===Test ctxt def-map table..===");
-	for dc.tycx.def_map.iter().advance |(key,value)|{
+	for (key,value) in dc.tycx.def_map.iter(){
 		dump!(key,value);
 	}
 }
@@ -616,17 +656,17 @@ pub fn text_span<'a,'b>(text:&'a [u8],s:&'b codemap::span)->&'a[u8] {
 	text.slice(*s.lo,*s.hi)
 }
 
-pub fn build_node_def_node_table(dc:&DocContext)->~HashMap<ast::node_id, ast::def_id>
+pub fn build_node_def_node_table(dc:&DocContext)->~HashMap<ast::NodeId, ast::def_id>
 {
 	let mut r=~HashMap::new();
 	let curr_crate_id_hack=0;	// TODO WHAT IS CRATE ID REALLY?!
 	// todo .. for range(0,c.next_id) || ??
-	let mut id:ast::node_id=0;
-	while id<*(dc.tycx.next_id) as ast::node_id {
+	let mut id:ast::NodeId=0;
+	while id<*(dc.tycx.next_id) as ast::NodeId {
 		if_some!(t in safe_node_id_to_type(dc.tycx,id as int) then {
 			if_some!(def in dc.tycx.def_map.find(&(id as int)) then { // finds a def..
 				if_some!(did in get_def_id(curr_crate_id_hack,*def) then {
-					r.insert(id as ast::node_id,did);
+					r.insert(id as ast::NodeId,did);
 				})
 			});
 		});
@@ -635,7 +675,7 @@ pub fn build_node_def_node_table(dc:&DocContext)->~HashMap<ast::node_id, ast::de
 	r
 }
 
-pub fn def_node_id_from_node_id(dc:&DocContext, id:ast::node_id)->ast::node_id {
+pub fn def_node_id_from_node_id(dc:&DocContext, id:ast::NodeId)->ast::NodeId {
 	let crate_num=0;	// TODO - whats crate Id really???
 	match dc.tycx.def_map.find(&id) { // finds a def..
 		Some(a)=>{
@@ -740,7 +780,7 @@ pub fn rustfind_interactive(dc:&DocContext) {
 				"h"|""=> println("interactive mode - enter file:line:pos or line:pos for current fileo\n j-dump json q-quit i-info\n"),
 				"i"=> {
 					println("files in current crate:-\n");
-					for dc.tycx.sess.codemap.files.iter().advance |x| {
+					for x in dc.tycx.sess.codemap.files.iter() {
 						println("\t"+x.name);
 					}
 				}
@@ -763,7 +803,7 @@ pub fn rustfind_interactive(dc:&DocContext) {
 	}
 }
 
-pub fn def_of_symbol_to_str(dc:&DocContext, ns:&NodeSpans,ds:&HashMap<ast::node_id, ast::def_id>,s:&str)->~str {
+pub fn def_of_symbol_to_str(dc:&DocContext, ns:&NodeSpans,ds:&HashMap<ast::NodeId, ast::def_id>,s:&str)->~str {
 	~"TODO"	
 }
 

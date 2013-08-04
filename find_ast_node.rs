@@ -2,8 +2,8 @@ use syntax::ast;
 use syntax::ast::*;
 use syntax::ast_map;
 use syntax::visit;
-use syntax::visit::*;
-use syntax::visit::{Visitor, fn_kind};
+use syntax::oldvisit::*;
+use syntax::oldvisit::{Visitor, fn_kind};
 use syntax::codemap::*;
 use rustc::{front, metadata, driver, middle};
 use rustc::middle::mem_categorization::ast_node;
@@ -22,9 +22,10 @@ use std::hashmap::HashMap;
 
 // TODO: code here only depends on ty::ctxt, sess:Session is held in there aswell.
 pub struct DocContext {
-    crate: @ast::crate,
+    crate: @ast::Crate,
     tycx: middle::ty::ctxt,
-    sess: driver::session::Session
+    sess: driver::session::Session,
+	ca: driver::driver::CrateAnalysis
 }
 
 
@@ -39,12 +40,12 @@ macro_rules! dump{ ($($a:expr),*)=>
 }
 
 /// main
-pub fn find_node_at_byte_pos(c:@crate,_location:codemap::BytePos)->AstNode {
+pub fn find_node_at_byte_pos(c:@Crate,_location:codemap::BytePos)->AstNode {
 	let tree_loc=find_node_in_tree_at_byte_pos(c,_location);
 	return tree_loc.last().clone();
 }
 
-pub fn find_node_in_tree_at_byte_pos(c:@crate,_location:codemap::BytePos)->~[AstNode] {
+pub fn find_node_in_tree_at_byte_pos(c:@Crate,_location:codemap::BytePos)->~[AstNode] {
 	// TODO: Now that we have a sepereate 'node-spans table'
 	// would it be more efficient to use that?
 	// if we encoded hrc information in the node-spans-table,
@@ -84,9 +85,9 @@ pub struct NodeInfo {
 	kind:~str,
 	span:codemap::span
 }
-pub type NodeSpans= HashMap<ast::node_id,NodeInfo>;
+pub type NodeSpans= HashMap<ast::NodeId,NodeInfo>;
 
-pub fn build_node_spans_table(c:@crate)->@mut NodeSpans {
+pub fn build_node_spans_table(c:@Crate)->@mut NodeSpans {
 	// todo-lambdas, big fcuntion but remove the extraneous symbols
 	let node_spans=@mut HashMap::new();
 	let vt=mk_vt(@Visitor{
@@ -123,7 +124,8 @@ pub fn node_spans_table_to_json_sub(ns:&NodeSpans)->~str {
 	// TODO - is there a cleaner functional way,
 	// map (|x| fmt...).flatten_to_str() or something like that..
 	let mut r=~"";
-	for ns.iter().advance |(k,v)| {
+//	for ns.iter().advance |(k,v)| {
+	for (k,v) in ns.iter() {
 		r.push_str(fmt!("\t{node_id:%i,\tkind:\"%s\",\tspan:{lo:%u,\thi:%u}},\n",*k,v.kind,*v.span.lo,*v.span.hi));
 	}
 	r
@@ -133,10 +135,11 @@ impl ToJsonStr for NodeSpans {
 		~"[\n"+node_spans_table_to_json_sub(self)+~"]\n"
 	}
 }
-impl ToJsonStr for HashMap<ast::node_id,ast::def_id> {
+impl ToJsonStr for HashMap<ast::NodeId,ast::def_id> {
 	pub fn to_json_str(&self)->~str {
 		let mut r=~"[\n";
-		for self.iter().advance|(&key,&value)| {
+//		for self.iter().advance|(&key,&value)| {
+		for (&key,&value) in self.iter() {
 			r.push_str(fmt!("\t{node_id:%?,\tdef_id:{crate:%?,node:%?}},\n", key, value.crate,value.node));
 		}
 		r.push_str("]\n");
@@ -153,15 +156,15 @@ pub enum AstNode
 	astnode_mod(@_mod),
 	astnode_view_item(@view_item),
 	astnode_item(@item),
-	astnode_local(@local),
-	astnode_block(@blk),
+	astnode_local(@Local),
+	astnode_block(@Block),
 	astnode_stmt(@stmt),
 	astnode_arm(@arm),
 	astnode_pat(@pat),
 	astnode_decl(@decl),
 	astnode_expr(@expr),
 	astnode_ty(@Ty),
-	astnode_ty_method(@ty_method),
+	//astnode_ty_method(@ty_method),
 	astnode_trait_method(@trait_method),
 	astnode_struct_def(@struct_def),
 	astnode_struct_field(@struct_field),
@@ -238,13 +241,12 @@ impl KindToStr for ast::expr {
     	expr_if(_,_,_)=>"if",
 
 	    expr_while(_, _)=>"while",
+	    expr_for_loop(_, _,_)=>"for_loop",
 	    expr_loop(_, _)=>"loop",
 	    expr_match(_, _)=>"match",
 	    expr_fn_block(_, _)=>"fn_blk",
-	    expr_loop_body(_)=>"loop_body",
 	    expr_do_body(_)=>"do_body",
 	    expr_block(_)=>"blk",
-	    expr_copy(_)=>"copy,",
 	    expr_assign(_,_)=>"assign",
 	    expr_assign_op(_, binop, _, _)=>match binop {
 			add=>"assign_add",
@@ -287,11 +289,11 @@ impl KindToStr for ast::expr {
 impl AstNode {
 	// Accessor for the node_id to use for getting definition
 	// TODO - clarify by wrapping access to def_map here?
-	pub fn ty_node_id(&self)->Option<ast::node_id> {
+	pub fn ty_node_id(&self)->Option<ast::NodeId> {
 		match *self {
 			astnode_ty(ty)=>
 				match(ty.node) {
-					ty_path(_,_,node_id)=>Some(node_id),
+					ty_path(_,_,NodeId)=>Some(NodeId),
 					_ => self.get_id()
 				},
 			_ => self.get_id()
@@ -313,7 +315,7 @@ impl KindToStr for AstNode {
 			astnode_decl(x)=>x.kind_to_str(),
 			astnode_expr(x)=>x.kind_to_str(),
 			astnode_ty(_)=>"ty",
-			astnode_ty_method(_)=>"ty_method",
+			//astnode_ty_method(_)=>"ty_method",
 			astnode_trait_method(_)=>"trait_method",
 			astnode_struct_def(_)=>"struct_def",
 			astnode_struct_field(_)=>"struct_field",
@@ -324,24 +326,24 @@ impl KindToStr for AstNode {
 }
 
 pub trait AstNodeAccessors {
-	pub fn get_id(&self)->Option<ast::node_id>;
+	pub fn get_id(&self)->Option<ast::NodeId>;
 }
 impl AstNodeAccessors for ast::item {
-	pub fn get_id(&self)->Option<ast::node_id> {
+	pub fn get_id(&self)->Option<ast::NodeId> {
 		Some(self.id)
 	}
 }
-impl AstNodeAccessors for ast::local_ {
-	pub fn get_id(&self)->Option<ast::node_id> {
+impl AstNodeAccessors for ast::Local {
+	pub fn get_id(&self)->Option<ast::NodeId> {
 		Some(self.id)
 	}
 }
 
 impl AstNodeAccessors for ast::item_ {
-	pub fn get_id(&self)->Option<ast::node_id> {
+	pub fn get_id(&self)->Option<ast::NodeId> {
 		match *self {
 		item_static(_,_,ref e) => Some(e.id),
-		item_fn(ref decl,_,_,_,ref b)=>Some(b.node.id),
+		item_fn(ref decl,_,_,_,ref b)=>Some(b.id),
 		item_mod(_)=>None,
 		item_foreign_mod(_)=>None,
 		item_ty(ref ty,_)=>Some(ty.id),
@@ -355,30 +357,30 @@ impl AstNodeAccessors for ast::item_ {
 }
 
 impl AstNodeAccessors for ast::decl_ {
-	pub fn get_id(&self)->Option<node_id> {
+	pub fn get_id(&self)->Option<NodeId> {
 		match *self{
-			decl_local(ref x)=>Some(x.node.id),
+			decl_local(ref x)=>Some(x.id),
 			decl_item(ref x)=>Some(x.id)
 		}
 	}
 }
 impl<T:AstNodeAccessors> AstNodeAccessors for codemap::spanned<T> {
-	pub fn get_id(&self)->Option<node_id> {
+	pub fn get_id(&self)->Option<NodeId> {
 		self.node.get_id()
 	}
 }
-impl AstNodeAccessors for ty_method {
-	pub fn get_id(&self)->Option<node_id> {
-		Some(self.id)
-	}
-}
-impl AstNodeAccessors for blk_ {
-	pub fn get_id(&self)->Option<node_id> {
+//impl AstNodeAccessors for ty_method {
+//	pub fn get_id(&self)->Option<NodeId> {
+//		Some(self.id)
+//	}
+//}
+impl AstNodeAccessors for ast::Block {
+	pub fn get_id(&self)->Option<NodeId> {
 		Some(self.id)
 	}
 }
 impl AstNodeAccessors for stmt_ {
-	pub fn get_id(&self)->Option<node_id> {
+	pub fn get_id(&self)->Option<NodeId> {
 		match *self {
 			stmt_decl(_,x)=>Some(x),
 			stmt_expr(_,x)=>Some(x),
@@ -389,7 +391,7 @@ impl AstNodeAccessors for stmt_ {
 }
 
 impl AstNodeAccessors for view_item_ {
-	pub fn get_id(&self)->Option<node_id> {
+	pub fn get_id(&self)->Option<NodeId> {
 		match *self {
 			view_item_extern_mod(_,_,node_id)=>Some(node_id),
 			view_item_use(_)=>None
@@ -397,13 +399,13 @@ impl AstNodeAccessors for view_item_ {
 	}
 }
 impl AstNodeAccessors for struct_field_ {
-	pub fn get_id(&self)->Option<node_id> {
+	pub fn get_id(&self)->Option<NodeId> {
 		Some(self.id)
 	}
 }
 
 impl AstNodeAccessors for trait_method {
-	pub fn get_id(&self)->Option<node_id> {
+	pub fn get_id(&self)->Option<NodeId> {
 		match(*self) {
 			required(ref m)=>Some(m.id),
 			provided(ref m)=>None
@@ -412,13 +414,13 @@ impl AstNodeAccessors for trait_method {
 }
 
 impl AstNodeAccessors for AstNode {
-	pub fn get_id(&self)->Option<node_id> {
+	pub fn get_id(&self)->Option<NodeId> {
 		// todo - should be option<node_id> really..
 		match *self {
 			astnode_mod(ref x) => None,
 			astnode_view_item(ref x) =>x.node.get_id(),
 			astnode_item(ref x) =>Some(x.id),
-			astnode_local(ref x) =>Some(x.node.id),
+			astnode_local(ref x) =>Some(x.id),
 			astnode_block(ref x)=>None,
 			astnode_stmt(ref x)=>None,
 			astnode_arm(ref x)=>None,
@@ -427,7 +429,7 @@ impl AstNodeAccessors for AstNode {
 			astnode_expr(ref x)=>Some(x.id),
 //			astnode_expr_post(ref x)=>Some(x.id),
 			astnode_ty(ref x)=>Some(x.id),
-			astnode_ty_method(ref x)=>Some(x.id),
+//			astnode_ty_method(ref x)=>Some(x.id),
 			astnode_trait_method(ref x)=>x.get_id(),
 			astnode_struct_def(ref x)=>None,
 			astnode_struct_field(ref x)=>Some(x.node.id),
@@ -456,7 +458,7 @@ pub struct FindAstNodeSt {
 //	node_spans: HashMap<ast::node_id,codemap::span>
 }
 
-pub fn push_span(spt:&mut NodeSpans,n:ast::node_id,idt:Option<ident>,k:&str, s:codemap::span) {
+pub fn push_span(spt:&mut NodeSpans,n:ast::NodeId,idt:Option<ident>,k:&str, s:codemap::span) {
 	spt.insert(n,NodeInfo{kind:k.to_str(),span:s});
 }
 
@@ -480,12 +482,15 @@ fn fcns_item(a:@item, (s,v):NodeSpansSV) {
 	push_span(s,a.id,item_get_ident(a),"item",a.span);
 	visit_item(a,(s,v))
 }
-fn fcns_local(a:@local, (s,v):NodeSpansSV) {
-	push_spanned(s,"local",a);
+fn fcns_local(a:@Local, (s,v):NodeSpansSV) {
+//	push_spanned(s,"local",a);
+	// local var? pattern not ident..
+	push_span(s, a.id, None,"local",a.span);
 	visit_local(a,(s,v))
 }
-fn fcns_block(a:&blk, (s,v):NodeSpansSV) {
-	push_spanned(s,"block",a);
+fn fcns_block(a:&Block, (s,v):NodeSpansSV) {
+//	push_spanned(s,"block",a);
+	push_span(s, a.id, None, "block",a.span);
 	visit_block(a,(s,v))
 }
 fn fcns_stmt(a:@stmt, (s,v):NodeSpansSV) {
@@ -493,7 +498,10 @@ fn fcns_stmt(a:@stmt, (s,v):NodeSpansSV) {
 	visit_stmt(a,(s,v))
 }
 fn fcns_arm(a:&arm, (s,v):NodeSpansSV) {
-	push_spanned(s,"arm",&a.body);
+//	push_spanned(s,"arm",&a.body);
+	// todo - does an arm even have a node id?
+//	push_span(s, a.body.id, None,"arm", a.span);
+// ERRORTODO..
 	visit_arm(a,(s,v))
 }
 fn fcns_pat(a:@pat, (s,v):NodeSpansSV) {
@@ -504,7 +512,7 @@ fn fcns_decl(a:@decl, (s,v):NodeSpansSV) {
 	push_spanned(s,"decl",a);
 	visit_decl(a,(s,v))
 }
-fn fcns_struct_def(sd:@struct_def, ide:ident, g:&Generics, id:node_id, (s,b):NodeSpansSV) {
+fn fcns_struct_def(sd:@struct_def, ide:ident, g:&Generics, id:NodeId, (s,b):NodeSpansSV) {
 	visit_struct_def(sd,ide,g,id,(s,b))
 }
 
@@ -524,7 +532,7 @@ fn fcns_ty(a:&Ty, (s,v):NodeSpansSV) {
 	push_span(s,a.id,None,"ty",a.span);
 	visit_ty(a,(s,v))
 }
-fn fcns_fn(fk:&fn_kind, fd:&fn_decl, body:&blk, sp:span, nid:node_id, (s,v):NodeSpansSV) {
+fn fcns_fn(fk:&fn_kind, fd:&fn_decl, body:&Block, sp:span, nid:NodeId, (s,v):NodeSpansSV) {
 	visit_fn(fk,fd,body,sp,nid,(s,v))
 }
 fn fcns_struct_field(a:@struct_field, (s,v):NodeSpansSV) {
@@ -544,7 +552,7 @@ fn fcns_struct_field(a:@struct_field, (s,v):NodeSpansSV) {
 type FindAstNodeSV = (@mut FindAstNodeSt, vt<@mut FindAstNodeSt>);
 fn find_view_item(a:&view_item, (s,v):FindAstNodeSV) {
 	if span_contains(s.location, a.span) {
-		s.result.push(astnode_view_item(@ copy *a));
+		s.result.push(astnode_view_item(@a.clone()));
 	}
 	visit_view_item(a,(s,v))
 }// struct Visitor<E>.visit_foreign_item: @fn(@foreign_item, (E, vt<E>)),
@@ -556,7 +564,7 @@ fn find_item(a:@item, (s,v):FindAstNodeSV) {
 	visit_item(a,(s,v))
 }
 // struct Visitor<E>.visit_local: @fn(@local, (E, vt<E>)),
-fn find_local(a:@local, (s,v):FindAstNodeSV) {
+fn find_local(a:@Local, (s,v):FindAstNodeSV) {
 	if span_contains(s.location, a.span) {
 		s.result.push(astnode_local(a));
 	}
@@ -564,9 +572,9 @@ fn find_local(a:@local, (s,v):FindAstNodeSV) {
 }
 
 // struct Visitor<E>.visit_block: @fn(&blk, (E, vt<E>)),
-fn find_block(a:&blk, (s,v):FindAstNodeSV) {
+fn find_block(a:&Block, (s,v):FindAstNodeSV) {
 	if span_contains(s.location, a.span) {
-		s.result.push(astnode_block(@ copy *a));
+		s.result.push(astnode_block(@a.clone()));
 	}
 	visit_block(a,(s,v))
 }
@@ -625,7 +633,7 @@ fn find_expr_post(a:@expr, (s,v):FindAstNodeSV) {
 // struct Visitor<E>.visit_ty: @fn(&Ty, (E, vt<E>)),
 fn find_ty(a:&Ty, (s,v):FindAstNodeSV) {
 	if span_contains(s.location, a.span) {
-		s.result.push(astnode_ty(@copy *a));
+		s.result.push(astnode_ty(@a.clone()));
 	}
 	visit_ty(a,(s,v))
 }
@@ -634,7 +642,7 @@ fn find_ty(a:&Ty, (s,v):FindAstNodeSV) {
 // struct Visitor<E>.visit_fn: @fn(&fn_kind, &fn_decl, &blk, span, node_id, (E, vt<E>)),
 
 
-fn find_fn(fk:&fn_kind, fd:&fn_decl, body:&blk, sp:span, nid:node_id, (s,v):FindAstNodeSV) {
+fn find_fn(fk:&fn_kind, fd:&fn_decl, body:&Block, sp:span, nid:NodeId, (s,v):FindAstNodeSV) {
 	//if span_contains(s.location, span) {
 		//s.result.push(astnode_fn2(a));
 	//}
@@ -666,7 +674,8 @@ pub fn get_node_info_str(dc:&DocContext,node:&[AstNode])->~str
 	{
 		let mut acc=~"";
 		let mut first=true;
-		for path.idents.iter().advance |x|{
+//		for path.idents.iter().advance |x|{
+		for x in path.idents.iter() {
 			if !first {acc=acc.append(~"::");}
 			acc=acc.append(dc.sess.str_of(*x));
 			first=false
@@ -756,7 +765,7 @@ pub fn get_node_info_str(dc:&DocContext,node:&[AstNode])->~str
 	}
 }
 
-pub fn safe_node_id_to_type(cx: ty::ctxt, id: ast::node_id) -> Option<ty::t> {
+pub fn safe_node_id_to_type(cx: ty::ctxt, id: ast::NodeId) -> Option<ty::t> {
     //io::println(fmt!("%?/%?", id, cx.node_types.len()));
     match cx.node_types.find(&(id as uint)) {
        Some(&t) => Some(t),
@@ -764,7 +773,7 @@ pub fn safe_node_id_to_type(cx: ty::ctxt, id: ast::node_id) -> Option<ty::t> {
 	}
 }
 
-pub fn get_def_id(curr_crate:crate_num,src_def:def)->Option<def_id> {
+pub fn get_def_id(curr_crate:CrateNum,src_def:def)->Option<def_id> {
 	let mk=|x|{Some(def_id{crate:curr_crate, node:x})}; // todo,mmaybe this is best 'None'..
 	// todo-'definition' can be at multiple locations. we should return [def_id] really..
 	match (src_def) {
