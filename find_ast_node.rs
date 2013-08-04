@@ -116,6 +116,7 @@ pub fn build_node_spans_table(c:@Crate)->@mut NodeSpans {
 	node_spans
 }
 
+
 pub trait ToJsonStr {
 	fn to_json_str(&self)->~str;
 }
@@ -126,15 +127,18 @@ pub fn node_spans_table_to_json_sub(ns:&NodeSpans)->~str {
 	let mut r=~"";
 //	for ns.iter().advance |(k,v)| {
 	for (k,v) in ns.iter() {
+		//let (_,line,_)=byte_pos_to_file_line_col(c,*v.span.lo);
 		r.push_str(fmt!("\t{node_id:%i,\tkind:\"%s\",\tspan:{lo:%u,\thi:%u}},\n",*k,v.kind,*v.span.lo,*v.span.hi));
 	}
 	r
 }
+
 impl ToJsonStr for NodeSpans {
 	pub fn to_json_str(&self)->~str {
 		~"[\n"+node_spans_table_to_json_sub(self)+~"]\n"
 	}
 }
+
 impl ToJsonStr for HashMap<ast::NodeId,ast::def_id> {
 	pub fn to_json_str(&self)->~str {
 		let mut r=~"[\n";
@@ -479,7 +483,7 @@ fn fcns_view_item(a:&view_item, (s,v):NodeSpansSV) {
 	visit_view_item(a,(s,v))
 }
 fn fcns_item(a:@item, (s,v):NodeSpansSV) {
-	push_span(s,a.id,item_get_ident(a),"item",a.span);
+	push_span(s,a.id,item_get_ident(a),a.kind_to_str(),a.span);
 	visit_item(a,(s,v))
 }
 fn fcns_local(a:@Local, (s,v):NodeSpansSV) {

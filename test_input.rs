@@ -20,6 +20,4 @@ struct Baz(int);
 impl Foo {
 	fn my_method(&self,i:int){ print("my_method of foo");}
 }
-impl Bar {
-	fn my_method(&self,i:int){ print("my_method of bar");}
-}
+

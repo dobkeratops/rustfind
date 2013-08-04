@@ -5,6 +5,7 @@ extern mod extra;
 
 use rustc::{front, metadata, driver, middle};
 use rustc::middle::*;
+use rustc::middle::typeck;
 
 use std::num;
 use std::num::*;
@@ -13,6 +14,7 @@ use syntax::parse;
 use syntax::ast;
 use syntax::ast_map;
 use syntax::visit;
+use syntax::parse::token;
 use syntax::visit::*;
 use syntax::visit::{Visitor, fn_kind};
 use find_ast_node::*;
@@ -363,27 +365,39 @@ fn lookup_def_of_node_in_tree(dc:&DocContext,node_in_tree:&[AstNode],m:ShowDefMo
 
 // currently phase_3_run_analysis_passes will return the method_map
 
-
 	match *node {
 		astnode_expr(e)=>match e.node {
 			ast::expr_method_call(ref id,ref receiver,ref ident,ref ty_params,ref arg_exprs,ref call_sugar)=>{
 				io::println("TODO: lookup def of method call:... ");
-
-				dump!(id,receiver,ident,ty_params,arg_exprs,call_sugar);
+//				dump!(id,receiver,ident,ty_params,arg_exprs,call_sugar);
 				let rec_ty_node= astnode_expr(*receiver).ty_node_id();
-				let rec_ty_node1= dc.tycx.node_types.find(&(*id as uint)); //astnode_expr(*receiver).ty_node_id();
+				let rec_ty_node1= dc.tycx.node_types.find(&(*id as uint));
+				logi!( "ident=",ident.name,":",syntax::parse::token::ident_to_str(ident));
 
-
-				if_some!(self_t in rec_ty_node then { dump_methods_of_type(dc.tycx, self_t)
+				match dc.ca.maps.method_map.find(&e.id) {
+					None=>logi!("no method map entry for",e.id),
+					Some(mme)=>{
+						logi!("Method Map entry for",e.id);
+						match mme.origin {
+							typeck::method_static(def_id)=> {
+								dump!(def_id );
+								print(get_node_source(dc.tycx, node_spans, def_id.node));
+							},
+							_=>logi!("unhandled case")
+						}
+					}
+				}
+//astnode_expr(*receiver).ty_node_id();
+				//if_some!(self_t in rec_ty_node then { dump_methods_of_type(dc.tycx, self_t)
 					//rustc::middle::typeck::check::lookup(??, e, receiver, ??, ident, self_t, ty_params, DontDerefArgs, CheckTraitsAndInherentMNethods);
-				});
-				dump!(rec_ty_node1);
-				if_some!(t in rec_ty_node1 then { dump_methods_of_t(dc.tycx, *t)});
-			}
+//				});
+//				dump!(rec_ty_node1);
+//				if_some!(t in rec_ty_node1 then { dump_methods_of_t(dc.tycx, *t)});
+			},
 			_=>{}
 		},
-
 		_=>{}
+
 	}
 
 	match node.ty_node_id() {
@@ -608,6 +622,28 @@ pub fn file_line_col_len_to_byte_pos(c:ty::ctxt,src_filename:&str,src_line:uint 
 		}
 	}
 	return None;
+}
+
+
+pub fn byte_pos_to_file_line_col(c:ty::ctxt, pos:uint)->(@str,uint,uint) {
+	let mut i=c.sess.codemap.files.len();
+	while i>0 {	
+			// caution, need loop because we return, wait for new foreach ..in..
+		i-=1;
+		let fm=&c.sess.codemap.files[i];
+		let filemap_filename:&str=fm.name;
+		if pos > *fm.start_pos {
+			let mut line=fm.lines.len();
+			while line>0 {
+				line-=1;
+				let lstart=*fm.lines[line];
+				if lstart > pos {
+					return (fm.name, line, pos-lstart)
+				}
+			}
+		}
+	}	
+	(@"",0,0)
 }
 
 
