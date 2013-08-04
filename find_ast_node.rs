@@ -104,7 +104,7 @@ pub fn build_node_spans_table(c:@Crate)->@mut NodeSpans {
 		visit_expr:fcns_expr,
 		//visit_expr_post:f_expr,--called after visit
 		visit_ty:fcns_ty,
-		//visit_method
+		visit_ty_method:fcns_type_method,
 		//visit_trait_method
 		visit_struct_def:fcns_struct_def,
 		visit_struct_field:fcns_struct_field,
@@ -168,7 +168,7 @@ pub enum AstNode
 	astnode_decl(@decl),
 	astnode_expr(@expr),
 	astnode_ty(@Ty),
-	//astnode_ty_method(@ty_method),
+	astnode_ty_method(@TypeMethod),
 	astnode_trait_method(@trait_method),
 	astnode_struct_def(@struct_def),
 	astnode_struct_field(@struct_field),
@@ -319,7 +319,7 @@ impl KindToStr for AstNode {
 			astnode_decl(x)=>x.kind_to_str(),
 			astnode_expr(x)=>x.kind_to_str(),
 			astnode_ty(_)=>"ty",
-			//astnode_ty_method(_)=>"ty_method",
+			astnode_ty_method(_)=>"ty_method",
 			astnode_trait_method(_)=>"trait_method",
 			astnode_struct_def(_)=>"struct_def",
 			astnode_struct_field(_)=>"struct_field",
@@ -433,7 +433,7 @@ impl AstNodeAccessors for AstNode {
 			astnode_expr(ref x)=>Some(x.id),
 //			astnode_expr_post(ref x)=>Some(x.id),
 			astnode_ty(ref x)=>Some(x.id),
-//			astnode_ty_method(ref x)=>Some(x.id),
+			astnode_ty_method(ref x)=>Some(x.id),
 			astnode_trait_method(ref x)=>x.get_id(),
 			astnode_struct_def(ref x)=>None,
 			astnode_struct_field(ref x)=>Some(x.node.id),
@@ -484,6 +484,15 @@ fn fcns_view_item(a:&view_item, (s,v):NodeSpansSV) {
 }
 fn fcns_item(a:@item, (s,v):NodeSpansSV) {
 	push_span(s,a.id,item_get_ident(a),a.kind_to_str(),a.span);
+	match (a.node) {
+		item_impl(ref typarams,ref traitref,ref self_ty, ref methods)=> {
+			for m in methods.iter() {
+				push_span(s,m.id,Some(a.ident),"method",m.span);
+				// iterate sub??
+			}
+		}
+		_ => {}
+	}
 	visit_item(a,(s,v))
 }
 fn fcns_local(a:@Local, (s,v):NodeSpansSV) {
@@ -543,6 +552,14 @@ fn fcns_struct_field(a:@struct_field, (s,v):NodeSpansSV) {
 	push_spanned(s,"struct_field",a);
 	visit_struct_field(a,(s,v))
 }
+
+fn fcns_type_method(a:&TypeMethod, (s,v):NodeSpansSV) {
+	println("FOUND TYPE METHOD");
+	dump!(a);
+	push_span(s,a.id,Some(a.ident),"type_method",a.span);
+	visit_ty_method(a,(s,v))
+}
+
 
 
 // struct Visitor<E>.visit_mod: @fn(&_mod, span, node_id, (E, vt<E>)),

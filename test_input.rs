@@ -16,8 +16,6 @@ fn main() {
 struct Foo(int);
 struct Bar(int);
 struct Baz(int);
-
 impl Foo {
 	fn my_method(&self,i:int){ print("my_method of foo");}
 }
-
