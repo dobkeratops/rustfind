@@ -412,7 +412,7 @@ fn lookup_def_of_node_in_tree(dc:&DocContext,node_in_tree:&[AstNode],m:ShowDefMo
 				let tydef=auto_deref_ty(ty::get(*obj_ty.unwrap()));
 				match tydef.sty {
 					ty::ty_struct(def,_)=> {
-						let node_to_show=some_or_else(&find_named_struct_field(dc.tycx, def.node, ident),&def.node);
+						let node_to_show=find_named_struct_field(dc.tycx, def.node, ident).get_or_default(def.node);
 						return mk_return_str(dc,m,node_spans,node_to_show);
 					},
 					_=>return ~"expected struct"
@@ -427,7 +427,6 @@ fn lookup_def_of_node_in_tree(dc:&DocContext,node_in_tree:&[AstNode],m:ShowDefMo
 	// handle everything else
 	match node.ty_node_id() {
 		Some(id) =>{
-
 			let (def_id,opt_info)= def_info_from_node_id(dc,node_spans,id); 
 			match opt_info {
 				Some(info)=> {
@@ -439,7 +438,7 @@ fn lookup_def_of_node_in_tree(dc:&DocContext,node_in_tree:&[AstNode],m:ShowDefMo
 		None=> { return ~"no_def_found";}
 	};
 
-	return ~"";
+	return ~"no def found";
 }
 
 fn get_file_line_col_len_str(cx:ty::ctxt, filename:&str, line:uint, col:uint,len:uint)->~str {
