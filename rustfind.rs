@@ -359,7 +359,7 @@ fn lookup_def_of_node_in_tree(dc:&DocContext,node_in_tree:&[AstNode],m:ShowDefMo
 	let node=node_in_tree.last();
 
 
-	fn mk_return_str(dc:&DocContext,  m:ShowDefMode, node_spans:&NodeSpans, def_node_id:ast::NodeId)->~str {
+	fn mk_return_str(dc:&DocContext,  m:ShowDefMode, node_spans:&NodeSpans, def_node_id:ast::NodeId, extra_str:&str)->~str {
 		match node_spans.find(&def_node_id) {
 			None=>return ~"{no defining span for "+def_node_id.to_str()+"}",
 			Some(def_info)=>{
@@ -390,14 +390,14 @@ fn lookup_def_of_node_in_tree(dc:&DocContext,node_in_tree:&[AstNode],m:ShowDefMo
 						//logi!("Method Map entry for",e.id);
 						match mme.origin {
 							typeck::method_static(def_id)=> 
-								return mk_return_str(dc,m,node_spans,def_id.node),
+								return mk_return_str(dc,m,node_spans,def_id.node,"(static_method)\n"),
 							typeck::method_trait(def_id,_,_)=>
-								return mk_return_str(dc,m,node_spans,def_id.node),
+								return mk_return_str(dc,m,node_spans,def_id.node,"(trait_method)\n"),
 							typeck::method_param(mp)=>{
 								match dc.tycx.trait_method_def_ids.find(&mp.trait_id) {
 									None=>{}
 									Some(method_def_ids)=>{
-										return mk_return_str(dc,m,node_spans, method_def_ids[mp.method_num].node)
+										return mk_return_str(dc,m,node_spans, method_def_ids[mp.method_num].node,"(method_param)\n")
 									}
 								}
 							}
@@ -413,7 +413,7 @@ fn lookup_def_of_node_in_tree(dc:&DocContext,node_in_tree:&[AstNode],m:ShowDefMo
 				match tydef.sty {
 					ty::ty_struct(def,_)=> {
 						let node_to_show=find_named_struct_field(dc.tycx, def.node, ident).get_or_default(def.node);
-						return mk_return_str(dc,m,node_spans,node_to_show);
+						return mk_return_str(dc,m,node_spans,node_to_show,"(struct_field)");
 					},
 					_=>return ~"expected struct"
 				}
@@ -430,7 +430,7 @@ fn lookup_def_of_node_in_tree(dc:&DocContext,node_in_tree:&[AstNode],m:ShowDefMo
 			let (def_id,opt_info)= def_info_from_node_id(dc,node_spans,id); 
 			match opt_info {
 				Some(info)=> {
-					return mk_return_str(dc,m,node_spans,def_id);
+					return mk_return_str(dc,m,node_spans,def_id,"(def)");
 				},
 				None=>return~"no_def_found"
 			}
@@ -757,6 +757,15 @@ fn first_file_name(dc:&DocContext)->~str {
 	dc.tycx.sess.codemap.files[0].name.to_str() // clone?
 }
 
+fn find_file_name_in(dc:&DocContext,fname:&str)->Option<~str> {
+	// todo subsequence match..
+	// TODO - is there an existing way of doing this, "index_of.." ..contains()..?
+	for f in dc.tycx.sess.codemap.files.iter() {
+		if fname==f.name {return Some(fname.to_owned());}
+	}
+	None
+}
+
 pub fn rustfind_interactive(dc:&DocContext) {
 	// TODO - check if RUSTI can already do this.. it would be better there IMO
 	let node_spans=build_node_spans_table(dc.crate);
@@ -765,12 +774,12 @@ pub fn rustfind_interactive(dc:&DocContext) {
 	let mut curr_file=first_file_name(dc);
 
 	loop {
-		print("rustfind>");
+		print("rustfind "+curr_file+">");
 		let input_line=io::stdin().read_line();
 		let toks:~[&str]=input_line.split_iter(' ').collect();
 		if toks.len()>0 {
 			match toks[0] {
-				"h"|""=> println("interactive mode - enter file:line:pos or line:pos for current fileo\n j-dump json q-quit i-info\n"),
+				"h"|"help"=> print("interactive mode\n - enter file:line:pos or line:pos for current file\n - show location & def of symbol there\n j-dump json q-quit i-info\n"),
 				"i"=> {
 					println("files in current crate:-\n");
 					for x in dc.tycx.sess.codemap.files.iter() {
@@ -785,7 +794,7 @@ pub fn rustfind_interactive(dc:&DocContext) {
 					let cmd=toks[0];
 					let cmd1=match cmd[0] as char { '0'..'9'=>curr_file+":"+cmd,_=>cmd.to_str() };
 					let subtoks:~[&str]=cmd1.split_iter(':').collect();
-					curr_file=subtoks[0].to_str();
+					curr_file=find_file_name_in(dc, subtoks[0].to_str()).get_or_default(curr_file);
 					//dump!(cmd1,subtoks,curr_file);
 					let def=lookup_def_of_file_line_pos(dc, cmd1,SDM_Source);
 					print(def);
