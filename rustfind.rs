@@ -306,7 +306,14 @@ fn dump_methods_of_t(tycx:&ty::ctxt_, t:*ty::t_opaque) {
 
 }
 
-
+fn auto_deref_ty<'a>(t:&'a ty::t_box_)->&'a ty::t_box_ {
+	match t.sty {
+		ty::ty_box(mt)|ty::ty_ptr(mt)|ty::ty_uniq(mt)|ty::ty_rptr(_,mt)=>{
+			ty::get(mt.ty)
+		},	
+		_=>t
+	}
+}
 
 fn lookup_def_of_node_in_tree(dc:&DocContext,node_in_tree:&[AstNode],m:ShowDefMode)->~str {
 	// TODO - cache outside?
@@ -334,9 +341,9 @@ fn lookup_def_of_node_in_tree(dc:&DocContext,node_in_tree:&[AstNode],m:ShowDefMo
 		}
 	}
 
-	// handle methods-calls
 	match *node {
 		astnode_expr(e)=>match e.node {
+			// handle methods-calls
 			ast::expr_method_call(ref id,ref receiver,ref ident,ref ty_params,ref arg_exprs,ref call_sugar)=>{
 				let rec_ty_node= astnode_expr(*receiver).ty_node_id();
 				let rec_ty_node1= dc.tycx.node_types.find(&(*id as uint));
@@ -362,6 +369,21 @@ fn lookup_def_of_node_in_tree(dc:&DocContext,node_in_tree:&[AstNode],m:ShowDefMo
 					}
 				}
 			},
+			// handle struct-fields? "object.field"
+			ast::expr_field(ref object_expr,ref ident,ref ty_params)=>{
+				// we want the type of the object..
+				let obj_ty=dc.tycx.node_types.find(&(object_expr.id as uint));
+				let tydef=auto_deref_ty(ty::get(*obj_ty.unwrap()));
+				match tydef.sty {
+					ty::ty_struct(def,_)=> {
+						return mk_return_str(dc,m,node_spans,def.node);
+					},
+					_=>return ~"expected struct"
+				}
+//				let def=dc.tycx.def_map.find(&object_expr.id).unwrap();
+				let (def_id,opt_info)= def_info_from_node_id(dc,node_spans,object_expr.id);
+				return "field: "+parse::token::ident_to_str(ident)+" TODO_RESOLVE_STRUCT_FIELD";//+mk_return_str(dc,m,node_spans,def_id);
+			}
 			_=>{}
 		},
 		_=>{}
@@ -694,6 +716,7 @@ fn debug_test(dc:&DocContext) {
 	dump!(lookup_def_of_file_line_pos(dc, &"test_input.rs:8:21",SDM_Source));println("");
 	dump!(lookup_def_of_file_line_pos(dc, &"test_input2.rs:3:12",SDM_Source));println("");
 	dump!(lookup_def_of_file_line_pos(dc, &"test_input.rs:10:8",SDM_Source));println("");
+	dump!(lookup_def_of_file_line_pos(dc, &"test_input.rs:13:16",SDM_Source));println("");
 	
 }
 
