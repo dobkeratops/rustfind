@@ -314,6 +314,42 @@ fn auto_deref_ty<'a>(t:&'a ty::t_box_)->&'a ty::t_box_ {
 		_=>t
 	}
 }
+ 
+fn get_struct_def<'a,'b>(tc:&'a ty::ctxt_, struct_node_id:ast::NodeId)->Option<(@ast::item,@ast::struct_def,ast::Generics)> {
+	match tc.items.find(&struct_node_id) {
+		None=>{print("no node found");None},
+		Some(node)=>match *node {
+			syntax::ast_map::node_item(item,ref path)=>{
+				match item.node {
+					ast::item_struct(sd, ref generics)=>Some((item, sd, generics.clone())),
+					_=>None
+				}
+			}
+			_=> None
+		},
+	}
+}
+
+fn find_named_struct_field(tc:&ty::ctxt_, struct_node_id:ast::NodeId, field_ident:&ast::ident)->Option<ast::NodeId> {
+	match get_struct_def(tc,struct_node_id) {
+		None=>None,
+		Some((it,sd,ge))=>{
+			for f in sd.fields.iter() {
+				match f.node.kind {
+					ast::named_field(ref ident,vis)=>if *ident==*field_ident {return Some(f.node.id);},
+					_=>return None
+				}
+			}
+			None
+		}
+	}
+}
+fn some_or_else<T:Clone>(opt:&Option<T>,fallback_value:&T)->T {
+	match *opt {
+		Some(ref value)=>value.clone(),
+		None=>fallback_value.clone()
+	}
+}
 
 fn lookup_def_of_node_in_tree(dc:&DocContext,node_in_tree:&[AstNode],m:ShowDefMode)->~str {
 	// TODO - cache outside?
@@ -376,13 +412,11 @@ fn lookup_def_of_node_in_tree(dc:&DocContext,node_in_tree:&[AstNode],m:ShowDefMo
 				let tydef=auto_deref_ty(ty::get(*obj_ty.unwrap()));
 				match tydef.sty {
 					ty::ty_struct(def,_)=> {
-						return mk_return_str(dc,m,node_spans,def.node);
+						let node_to_show=some_or_else(&find_named_struct_field(dc.tycx, def.node, ident),&def.node);
+						return mk_return_str(dc,m,node_spans,node_to_show);
 					},
 					_=>return ~"expected struct"
 				}
-//				let def=dc.tycx.def_map.find(&object_expr.id).unwrap();
-				let (def_id,opt_info)= def_info_from_node_id(dc,node_spans,object_expr.id);
-				return "field: "+parse::token::ident_to_str(ident)+" TODO_RESOLVE_STRUCT_FIELD";//+mk_return_str(dc,m,node_spans,def_id);
 			}
 			_=>{}
 		},

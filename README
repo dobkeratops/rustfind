@@ -1,5 +1,5 @@
 Attempt to use rust libsyntax to find symbol definitions
-just about workable now
+finds struct-defs, functions, methods, fields 
 
 "make" to compile and run test program
 ./rustfind -h to display options
@@ -14,16 +14,18 @@ roadmap
 [1] a commandline tool rustfind sourcefile.rs:LINE:COLUMN: --> definition.rs:LINE:col
 (to add add hoc navigation tools eg gedit external tools)
   [.1] CTAGS generation  ??
-  [.1] possibly an interactive commandline tool (enter symbol-> dump location)
+  [.1] interactive commandline tool (enter src/location/symbol-> dump location)
   [.2] possibly queries like "list all the functions that use this type, list all the impls' for this type.."
 
-[2] JSON / or other dump .. are there any formats IDE's read for their indexers?
+[2] JSON / or other dump
+.. are there any formats IDE's read for their indexers?
 
 [3] options to dump/pretty print more context for the definitoon
   
-[3.5] maybe one of those html hyperlinked source generators, like woboq?
+[4] an html hyperlinked source generator, like woboq?
+   ... + popup type annotaions?
 
-[4] use components for IDE integration?
+[5] use components for IDE integration?
 
 Notes on sourcecode:-
 --------------------
@@ -31,10 +33,16 @@ Notes on sourcecode:-
 -borrows code from rustdoc_ng
 -there might be a fair amoount of repition with the compiler internals eg ast node wrappers,
 this can be cleaned up..
--a lot would factor out if ctxt had a node_id:span map
+-a lot here would factor out if ctxt had a node_id:span map
 
 Other:-
 -------
 improved syntax highlighting rust.lang & required styles (for gtksourceview) included in scripts
+
+more ideas
+
+can ctags actually deal with overloaded symbols?
+could we write out an intermediate that editors can read for fast jump-to-def, with some dynamic context .. 
+
 
 
