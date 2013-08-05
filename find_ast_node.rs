@@ -155,6 +155,13 @@ impl ToJsonStr for HashMap<ast::NodeId,ast::def_id> {
 // is there a way of acheiving this without one?
 // TODO: TRY USING ast_map::ast_node INSTEAD
 #[deriving(Clone)]
+
+// TODO - include heirachical location in wrappertype? node.parent.. node.node
+// Currently we use a [AstNode] to represent a location in the node-tree with all parent nodes.
+// but this looks confusing, eg are we passing a node list?
+// struct HrcNode{ parent:Option<HrcNode>, node:AstNode}
+// or even AstNode{ .../* each type has (sParent,content)*/}
+
 pub enum AstNode 
 {
 	astnode_mod(@_mod),

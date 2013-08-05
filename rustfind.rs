@@ -243,7 +243,7 @@ fn dump_json(dc:&DocContext) {
 }
 
 
-fn lookup_def_of_file_line_pos(dc:&DocContext,filepos:&str, show_all:ShowDefMode)->~str {
+fn lookup_def_of_file_line_pos_old(dc:&DocContext,filepos:&str, show_all:ShowDefMode)->~str {
 
 	let toks:~[&str]=filepos.split_iter(':').collect();
 	if toks.len()<3 { return ~"" }
@@ -262,6 +262,41 @@ fn lookup_def_of_file_line_pos(dc:&DocContext,filepos:&str, show_all:ShowDefMode
 		})
 	})
 	return ~"";
+}
+
+fn byte_pos_from_file_line_pos(dc:&DocContext,filepos:&str)->Option<syntax::codemap::BytePos> {
+	let toks:~[&str]=filepos.split_iter(':').collect();
+	if toks.len()<3 { return None; }
+
+//	let line:Option<uint> = FromStr::from_str(toks[1]);
+	if_some!(line in FromStr::from_str(toks[1]) then {
+		if_some!(col in FromStr::from_str(toks[2]) then {
+			//todo - if no column specified, just lookup everything on that line!
+				return file_line_col_to_byte_pos(dc.tycx,toks[0],line,col);
+		})
+	})
+	return None;
+
+}
+
+fn lookup_def_of_file_line_pos(dc:&DocContext,file_pos_str:&str, show_mode:ShowDefMode)->~str {
+	match byte_pos_from_file_line_pos(dc,file_pos_str) {
+		Some(bp)=>lookup_def_of_byte_pos(dc,bp,show_mode),
+		None=>return ~"file not in crate or position out of range"
+	}
+}
+
+fn node_id_from_file_line_pos(dc:&DocContext, file_pos_str:&str)->Option<ast::NodeId> {
+	match node_from_file_line_pos(dc, file_pos_str) {
+		None=>None,
+		Some(an)=>an.get_id()
+	}
+}
+fn node_from_file_line_pos(dc:&DocContext, file_pos_str:&str)->Option<find_ast_node::AstNode> {
+	match byte_pos_from_file_line_pos(dc,file_pos_str) {
+		Some(bp)=>{let ndt=find_node_in_tree_at_byte_pos(dc.crate,bp);Some(ndt.last().clone())},
+		None=>None
+	}
 }
 
 enum ShowDefMode {
@@ -352,11 +387,17 @@ fn some_or_else<T:Clone>(opt:&Option<T>,fallback_value:&T)->T {
 }
 
 fn lookup_def_of_node_in_tree(dc:&DocContext,node_in_tree:&[AstNode],m:ShowDefMode)->~str {
-	// TODO - cache outside?
+	lookup_def_of_node(dc,node_in_tree.last(),m)
+}
+
+fn lookup_def_of_node(dc:&DocContext,node:&AstNode,m:ShowDefMode)->~str {
 	let node_spans=build_node_spans_table(dc.crate);
 	let node_def_node = build_node_def_node_table(dc);
+	lookup_def_of_node_sub(dc,node,m,node_spans,node_def_node)
+}
 
-	let node=node_in_tree.last();
+fn lookup_def_of_node_sub(dc:&DocContext,node:&AstNode,m:ShowDefMode,node_spans:&NodeSpans, node_def_node:&HashMap<ast::NodeId,ast::def_id>)->~str {
+	// TODO - cache outside?
 
 
 	fn mk_return_str(dc:&DocContext,  m:ShowDefMode, node_spans:&NodeSpans, def_node_id:ast::NodeId, extra_str:&str)->~str {
@@ -432,12 +473,12 @@ fn lookup_def_of_node_in_tree(dc:&DocContext,node_in_tree:&[AstNode],m:ShowDefMo
 				Some(info)=> {
 					return mk_return_str(dc,m,node_spans,def_id,"(def)");
 				},
-				None=>return~"no_def_found"
+				_=>{}
 			}
 		}
-		None=> { return ~"no_def_found";}
+		None=> {}
 	};
-
+	// dump_node_in_tree(node_in_tree);
 	return ~"no def found";
 }
 
@@ -750,6 +791,7 @@ fn debug_test(dc:&DocContext) {
 	dump!(lookup_def_of_file_line_pos(dc, &"test_input2.rs:3:12",SDM_Source));println("");
 	dump!(lookup_def_of_file_line_pos(dc, &"test_input.rs:10:8",SDM_Source));println("");
 	dump!(lookup_def_of_file_line_pos(dc, &"test_input.rs:13:16",SDM_Source));println("");
+	dump!(lookup_def_of_file_line_pos(dc, &"test_input.rs:11:10",SDM_Source));println("");
 	
 }
 
@@ -796,6 +838,7 @@ pub fn rustfind_interactive(dc:&DocContext) {
 					let subtoks:~[&str]=cmd1.split_iter(':').collect();
 					curr_file=find_file_name_in(dc, subtoks[0].to_str()).get_or_default(curr_file);
 					//dump!(cmd1,subtoks,curr_file);
+					let node_id = node_id_from_file_line_pos(dc,cmd1);
 					let def=lookup_def_of_file_line_pos(dc, cmd1,SDM_Source);
 					print(def);
 					//println(def_of_symbol_to_str(dc,node_spans,node_def_node,toks[0]));
