@@ -2,72 +2,81 @@ use find_ast_node::*;
 use syntax::codemap;
 use ioutil::*;
 
-struct HtmlWriter {
+pub struct HtmlWriter {
 	doc:~str,
-	tag_stack:~[~str]
+	tag_stack:~[~str],
 }
 
+/// helper object for building html docs, puts tags in a stack for convinient close
 impl<'self> HtmlWriter {
-	fn new()->HtmlWriter { let x=HtmlWriter { doc:~"", tag_stack:~[]}; x
-	}
+	pub fn new()->HtmlWriter { HtmlWriter { doc:~"", tag_stack:~[]}}
 
-	fn push_quoted_str(&'self mut self, a:&str)->&'self mut HtmlWriter {
+	pub fn write_quoted_str(&'self mut self, a:&str)->&'self mut HtmlWriter {
 		self.doc.push_str("\"");
 		self.doc.push_str(a);
 		self.doc.push_str("\"");
 		self
 	}
 
-	fn begin_tag_ext(&'self mut self, tag_name:&str, key_values:&[(~str,~str)])->&'self mut HtmlWriter {
+	pub fn begin_tag_ext(&'self mut self, tag_name:&str, key_values:&[(~str,~str)])->&'self mut HtmlWriter {
 		self.write_tag_sub(tag_name,key_values,false);
 		self.tag_stack.push(tag_name.to_str());
 		self
 	}
-	fn begin_tag(&'self mut self, tag_name:&str)->&'self mut HtmlWriter {
+	pub fn begin_tag(&'self mut self, tag_name:&str)->&'self mut HtmlWriter {
 		self.begin_tag_ext(tag_name,&[]);
 		self
 	}
-	fn write_tag_ext(&'self mut self, tag_name:&str, key_values:&[(~str,~str)])->&'self mut HtmlWriter {
+	pub fn write_tag_ext(&'self mut self, tag_name:&str, key_values:&[(~str,~str)])->&'self mut HtmlWriter {
 		self.write_tag_sub(tag_name,key_values,true);
 		self
 	}
-	fn write_tag(&'self mut self, tag_name:&str)->&'self mut HtmlWriter {
+	pub fn write_tag(&'self mut self, tag_name:&str)->&'self mut HtmlWriter {
 		self.write_tag_sub(tag_name,&[],true);
 		self
 	}
-	fn write_tag_sub(&'self mut self, tag_name:&str, key_values:&[(~str,~str)], closed:bool)->&'self mut HtmlWriter {
+	priv fn write_tag_sub(&'self mut self, tag_name:&str, key_values:&[(~str,~str)], closed:bool)->&'self mut HtmlWriter {
 		self.doc.push_str("<"+tag_name);
 		for &(ref k,ref v) in key_values.iter() {
 			self.doc.push_str(" ");
 			self.doc.push_str(*k);
 			self.doc.push_str(&"=");
-			self.push_quoted_str(*v);
+			self.write_quoted_str(*v);
 		}
 		if closed { self.doc.push_str("/"); }
 		self.doc.push_str(">");
 		self
 	}
-	fn end_tag(&'self mut self)->&'self mut HtmlWriter {
+	pub fn end_tag(&'self mut self)->&'self mut HtmlWriter {
 		let tag_name=self.tag_stack.pop();
 		self.doc.push_str("</");
 		self.doc.push_str(tag_name);
 		self.doc.push_str(">");
 		self
 	}
-	fn write(&'self mut self,t:&str)->&'self mut HtmlWriter {
+	pub fn write(&'self mut self,t:&str)->&'self mut HtmlWriter {
 		self.doc.push_str(t);
 		self
 	}
-	fn write_tagged(&'self mut self, tagname:&str, text:&str)->&'self mut HtmlWriter {
+	pub fn write_tagged(&'self mut self, tagname:&str, text:&str)->&'self mut HtmlWriter {
 		self.begin_tag(tagname);
 		self.doc.push_str(text);
 		self.end_tag();
 		self
 	}
-	fn writeln(&'self mut self, text:&str)->&'self mut HtmlWriter {
+	pub fn writeln(&'self mut self, text:&str)->&'self mut HtmlWriter {
 		self.doc.push_str(text);
 		self.write_tag("br");
 		self
+	}
+	pub fn begin_tag_anchor(&'self mut self, anchor:&str)->&'self mut HtmlWriter {
+		self.begin_tag_ext("a",[(~"id",anchor.to_owned())])
+	}
+	pub fn begin_tag_link(&'self mut self, link:&str)->&'self mut HtmlWriter {
+		self.begin_tag_ext("a",[(~"href",link.to_owned())])
+	}
+	pub fn write_space(&'self mut self)->&'self mut HtmlWriter {
+		self.write("&emsp;")
 	}
 }
 
@@ -88,8 +97,13 @@ fn pad_to_length(a:&str,l:uint,pad:&str)->~str {
 	acc
 }
 
+struct Component<A,B>{
+	parent:A,
+	obj:B
+}
+
 pub fn write_html(dc:&DocContext, fm:&codemap::FileMap)->~str {
-	let mut doc=HtmlWriter::new();
+	let mut doc=HtmlWriter::new::();
 
 	doc.begin_tag("head");
 	doc.write_tag_ext("link",&[(~"href",~"css/shCore.css"),(~"rel",~"stylesheet"),(~"type",~"text/css")]);
@@ -121,10 +135,13 @@ pub fn write_html(dc:&DocContext, fm:&codemap::FileMap)->~str {
 	let max_digits=num_digits(fm.lines.len());
 
 	while line<fm.lines.len() {
+		// todo: line numbers want to go in a seperate column so they're unselectable..
 		doc.write_tagged("ln",pad_to_length(line.to_str(),max_digits,"0"));
+		doc.begin_tag_anchor(line.to_str());
 		let lend=if line<(fm.lines.len()-1){*fm.lines[line+1]-fstart}else{fm.src.len()};
 		doc.write("&emsp;");
 		doc.writeln(fm.src.slice(*fm.lines[line]-fstart,lend));
+		doc.end_tag();
 		line+=1;
 	}
 	doc.end_tag();

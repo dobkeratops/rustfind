@@ -41,11 +41,13 @@ macro_rules! dump{ ($($a:expr),*)=>
 
 /// main
 pub fn find_node_at_byte_pos(c:@Crate,_location:codemap::BytePos)->AstNode {
-	let tree_loc=find_node_in_tree_at_byte_pos(c,_location);
+	let tree_loc=find_node_tree_loc_at_byte_pos(c,_location);
 	return tree_loc.last().clone();
 }
 
-pub fn find_node_in_tree_at_byte_pos(c:@Crate,_location:codemap::BytePos)->~[AstNode] {
+pub type NodeTreeLoc = ~[AstNode];
+
+pub fn find_node_tree_loc_at_byte_pos(c:@Crate,_location:codemap::BytePos)->NodeTreeLoc {
 	// TODO: Now that we have a sepereate 'node-spans table'
 	// would it be more efficient to use that?
 	// if we encoded hrc information in the node-spans-table,
@@ -463,7 +465,7 @@ fn expr_get_ident(a:&expr)->Option<ident> {
  
 
 pub struct FindAstNodeSt {
-	result: ~[AstNode],		// todo - full tree path, all the parent nodes.
+	result: NodeTreeLoc,		// todo - full tree path, all the parent nodes.
 	location: uint,
 	stop: bool,
 //	node_spans: HashMap<ast::node_id,codemap::span>
@@ -694,7 +696,7 @@ fn find_struct_field(a:@struct_field, (s,v):FindAstNodeSV) {
 }
 
 
-pub fn get_node_info_str(dc:&DocContext,node:&[AstNode])->~str
+pub fn get_node_info_str(dc:&DocContext,node:&NodeTreeLoc)->~str
 {
 	fn path_to_str(dc:&DocContext, path:&ast::Path)->~str
 	{
