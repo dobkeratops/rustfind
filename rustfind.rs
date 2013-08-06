@@ -1,4 +1,3 @@
-
 extern mod syntax;
 extern mod rustc;
 extern mod extra;
@@ -32,9 +31,12 @@ use std::os;
 use std::local_data;
 use extra::json::ToJson;
 
+use rust2html::*;
+
 mod text_formatting;
 mod find_ast_node;
 mod ioutil;
+mod rust2html;
 
 
 pub static ctxtkey: local_data::Key<@DocContext> = &local_data::Key;
@@ -127,6 +129,7 @@ fn main() {
     use extra::getopts::*;
     use std::hashmap::HashMap;
 
+
     let args = os::args();
 
     let opts = ~[
@@ -173,7 +176,15 @@ fn main() {
 		if opt_present(&matches,"i") {
 			rustfind_interactive(dc)
 		}
+
+		// Dump as html..
+		for f in dc.sess.codemap.files.iter() {
+			rust2html::write_source_as_html(dc, f.name, "html");
+		}
+
 	}
+
+
 }
 
 fn get_filename_only(fnm:&str)->~str {
@@ -263,6 +274,79 @@ fn lookup_def_of_file_line_pos_old(dc:&DocContext,filepos:&str, show_all:ShowDef
 	})
 	return None;
 }
+
+struct TextFilePos {
+	name:~str,
+	line:uint, // ONE BASED, as viewed in text-editors+grep
+	col:uint
+}
+trait ToTextFilePos {
+	fn to_text_file_pos(self,cx:ty::ctxt)->Option<TextFilePos>;
+}
+
+impl ToTextFilePos for syntax::codemap::BytePos {
+	fn to_text_file_pos(self, cx:ty::ctxt)->Option<TextFilePos> {
+		let mut i=cx.sess.codemap.files.len();
+		while i>0 {
+			i-=1;
+			let fm=&cx.sess.codemap.files[i];
+			if *fm.start_pos <= *self {
+				let mut line=fm.lines.len();
+				while line>0 {
+					line-=1;
+					let line_start=*fm.lines[line];
+					if line_start<=*self {
+						return Some(TextFilePos::new(fm.name.to_owned(), line+1,*self-line_start))
+					}
+				}
+			}
+		}
+		None
+	}
+}
+
+impl FromStr for TextFilePos {
+	fn from_str(file_pos_str:&str)->Option<TextFilePos> {
+		let toks:~[&str]=file_pos_str.split_iter(':').collect();
+		if toks.len()<=0 {
+			None 
+		} else if toks.len()==1 {
+			Some(TextFilePos::new(toks[0],1,0))
+		} else {
+			match FromStr::from_str(toks[1]) {
+				None=>None,
+				Some(line)=>match FromStr::from_str(toks[2]) {
+					None=>Some(TextFilePos::new(toks[0],line,0)),
+					Some(col)=>Some(TextFilePos::new(toks[0],line,col))
+				}
+			}
+		}
+	}
+}
+
+impl TextFilePos {
+	fn new(filename:&str,_line:uint,_col:uint)->TextFilePos { TextFilePos{name:filename.to_owned(),line:_line,col:_col}}
+
+	fn to_str(&self)->~str {
+		self.name+":"+self.line.to_str()+":"+self.col.to_str()+":"		
+	}
+
+	fn to_byte_pos(&self,cx:ty::ctxt)->Option<syntax::codemap::BytePos> {
+		let mut i=cx.sess.codemap.files.len();
+		while i>0 {	// caution, need loop because we return, wait for new foreach ..in..
+			i-=1;
+			let fm=&cx.sess.codemap.files[i];
+			let filemap_filename:&str=fm.name;	
+			if filemap_filename==self.name {
+				if self.line>fm.lines.len() { return None;}
+				return Some(BytePos(*fm.lines[self.line-1]+self.col));
+			}
+		}
+		return None;
+	}
+}
+
+
 
 fn byte_pos_from_file_line_pos(dc:&DocContext,filepos:&str)->Option<syntax::codemap::BytePos> {
 	let toks:~[&str]=filepos.split_iter(':').collect();

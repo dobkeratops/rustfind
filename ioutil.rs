@@ -145,5 +145,20 @@ pub fn fileSaveArray<T>(buffer:&[T],filename:&str) {
 	}
 }
 
+pub fn fileSaveStr(text:&str,filename:&str) {
+	unsafe {
+		let fp=fileOpen(filename,"wb");
+		if fp!=(0 as *FILE) {
+			fwrite(c_str(text) as *c_void,text.len() as u64,1,fp);
+
+			//fwrite(to_void_ptr(&buffer[0]),sizeofArray(buffer),1,fp);
+			fclose(fp);
+		} else {
+			printStr(&("could not write "+filename));
+		}
+	}
+}
+
+
 
 
