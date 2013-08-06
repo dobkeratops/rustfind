@@ -243,31 +243,52 @@ fn dump_json(dc:&DocContext) {
 	}
 	println("\t]");
 	println("\tnode_spans:");
-	let node_spans=build_node_spans_table(dc.crate);
+	let nim=build_node_info_map(dc.crate);
 	let node_def_node = build_node_def_node_table(dc);
-	println(node_spans.to_json_str());	
+	let jdm=build_jump_to_def_map(dc,nim,node_def_node);
+	println(nim.to_json_str());	
 	println(",");
 	println("\tnode_defs [\n");
-	println(node_defs_as_json_str(dc,node_spans,node_def_node));
+	println(jdm.to_json_str());
 	println("\t],\n");
 	println("\tdef_ids:");
 	println(node_def_node.to_json_str());
 	println("}");
 }
 
-fn node_defs_as_json_str(dc:&DocContext, ns:@mut NodeSpans,nd:&HashMap<ast::NodeId,ast::def_id>)->~str {
-	let mut acc=~"";
+pub type JumpToDefMap = HashMap<ast::NodeId,ast::NodeId> ;
+
+impl ToJsonStr for JumpToDefMap {
+	pub fn to_json_str(&self)->~str {
+		let mut acc=~"";
+		for (&k,&v) in self.iter() {
+			acc.push_str("\t\t{ node_id:"+k.to_str()+", def_node_id:"+ v.to_str()+" },\n");
+		}
+		acc
+	}
+}
+
+
+pub fn build_jump_to_def_map(dc:&DocContext, nim:@mut NodeInfoMap,nd:&HashMap<ast::NodeId,ast::def_id>)->~JumpToDefMap{
 // todo: NodeId->AStNode  .. lookup_def_ inner functionality extracted
-/*	for (&k,&v) in ns.iter() {
-		match lookup_def_of_node_sub(dc,*k,ns,nd) 
-		{
+	let mut jdm=~HashMap::new();
+	for (k,_) in nim.iter() {
+		match get_ast_node_of_node_id(nim,*k) {
 			None=>{},
-			Some(def_node_id)=>
-				acc.push_str("\t\t{ node_id:"+k.to_str()+" def_node_id:"+ def_node_id.to_str()+" },\n")
+			Some(ast_node)=>{
+				match lookup_def_node_of_node(dc,&ast_node,nim,nd) {
+					None=>{},
+					Some(def_node_id)=>{
+						if *k != def_node_id {
+							jdm.insert(*k,def_node_id);
+						}
+					}
+				}
+			}
 		}
 	}
-*/
-	acc
+
+	jdm
 }
 
 
@@ -499,33 +520,13 @@ fn lookup_def_of_node_tree_loc(dc:&DocContext,node_tree_loc:&NodeTreeLoc,m:ShowD
 }
 
 fn lookup_def_of_node(dc:&DocContext,node:&AstNode,m:ShowDefMode)->Option<~str> {
-	let node_spans=build_node_spans_table(dc.crate);
+	let node_spans=build_node_info_map(dc.crate);
 	let node_def_node = build_node_def_node_table(dc);
 	lookup_def_of_node_sub(dc,node,m,node_spans,node_def_node)
 }
 
-fn lookup_def_of_node_sub(dc:&DocContext,node:&AstNode,m:ShowDefMode,node_spans:&NodeSpans, node_def_node:&HashMap<ast::NodeId,ast::def_id>)->Option<~str> {
-	// TODO - cache outside?
-
-
-	fn mk_result(dc:&DocContext,  m:ShowDefMode, node_spans:&NodeSpans, def_node_id:ast::NodeId, extra_str:&str)->Option<~str> {
-		match node_spans.find(&def_node_id) {
-			None=>None,
-			Some(def_info)=>{
-				let loc=get_source_loc(dc,def_info.span.lo);
-				let def_pos_str=
-					loc.file.name + ":"+loc.line.to_str()+": "+
-						match m { SDM_LineCol=>loc.col.to_str()+": ", _ =>~"" }+"\n";
-				return	match m{
-					SDM_Source=>Some(def_pos_str+get_node_source(dc.tycx,node_spans, def_node_id)+"\n"),
-					SDM_GeditCmd=>Some("+"+loc.line.to_str()+" "+loc.file.name+" "),
-					_ => Some(def_pos_str)
-				};
-
-			}
-		}
-	}
-
+fn lookup_def_node_of_node(dc:&DocContext,node:&AstNode, node_spans:&NodeInfoMap, node_def_node:&HashMap<ast::NodeId,ast::def_id>)->Option<ast::NodeId> {
+	
 	match *node {
 		astnode_expr(e)=>match e.node {
 			// handle methods-calls
@@ -539,14 +540,14 @@ fn lookup_def_of_node_sub(dc:&DocContext,node:&AstNode,m:ShowDefMode,node_spans:
 						//logi!("Method Map entry for",e.id);
 						match mme.origin {
 							typeck::method_static(def_id)=> 
-								return mk_result(dc,m,node_spans,def_id.node,"(static_method)\n"),
+								return Some(def_id.node),
 							typeck::method_trait(def_id,_,_)=>
-								return mk_result(dc,m,node_spans,def_id.node,"(trait_method)\n"),
+								return Some(def_id.node),
 							typeck::method_param(mp)=>{
 								match dc.tycx.trait_method_def_ids.find(&mp.trait_id) {
-									None=>{}
+									None=>{},
 									Some(method_def_ids)=>{
-										return mk_result(dc,m,node_spans, method_def_ids[mp.method_num].node,"(method_param)\n")
+										return Some(method_def_ids[mp.method_num].node)
 									}
 								}
 							}
@@ -562,7 +563,7 @@ fn lookup_def_of_node_sub(dc:&DocContext,node:&AstNode,m:ShowDefMode,node_spans:
 				match tydef.sty {
 					ty::ty_struct(def,_)=> {
 						let node_to_show=find_named_struct_field(dc.tycx, def.node, ident).get_or_default(def.node);
-						return mk_result(dc,m,node_spans,node_to_show,"(struct_field)");
+						return Some(node_to_show);//mk_result(dc,m,node_spans,node_to_show,"(struct_field)");
 					},
 					_=>return None
 				}
@@ -579,15 +580,41 @@ fn lookup_def_of_node_sub(dc:&DocContext,node:&AstNode,m:ShowDefMode,node_spans:
 			let (def_id,opt_info)= def_info_from_node_id(dc,node_spans,id); 
 			match opt_info {
 				Some(info)=> {
-					return mk_result(dc,m,node_spans,def_id,"(def)");
+					return Some(def_id);
 				},
 				_=>{}
 			}
 		}
 		None=> {}
 	};
-	// dump_node_in_tree(node_in_tree);
 	return None;
+}
+
+fn lookup_def_of_node_sub(dc:&DocContext,node:&AstNode,m:ShowDefMode,node_spans:&NodeInfoMap, node_def_node:&HashMap<ast::NodeId,ast::def_id>)->Option<~str> {
+	// TODO - cache outside?
+
+
+	fn mk_result(dc:&DocContext,  m:ShowDefMode, node_spans:&NodeInfoMap, def_node_id:ast::NodeId, extra_str:&str)->Option<~str> {
+		match node_spans.find(&def_node_id) {
+			None=>None,
+			Some(def_info)=>{
+				let loc=get_source_loc(dc,def_info.span.lo);
+				let def_pos_str=
+					loc.file.name + ":"+loc.line.to_str()+": "+
+						match m { SDM_LineCol=>loc.col.to_str()+": ", _ =>~"" }+"\n";
+				return	match m{
+					SDM_Source=>Some(def_pos_str+get_node_source(dc.tycx,node_spans, def_node_id)+"\n"),
+					SDM_GeditCmd=>Some("+"+loc.line.to_str()+" "+loc.file.name+" "),
+					_ => Some(def_pos_str)
+				};
+
+			}
+		}
+	}
+	match lookup_def_node_of_node(dc, node,node_spans, node_def_node) {
+		None=>None,
+		Some(def_node_id)=>mk_result(dc,m,node_spans,def_node_id, "")
+	}
 }
 
 fn get_str_at_text_file_pos_len(cx:ty::ctxt, tfp:&TextFilePos,len:uint)->~str {
@@ -627,7 +654,7 @@ fn loc_to_str(loc:codemap::Loc)->~str {
 	loc.file.name+":"+loc.line.to_str()+":"+loc.col.to_str()+":"
 }
 
-pub fn dump_node_source_for_single_file_only(text:&[u8], ns:&NodeSpans, id:ast::NodeId) {
+pub fn dump_node_source_for_single_file_only(text:&[u8], ns:&NodeInfoMap, id:ast::NodeId) {
 	match(ns.find(&id)) {None=>logi!("()"),
 		Some(info)=>{
 			dump_span(text, &info.span);
@@ -636,7 +663,7 @@ pub fn dump_node_source_for_single_file_only(text:&[u8], ns:&NodeSpans, id:ast::
 }
 
 // TODO- this should return a slice
-pub fn get_node_source(c:ty::ctxt, ns:&NodeSpans, id:ast::NodeId)->~str {
+pub fn get_node_source(c:ty::ctxt, ns:&NodeInfoMap, id:ast::NodeId)->~str {
 	match (ns.find(&id)){
 		None=>~"",
 		Some(info)=>{
@@ -663,7 +690,7 @@ pub fn dump_span(text:&[u8], sp:&codemap::span) {
 }
 
 
-pub fn def_info_from_node_id<'a,'b>(dc:&'a DocContext, node_spans:&'b NodeSpans, id:ast::NodeId)->(int,Option<&'b NodeInfo>) {
+pub fn def_info_from_node_id<'a,'b>(dc:&'a DocContext, node_spans:&'b NodeInfoMap, id:ast::NodeId)->(int,Option<&'b NodeInfo>) {
 	let crate_num=0;
 	match dc.tycx.def_map.find(&id) { // finds a def..
 		Some(a)=>{
@@ -834,12 +861,16 @@ fn debug_test(dc:&DocContext) {
 	// TODO: parse commandline source locations,convert to codemap locations
 	//dump!(ctxt.tycx);
 	logi!("==== Get table of node-spans...===")
-	let node_spans=build_node_spans_table(dc.crate);
-	println(node_spans.to_json_str());
+	let node_info_map=build_node_info_map(dc.crate);
+	println(node_info_map.to_json_str());
 
 	logi!("==== Node Definition mappings...===")
 	let node_def_node = build_node_def_node_table(dc);
 	println(node_def_node.to_json_str());
+
+	logi!("==== JumpToDef Table ===");
+	let jdm = build_jump_to_def_map(dc,node_info_map,node_def_node);
+	println(jdm.to_json_str());
 
 
 	logi!("==== dump def table.===");
@@ -862,17 +893,17 @@ fn debug_test(dc:&DocContext) {
 
 
 		if_some!(id in nodetloc.last().ty_node_id() then {
-			logi!("source=",get_node_source(dc.tycx, node_spans,id));
+			logi!("source=",get_node_source(dc.tycx, node_info_map,id));
 			if_some!(t in find_ast_node::safe_node_id_to_type(dc.tycx, id) then {
 				println(fmt!("typeinfo: %?",
 					{let ntt= rustc::middle::ty::get(t); ntt}));
 				dump!(id,dc.tycx.def_map.find(&id));
 				});
-			let (def_id,opt_info)= def_info_from_node_id(dc,node_spans,id); 
+			let (def_id,opt_info)= def_info_from_node_id(dc,node_info_map,id); 
 			if_some!(info in opt_info then{
 				logi!("src node=",id," def node=",def_id,
 					" span=",info.span.my_to_str());
-				logi!("def source=", get_node_source(dc.tycx, node_spans, def_id));
+				logi!("def source=", get_node_source(dc.tycx, node_info_map, def_id));
 			})
 		})
 
@@ -917,7 +948,7 @@ fn find_file_name_in(dc:&DocContext,fname:&str)->Option<~str> {
 
 pub fn rustfind_interactive(dc:&DocContext) {
 	// TODO - check if RUSTI can already do this.. it would be better there IMO
-	let node_spans=build_node_spans_table(dc.crate);
+	let node_spans=build_node_info_map(dc.crate);
 
 	let node_def_node = build_node_def_node_table(dc);
 	let mut curr_file=first_file_name(dc);
@@ -954,7 +985,7 @@ pub fn rustfind_interactive(dc:&DocContext) {
 	}
 }
 
-pub fn def_of_symbol_to_str(dc:&DocContext, ns:&NodeSpans,ds:&HashMap<ast::NodeId, ast::def_id>,s:&str)->~str {
+pub fn def_of_symbol_to_str(dc:&DocContext, ns:&NodeInfoMap,ds:&HashMap<ast::NodeId, ast::def_id>,s:&str)->~str {
 	~"TODO"	
 }
 
