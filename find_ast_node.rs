@@ -574,7 +574,8 @@ fn fcns_expr_post(a:@expr, (s,v):NodeInfoMapSV) {
 
 // struct Visitor<E>.visit_ty: @fn(&Ty, (E, vt<E>)),
 fn fcns_ty(a:&Ty, (s,v):NodeInfoMapSV) {
-	push_span(s,a.id,None,"ty",a.span,astnode_none);
+	//todo - can't we borrow? do we need opaque hack? can we access another way?
+	push_span(s,a.id,None,"ty",a.span,astnode_ty(@a.clone()));
 	visit_ty(a,(s,v))
 }
 fn fcns_fn(fk:&fn_kind, fd:&fn_decl, body:&Block, sp:span, nid:NodeId, (s,v):NodeInfoMapSV) {
@@ -586,7 +587,8 @@ fn fcns_struct_field(a:@struct_field, (s,v):NodeInfoMapSV) {
 }
 
 fn fcns_type_method(a:&TypeMethod, (s,v):NodeInfoMapSV) {
-	push_span(s,a.id,Some(a.ident),"type_method",a.span,astnode_none);
+	//todo - can't we borrow? do we need opaque hack? can we access another way?
+	push_span(s,a.id,Some(a.ident),"type_method",a.span,astnode_ty_method(@a.clone()));
 	visit_ty_method(a,(s,v))
 }
 

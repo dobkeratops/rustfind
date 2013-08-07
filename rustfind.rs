@@ -428,6 +428,7 @@ fn lookup_def_of_node_tree_loc(dc:&DocContext,node_tree_loc:&NodeTreeLoc,m:ShowD
 }
 
 fn lookup_def_of_node(dc:&DocContext,node:&AstNode,m:ShowDefMode)->Option<~str> {
+	println("def of node:"+node.get_id().get_or_default(0).to_str());
 	let node_spans=build_node_info_map(dc.crate);
 	let node_def_node = build_node_def_node_table(dc);
 	lookup_def_of_node_sub(dc,node,m,node_spans,node_def_node)

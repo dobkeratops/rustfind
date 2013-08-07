@@ -27,7 +27,7 @@ pub fn make_html(dc:&DocContext, fm:&codemap::FileMap,nim:&NodeInfoMap,jdm:&Jump
 		let line_str=fm.src.slice(*fm.lines[line]-fstart,lend);
 		//doc.writeln(line_str);
 		doc.end_tag();
-		let markup_line=insert_links_in_line(dc,fm, nim, jdm,line_str, nodes_per_line[line]);
+		let markup_line=insert_links_in_line(dc,fm, nim, jdm,line_str, nodes_per_line[line],line);
 		doc.writeln(markup_line);
 		line+=1;
 	}
@@ -65,29 +65,30 @@ pub fn write_styles(doc:&mut HtmlWriter){
 	doc.write("a:visited{ color:#f0f0f0; font-style:normal;   text-decoration:none;}\n");
 	doc.write("a:link:hover{ color:#f0f0f0; font-style:normal; background-color:#606060; }\n");
 	doc.write("pr{font-weight:bold}\n");
-	doc.write("ln{color:#606060;background-color:#3c3c3c; }\n");
-	doc.write("rem{color:#ffffff; font-style:italic;font-weight:bold; opacity:0.4}\n");
+	doc.write("ln{color:#606060;background-color:#101010; }\n");
+	doc.write("c24{color:#ffffff; font-style:italic; opacity:0.5}\n");
+	doc.write("c25{color:#ffffff; opacity:0.95}\n");
 	doc.write("c1{color:#ffffc0;   font-weight:bold; }\n");
 	doc.write("c2{color:#60f0c0}\n");
 	doc.write("c3{color:#a0c0ff; font-weight:bold;}\n");
-	doc.write("c4{color:#d0b0f0}\n");
+	doc.write("c4{color:#f090f0}\n");
 	doc.write("c5{color:#a0e0e0; font-weight:bold}\n");
 	doc.write("c6{color:#f0f0e0}\n");
-	doc.write("c7{color:#f0f0f0}\n");
-	doc.write("c8{color:#f070f0}\n");
+	doc.write("c7{color:#fff0d0}\n");
+	doc.write("c8{color:#e0d0f0}\n");
 	doc.write("c9{color:#70f0f0}\n");
 	doc.write("c10{color:#f0f070}\n");
 	doc.write("c11{color:#c0f070}\n");
 	doc.write("c12{color:#70c0f0}\n");
 	doc.write("c13{color:#c0f070}\n");
-	doc.write("c14{color:#f070c0}\n");
-	doc.write("c15{color:#f070c0}\n");
-	doc.write("c16{color:#d0a0f0}\n");
-	doc.write("c17{color:#a0d0f0}\n");
-	doc.write("c18{color:#a0f0d0}\n");
+	doc.write("c14{color:#f0ffc0}\n");
+	doc.write("c15{color:#f0f0e0}\n");
+	doc.write("c16{color:#c0ffe0}\n");
+	doc.write("c17{color:#90d0f0}\n");
+	doc.write("c18{color:#f0a0d0}\n");
 	doc.write("c19{color:#d0f0a0}\n");
-	doc.write("c20{color:#f0a0d0}\n");
-	doc.write("c21{color:#e0e009; font-weight:bold}\n");
+	doc.write("c20{color:#a0a0ff}\n");
+	doc.write("c21{color:#dde009; font-weight:bold}\n");
 	doc.write("c22{color:#09f00d; font-weight:bold}\n");
 	doc.write("c23{color:#b0e0c0; font-weight:bold}\n");
 
@@ -178,12 +179,14 @@ pub fn node_color_index(ni:&NodeInfo)->int {
 	// todo, an enum ffs..
 	match ni.kind {
 		~"fn"=>1,
-		~"add"|~"sub"|~"mul"|~"div"|~"assign"|~"eq"|~"le"|~"gt"|~"ge"|~"ne"|~"binop"|~"assign_op"=>2,
+		~"add"|~"sub"|~"mul"|~"div"|~"assign"|~"eq"|~"le"|~"gt"|~"ge"|~"ne"|~"binop"|~"assign_op"
+		|~"bitand"|~"bitxor"|~"bitor"|~"shl"|~"shr"|~"not"|~"neg"|~"box"|~"uniq"|~"deref"|~"addr_of"
+			=>2,
 		~"ty"=>3,
 		~"de"=>4,
 		~"type_param"=>5,
-		~"struct_field"=>6,
-		~"keyword"=>7,
+		~"struct_field"|~"field"=>6,
+		~"keyword"|~"while"|~"match"|~"loop"|~"do"|~"cast"|~"if"=>7,
 		~"path"=>8,
 		~"call"=>9,
 		~"method_call"=>10,
@@ -196,9 +199,13 @@ pub fn node_color_index(ni:&NodeInfo)->int {
 		~"impl"=>17,
 		~"trait"=>18,
 		~"pat"=>20,
-		~"block"=>21,
-		~"method"=>22,
+		~"block"|~"blk"|~"fn_block"=>21,
+		~"method"|~"type_method"=>22,
 		~"tup"=>4,
+		~"arm"=>11,
+		~"index"=>13,
+		~"vstore"=>16,
+		~"mac"=>10,
 
 		_ =>0
 	}	
@@ -207,7 +214,7 @@ pub fn color_index_to_tag(i:int)->~str {
 	"c"+i.to_str()
 }
 
-fn insert_links_in_line(dc:&DocContext,fm:&codemap::FileMap, nim:&NodeInfoMap,jdm:&JumpToDefMap, line:&str, nodes:&[ast::NodeId])->~str {
+fn insert_links_in_line(dc:&DocContext,fm:&codemap::FileMap, nim:&NodeInfoMap,jdm:&JumpToDefMap, line:&str, nodes:&[ast::NodeId],line_index:uint)->~str {
 
 	let node_infos=nodes.map(|id|{nim.find(id)});
 //	for x in node_infos.iter() { println(fmt!("%?", x));}
@@ -229,18 +236,45 @@ fn insert_links_in_line(dc:&DocContext,fm:&codemap::FileMap, nim:&NodeInfoMap,jd
 				let e=byte_pos_to_index_file_pos(dc.tycx, ni.span.hi).unwrap();
 				let d=*ni.span.hi-*ni.span.lo;	// todo - get the actual hrc node depth in here!
 				let mut x=s.col;
+
 				// 'paint' the nodes we have here.
+				//if (s.line==e.line) 
+				let xe = if e.line>s.line{line.len()}else{e.col};
 				let ci = node_color_index(ni);
-				while x<e.col && x<line.len() {
+				while x<xe && x<line.len() {
 					if d < depth[x] {
 						color[x]=ci;
 						depth[x]=d;
-						link[x]=*link_id;
+						if *link_id!=0 {
+							link[x]=*link_id;
+						}
 					}
+					if link[x]==0 { link[x]=*link_id;}
 					x+=1;
 				}
 				rndcolor+=1;
 			}
+		}
+	}
+	// paint comments out, mark delimiter symbols--override what we get from buggy tree picture...
+	// TODO ... need to figure out tree nodes encompasing the current line from above to 
+	// propogate information properly eg brackets inside a type ..
+	{
+		let mut x=0;
+		while x<(line.len()-1) {
+			match line[x] as char{
+				'{'|'}'|'['|']'|';'|',' => {color[x]=4;},
+				'('|')'=> {color[x]=25;},
+				_=>{}
+			}
+
+			if line[x+0]=='/' as u8 && line[x+1]=='/' as u8 {
+				while x<line.len() {
+					color[x]=24;
+					x+=1;
+				}
+			}
+			x+=1;
 		}
 	}
 	// emit a span..
@@ -272,6 +306,17 @@ fn insert_links_in_line(dc:&DocContext,fm:&codemap::FileMap, nim:&NodeInfoMap,jd
 			curr_col=color[x];
 			outp.begin_tag(color_index_to_tag(curr_col));
 		}
+		outp.write(
+			match line[x] as char {
+			' '=>"&nbsp;",
+			'<'=>"&lt;",
+			'>'=>"&gt;",
+			'&'=>"&amp;",
+			'\t'=>"&nbsp;&nbsp;&nbsp;&nbsp;",
+			_=>line.slice(x,x+1)
+			}
+		);
+		/*
 		let chstr=line.slice(x,x+1);
 		if chstr==" " {
 			outp.write("&nbsp;");
@@ -281,9 +326,11 @@ fn insert_links_in_line(dc:&DocContext,fm:&codemap::FileMap, nim:&NodeInfoMap,jd
 		else {
 			outp.write(chstr);
 		}
+		*/
 		x+=1;
 	}
 	if curr_col>=0 {outp.end_tag();}
+	if curr_link>0 {outp.end_tag();}
 	outp.doc
 }
 
