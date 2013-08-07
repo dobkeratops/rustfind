@@ -93,7 +93,7 @@ fn main() {
     let args = os::args();
 
     let opts = ~[
-        optmulti("L"),optflag("d"),optflag("j"),optflag("h"),optflag("i"),optflag("g")
+        optmulti("L"),optflag("d"),optflag("j"),optflag("h"),optflag("i"),optflag("g"),optflag("w")
     ];
 
     let matches = getopts(args.tail(), opts).get();
@@ -107,6 +107,7 @@ fn main() {
 
 	if opt_present(&matches,"h") {
 		println("rustfind: useage:-");
+		println(" -w filename.rs [-L<lib path>] : create linked html pages for sources in crate");
 		println(" -j filename.rs [-L<library path>]  : dump JSON map of the ast nodes & defintions");
 		println(" cratename.rs anotherfile.rs:line:col:");
 		println("    - load cratename.rs; look for definition at anotherfile.rs:line:col");
@@ -138,7 +139,11 @@ fn main() {
 		}
 
 		// Dump as html..
-		write_source_as_html(dc);
+		if opt_present(&matches,"w") {
+			print("Creating HTML pages from source:-");
+			write_source_as_html(dc);
+			print("Creating HTML pages from source.. done");
+		}
 
 	}
 }
@@ -384,7 +389,7 @@ fn auto_deref_ty<'a>(t:&'a ty::t_box_)->&'a ty::t_box_ {
  
 fn get_struct_def<'a,'b>(tc:&'a ty::ctxt_, struct_node_id:ast::NodeId)->Option<(@ast::item,@ast::struct_def,ast::Generics)> {
 	match tc.items.find(&struct_node_id) {
-		None=>{print("no node found");None},
+		None=>{None},
 		Some(node)=>match *node {
 			syntax::ast_map::node_item(item,ref path)=>{
 				match item.node {

@@ -12,7 +12,7 @@ pub fn make_html(dc:&DocContext, fm:&codemap::FileMap,nim:&NodeInfoMap,jdm:&Jump
 	write_styles(&mut doc);
 
 	// write the doc lines..
-	doc.begin_tag_ext("body",&[(~"style",~"background-color:#383c40;")]);
+	doc.begin_tag_ext("body",&[(~"style",~"background-color:#303438;")]);
 	doc.begin_tag("maintext");
 	let mut line=0;
 	let fstart = *fm.start_pos;
@@ -60,7 +60,7 @@ fn write_head(doc:&mut HtmlWriter) {
 pub fn write_styles(doc:&mut HtmlWriter){
 	// write the styles..
 	doc.begin_tag_ext("style",&[(~"type",~"text/css")]);
-	doc.write("maintext {color:#f0f0f0; font-size:15px; font-family:\"Courier New\"}\n");
+	doc.write("maintext {color:#f0f0f0; font-size:12px; font-family:\"Courier New\"}\n");
 	doc.write("a:link{ color:#f0f0f0; font-style:normal;   text-decoration:none;}\n");
 	doc.write("a:visited{ color:#f0f0f0; font-style:normal;   text-decoration:none;}\n");
 	doc.write("a:link:hover{ color:#f0f0f0; font-style:normal; background-color:#606060; }\n");
@@ -98,15 +98,15 @@ pub fn write_styles(doc:&mut HtmlWriter){
 fn num_digits(a:uint)->uint{
 	let mut n=1;
 	let mut aa=a;
-	while aa>10 { aa/=10; n+=1;}
+	while aa>=10 { aa/=10; n+=1;}
 	n
 }
 fn pad_to_length(a:&str,l:uint,pad:&str)->~str {
 	let mut acc=~" ";
-	let mut i=l-a.len();
+	let mut i=(l-a.len()) as int;
 	while i>0 {
 		acc.push_str(pad);
-		i-=pad.len();
+		i-=pad.len() as int;
 	}
 	acc.push_str(a);
 	acc
@@ -208,6 +208,7 @@ pub fn color_index_to_tag(i:int)->~str {
 }
 
 fn insert_links_in_line(dc:&DocContext,fm:&codemap::FileMap, nim:&NodeInfoMap,jdm:&JumpToDefMap, line:&str, nodes:&[ast::NodeId])->~str {
+
 	let node_infos=nodes.map(|id|{nim.find(id)});
 //	for x in node_infos.iter() { println(fmt!("%?", x));}
 //	dump!(node_infos);
@@ -219,6 +220,7 @@ fn insert_links_in_line(dc:&DocContext,fm:&codemap::FileMap, nim:&NodeInfoMap,jd
 	let mut rndcolor=0;
 	let mut default_link_id=0 as ast::NodeId;;
 	for n in nodes.iter() {
+
 		match nim.find(n) {
 			None=>{},
 			Some(ni)=>{
@@ -270,7 +272,15 @@ fn insert_links_in_line(dc:&DocContext,fm:&codemap::FileMap, nim:&NodeInfoMap,jd
 			curr_col=color[x];
 			outp.begin_tag(color_index_to_tag(curr_col));
 		}
-		outp.write(line.slice(x,x+1));
+		let chstr=line.slice(x,x+1);
+		if chstr==" " {
+			outp.write("&nbsp;");
+		} else if (chstr=="\t") {
+			outp.write("&nbsp;&nbsp;&nbsp;&nbsp;");
+		}
+		else {
+			outp.write(chstr);
+		}
 		x+=1;
 	}
 	if curr_col>=0 {outp.end_tag();}
