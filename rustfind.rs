@@ -140,9 +140,9 @@ fn main() {
 
 		// Dump as html..
 		if opt_present(&matches,"w") {
-			print("Creating HTML pages from source:-");
+			println("Creating HTML pages from source:-");
 			write_source_as_html(dc);
-			print("Creating HTML pages from source.. done");
+			println("Creating HTML pages from source.. done");
 		}
 
 	}
