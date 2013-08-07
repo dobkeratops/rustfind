@@ -4,7 +4,9 @@ use syntax::ast_map;
 use syntax::visit;
 use syntax::oldvisit::*;
 use syntax::oldvisit::{Visitor, fn_kind};
+use syntax::codemap;
 use syntax::codemap::*;
+use syntax::codemap::BytePos;
 use rustc::{front, metadata, driver, middle};
 use rustc::middle::mem_categorization::ast_node;
 use syntax::*;
@@ -29,6 +31,14 @@ pub struct DocContext {
 }
 
 
+pub macro_rules! if_some {
+	($b:ident in $a:expr then $c:expr)=>(
+		match $a {
+			Some($b)=>$c,
+			None=>{}
+		}
+	);
+}
 macro_rules! dump{ ($($a:expr),*)=>
 	(	{	let mut txt=file!()+":"+line!().to_str()+": " ; 
 			$( txt=txt.append(
@@ -845,8 +855,173 @@ pub fn get_def_id(curr_crate:CrateNum,src_def:def)->Option<def_id> {
 
 
 
+pub struct TextFilePos {
+	name:~str,
+	line:uint, // ONE BASED, as viewed in text-editors+grep
+	col:uint
+}
+pub trait ToTextFilePos {
+	pub fn to_text_file_pos(self,cx:ty::ctxt)->Option<TextFilePos>;
+}
+
+impl ToTextFilePos for codemap::BytePos {
+	pub fn to_text_file_pos(self, cx:ty::ctxt)->Option<TextFilePos> {
+		let mut i=cx.sess.codemap.files.len();
+		while i>0 {
+			i-=1;
+			let fm=&cx.sess.codemap.files[i];
+			if *fm.start_pos <= *self {
+				let mut line=fm.lines.len();
+				while line>0 {
+					line-=1;
+					let line_start=*fm.lines[line];
+					if line_start<=*self {
+						return Some(TextFilePos::new(fm.name.to_owned(), line+1,*self-line_start))
+					}
+				}
+			}
+		}
+		None
+	}
+}
+
+impl FromStr for TextFilePos {
+	pub fn from_str(file_pos_str:&str)->Option<TextFilePos> {
+		let toks:~[&str]=file_pos_str.split_iter(':').collect();
+		if toks.len()<=0 {
+			None 
+		} else if toks.len()==1 {
+			Some(TextFilePos::new(toks[0],1,0))
+		} else {
+			match FromStr::from_str(toks[1]) {
+				None=>None,
+				Some(line)=>match FromStr::from_str(toks[2]) {
+					None=>Some(TextFilePos::new(toks[0],line,0)),
+					Some(col)=>Some(TextFilePos::new(toks[0],line,col))
+				}
+			}
+		}
+	}
+}
+
+impl TextFilePos {
+	pub fn new(filename:&str,_line:uint,_col:uint)->TextFilePos { TextFilePos{name:filename.to_owned(),line:_line,col:_col}}
+
+	pub fn to_str(&self)->~str {
+		self.name+":"+self.line.to_str()+":"+self.col.to_str()+":"		
+	}
+
+	pub fn to_byte_pos(&self,cx:ty::ctxt)->Option<codemap::BytePos> {
+		let mut i=cx.sess.codemap.files.len();
+		while i>0 {	// caution, need loop because we return, wait for new foreach ..in..
+			i-=1;
+			let fm=&cx.sess.codemap.files[i];
+			let filemap_filename:&str=fm.name;	
+			if filemap_filename==self.name {
+				if self.line>fm.lines.len() { return None;}
+				return Some(BytePos(*fm.lines[self.line-1]+self.col));
+			}
+		}
+		return None;
+	}
+}
+
+
+pub fn text_file_pos_to_byte_pos(c:ty::ctxt,tfp:&TextFilePos)->Option<codemap::BytePos>
+{
+//	for c.sess.codemap.files.rev_iter().advance |fm:&codemap::FileMap| {
+	let mut i=c.sess.codemap.files.len();
+	while i>0 {	// caution, need loop because we return, wait for new foreach ..in..
+		i-=1;
+		let fm=&c.sess.codemap.files[i];
+		let filemap_filename:&str=fm.name;	
+		if filemap_filename==tfp.name {
+			let line_pos=*fm.lines[tfp.line-1];
+			let bp_start=*fm.lines[tfp.line-1]+tfp.col;
+			return Some(BytePos(bp_start))
+		}
+	}
+	return None;
+}
+
+pub fn byte_pos_to_text_file_pos(c:ty::ctxt, pos:BytePos)->TextFilePos {
+	// TODO: cleanup with byte_pos_to_index_file_pos, one in terms of the other.
+	// TODO - functional, and with binary search or something ..
+	let mut i=c.sess.codemap.files.len();
+	while i>0 {	
+			// caution, need loop because we return, wait for new foreach ..in..
+		i-=1;
+		let fm=&c.sess.codemap.files[i];
+		let filemap_filename:&str=fm.name;
+		if *pos >= *fm.start_pos && *pos < *fm.start_pos+fm.src.len(){
+			let mut line=fm.lines.len();
+			while line>0 {
+				line-=1;
+				let lstart=*fm.lines[line];
+				if lstart < *pos {
+					return TextFilePos::new(fm.name, line, *pos-lstart)
+				}
+			}
+		}
+	}	
+	TextFilePos::new(c.sess.codemap.files[0].name,0,0)
+}
+
+pub struct IndexFilePos {
+	file_index:uint,
+	line:uint,
+	col:uint
+}
+
+pub fn byte_pos_to_index_file_pos(c:ty::ctxt, pos:BytePos)->Option<IndexFilePos> {
+	// TODO: cleanup with byte_pos_to_text_file_pos, one in terms of the other.
+	// TODO - functional, and with binary search or something ..
+	let mut i=c.sess.codemap.files.len();
+	while i>0 {	
+			// caution, need loop because we return, wait for new foreach ..in..
+		i-=1;
+		let fm=&c.sess.codemap.files[i];
+		let filemap_filename:&str=fm.name;
+		if *pos >= *fm.start_pos && *pos < *fm.start_pos+fm.src.len(){
+			let mut line=fm.lines.len();
+			while line>0 {
+				line-=1;
+				let lstart=*fm.lines[line];
+				if lstart < *pos {
+					return Some(IndexFilePos{ file_index:i, line:line, col:*pos-lstart});
+				}
+			}
+		}
+	}	
+	None
+}
 
 
 
+pub fn byte_pos_from_text_file_pos_str(dc:&DocContext,filepos:&str)->Option<codemap::BytePos> {
+	let toks:~[&str]=filepos.split_iter(':').collect();
+	if toks.len()<3 { return None; }
 
+//	let line:Option<uint> = FromStr::from_str(toks[1]);
+	if_some!(line in FromStr::from_str(toks[1]) then {
+		if_some!(col in FromStr::from_str(toks[2]) then {
+			//todo - if no column specified, just lookup everything on that line!
+				return text_file_pos_to_byte_pos(dc.tycx,&TextFilePos::new(toks[0],line,col));
+		})
+	})
+	return None;
+}
+
+
+pub type JumpToDefMap = HashMap<ast::NodeId,ast::NodeId> ;
+
+impl ToJsonStr for JumpToDefMap {
+	pub fn to_json_str(&self)->~str {
+		let mut acc=~"";
+		for (&k,&v) in self.iter() {
+			acc.push_str("\t\t{ node_id:"+k.to_str()+", def_node_id:"+ v.to_str()+" },\n");
+		}
+		acc
+	}
+}
 

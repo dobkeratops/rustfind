@@ -11,7 +11,7 @@ test2: rustfind
 int: rustfind
 	./rustfind -i $(OPTS)
 
-rustfind: rustfind.rs find_ast_node.rs astdump.rs text_formatting.rs rust2html.rs
+rustfind: rustfind.rs rsfind.rs find_ast_node.rs astdump.rs text_formatting.rs rust2html.rs htmlwriter.rs
 	rustc rustfind.rs
 
 

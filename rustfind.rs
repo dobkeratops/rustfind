@@ -34,8 +34,9 @@ use extra::json::ToJson;
 use rust2html::*;
 
 mod text_formatting;
-mod find_ast_node;
 mod ioutil;
+mod find_ast_node;
+mod htmlwriter;
 mod rust2html;
 
 
@@ -82,48 +83,7 @@ pub macro_rules! if_some {
 	);
 }
 
-/// tags: crate,ast,parse resolve
-/// Parses, resolves the given crate
-fn get_ast_and_resolve(cpath: &Path, libs: ~[Path]) -> DocContext {
-	
 
-
-    let parsesess = parse::new_parse_sess(None);
-    let sessopts = @driver::session::options {
-        binary: @"rustdoc",
-        maybe_sysroot: Some(@std::os::self_exe_path().get().pop()),
-        addl_lib_search_paths: @mut libs,
-        ..  (*rustc::driver::session::basic_options()).clone()
-    };
-	let quiet=true;
-	fn no_emit(cmsp: Option<(@codemap::CodeMap, codemap::span)>, msg: &str, lvl: syntax::diagnostic::level) {
-	}
-
-
-    let diagnostic_handler = syntax::diagnostic::mk_handler(None);
-    let span_diagnostic_handler =
-        syntax::diagnostic::mk_span_handler(diagnostic_handler, parsesess.cm);
-
-
-    let mut sess = driver::driver::build_session_(sessopts, parsesess.cm,
-                                                  if quiet{no_emit}else{syntax::diagnostic::emit},
-                                                  span_diagnostic_handler);
-
-/*    let (crate, tycx) = driver::driver::compile_upto(sess, sessopts.cfg.clone(),
-                                                     &driver::driver::file_input(cpath.clone()),
-                                                     driver::driver::cu_no_trans, None);
-*/
-	let input=driver::driver::file_input(cpath.clone());
-	let cfg= driver::driver::build_configuration(sess, @"", &input);
-
-	let crate1=driver::driver::phase_1_parse_input(sess,cfg.clone(),&input);
-	let crate2=driver::driver::phase_2_configure_and_expand(sess,cfg,crate1);
-	
-	let ca=driver::driver::phase_3_run_analysis_passes(sess,crate2);  
-//	let c=crate.unwrap();
-//	let t=tycx.unwrap();
-    DocContext { crate: crate2, tycx: ca.ty_cx, sess: sess, ca:ca }
-}
 
 fn main() {
     use extra::getopts::*;
@@ -178,14 +138,54 @@ fn main() {
 		}
 
 		// Dump as html..
-		for f in dc.sess.codemap.files.iter() {
-			rust2html::write_source_as_html(dc, f.name, "html");
-		}
+		write_source_as_html(dc);
 
+	}
+}
+
+/// tags: crate,ast,parse resolve
+/// Parses, resolves the given crate
+fn get_ast_and_resolve(cpath: &Path, libs: ~[Path]) -> DocContext {
+	
+
+
+    let parsesess = parse::new_parse_sess(None);
+    let sessopts = @driver::session::options {
+        binary: @"rustdoc",
+        maybe_sysroot: Some(@std::os::self_exe_path().get().pop()),
+        addl_lib_search_paths: @mut libs,
+        ..  (*rustc::driver::session::basic_options()).clone()
+    };
+	let quiet=true;
+	fn no_emit(cmsp: Option<(@codemap::CodeMap, codemap::span)>, msg: &str, lvl: syntax::diagnostic::level) {
 	}
 
 
+    let diagnostic_handler = syntax::diagnostic::mk_handler(None);
+    let span_diagnostic_handler =
+        syntax::diagnostic::mk_span_handler(diagnostic_handler, parsesess.cm);
+
+
+    let mut sess = driver::driver::build_session_(sessopts, parsesess.cm,
+                                                  if quiet{no_emit}else{syntax::diagnostic::emit},
+                                                  span_diagnostic_handler);
+
+/*    let (crate, tycx) = driver::driver::compile_upto(sess, sessopts.cfg.clone(),
+                                                     &driver::driver::file_input(cpath.clone()),
+                                                     driver::driver::cu_no_trans, None);
+*/
+	let input=driver::driver::file_input(cpath.clone());
+	let cfg= driver::driver::build_configuration(sess, @"", &input);
+
+	let crate1=driver::driver::phase_1_parse_input(sess,cfg.clone(),&input);
+	let crate2=driver::driver::phase_2_configure_and_expand(sess,cfg,crate1);
+	
+	let ca=driver::driver::phase_3_run_analysis_passes(sess,crate2);  
+//	let c=crate.unwrap();
+//	let t=tycx.unwrap();
+    DocContext { crate: crate2, tycx: ca.ty_cx, sess: sess, ca:ca }
 }
+
 
 fn get_filename_only(fnm:&str)->~str {
 	let toks:~[&str]=fnm.split_iter(':').collect();
@@ -256,17 +256,6 @@ fn dump_json(dc:&DocContext) {
 	println("}");
 }
 
-pub type JumpToDefMap = HashMap<ast::NodeId,ast::NodeId> ;
-
-impl ToJsonStr for JumpToDefMap {
-	pub fn to_json_str(&self)->~str {
-		let mut acc=~"";
-		for (&k,&v) in self.iter() {
-			acc.push_str("\t\t{ node_id:"+k.to_str()+", def_node_id:"+ v.to_str()+" },\n");
-		}
-		acc
-	}
-}
 
 
 pub fn build_jump_to_def_map(dc:&DocContext, nim:@mut NodeInfoMap,nd:&HashMap<ast::NodeId,ast::def_id>)->~JumpToDefMap{
@@ -313,114 +302,28 @@ fn lookup_def_at_file_line_pos_old(dc:&DocContext,filepos:&str, show_all:ShowDef
 	return None;
 }
 
-struct TextFilePos {
-	name:~str,
-	line:uint, // ONE BASED, as viewed in text-editors+grep
-	col:uint
-}
-trait ToTextFilePos {
-	fn to_text_file_pos(self,cx:ty::ctxt)->Option<TextFilePos>;
-}
 
-impl ToTextFilePos for syntax::codemap::BytePos {
-	fn to_text_file_pos(self, cx:ty::ctxt)->Option<TextFilePos> {
-		let mut i=cx.sess.codemap.files.len();
-		while i>0 {
-			i-=1;
-			let fm=&cx.sess.codemap.files[i];
-			if *fm.start_pos <= *self {
-				let mut line=fm.lines.len();
-				while line>0 {
-					line-=1;
-					let line_start=*fm.lines[line];
-					if line_start<=*self {
-						return Some(TextFilePos::new(fm.name.to_owned(), line+1,*self-line_start))
-					}
-				}
-			}
-		}
-		None
-	}
-}
-
-impl FromStr for TextFilePos {
-	fn from_str(file_pos_str:&str)->Option<TextFilePos> {
-		let toks:~[&str]=file_pos_str.split_iter(':').collect();
-		if toks.len()<=0 {
-			None 
-		} else if toks.len()==1 {
-			Some(TextFilePos::new(toks[0],1,0))
-		} else {
-			match FromStr::from_str(toks[1]) {
-				None=>None,
-				Some(line)=>match FromStr::from_str(toks[2]) {
-					None=>Some(TextFilePos::new(toks[0],line,0)),
-					Some(col)=>Some(TextFilePos::new(toks[0],line,col))
-				}
-			}
-		}
-	}
-}
-
-impl TextFilePos {
-	fn new(filename:&str,_line:uint,_col:uint)->TextFilePos { TextFilePos{name:filename.to_owned(),line:_line,col:_col}}
-
-	fn to_str(&self)->~str {
-		self.name+":"+self.line.to_str()+":"+self.col.to_str()+":"		
-	}
-
-	fn to_byte_pos(&self,cx:ty::ctxt)->Option<syntax::codemap::BytePos> {
-		let mut i=cx.sess.codemap.files.len();
-		while i>0 {	// caution, need loop because we return, wait for new foreach ..in..
-			i-=1;
-			let fm=&cx.sess.codemap.files[i];
-			let filemap_filename:&str=fm.name;	
-			if filemap_filename==self.name {
-				if self.line>fm.lines.len() { return None;}
-				return Some(BytePos(*fm.lines[self.line-1]+self.col));
-			}
-		}
-		return None;
-	}
-}
-
-
-
-fn byte_pos_from_text_file_pos_str(dc:&DocContext,filepos:&str)->Option<syntax::codemap::BytePos> {
-	let toks:~[&str]=filepos.split_iter(':').collect();
-	if toks.len()<3 { return None; }
-
-//	let line:Option<uint> = FromStr::from_str(toks[1]);
-	if_some!(line in FromStr::from_str(toks[1]) then {
-		if_some!(col in FromStr::from_str(toks[2]) then {
-			//todo - if no column specified, just lookup everything on that line!
-				return text_file_pos_to_byte_pos(dc.tycx,&TextFilePos::new(toks[0],line,col));
-		})
-	})
-	return None;
-}
-
-fn lookup_def_at_text_file_pos(dc:&DocContext, tfp:&TextFilePos, show_mode:ShowDefMode)->Option<~str> {
+pub fn lookup_def_at_text_file_pos(dc:&DocContext, tfp:&TextFilePos, show_mode:ShowDefMode)->Option<~str> {
 	match text_file_pos_to_byte_pos(dc.tycx, tfp) {
 		None=>None,
 		Some(bp)=>lookup_def_at_byte_pos(dc,bp,show_mode)
 	}
 }
 
-fn lookup_def_at_text_file_pos_str(dc:&DocContext,file_pos_str:&str, show_mode:ShowDefMode)->Option<~str> {
+pub fn lookup_def_at_text_file_pos_str(dc:&DocContext,file_pos_str:&str, show_mode:ShowDefMode)->Option<~str> {
 	match byte_pos_from_text_file_pos_str(dc,file_pos_str) {
 		None=>None,
 		Some(bp)=>lookup_def_at_byte_pos(dc,bp,show_mode),
 	}
 }
 
-fn node_id_from_text_file_pos_str(dc:&DocContext, file_pos_str:&str)->Option<ast::NodeId> {
+pub fn node_id_from_text_file_pos_str(dc:&DocContext, file_pos_str:&str)->Option<ast::NodeId> {
 	match node_from_text_file_pos_str(dc, file_pos_str) {
 		None=>None,
 		Some(an)=>an.get_id()
 	}
 }
-fn node_from_text_file_pos_str(dc:&DocContext, file_pos_str:&str)->Option<find_ast_node::AstNode> {
+pub fn node_from_text_file_pos_str(dc:&DocContext, file_pos_str:&str)->Option<find_ast_node::AstNode> {
 	match byte_pos_from_text_file_pos_str(dc,file_pos_str) {
 		Some(bp)=>{let ndt=find_node_tree_loc_at_byte_pos(dc.crate,bp);Some(ndt.last().clone())},
 		None=>None
@@ -434,19 +337,19 @@ enum ShowDefMode {
 	SDM_GeditCmd=3
 }
 
-fn lookup_def_at_byte_pos(dc:&DocContext, bp:BytePos, m:ShowDefMode)->Option<~str> {
+pub fn lookup_def_at_byte_pos(dc:&DocContext, bp:BytePos, m:ShowDefMode)->Option<~str> {
 	let ndt=find_ast_node::find_node_tree_loc_at_byte_pos(dc.crate,bp);
 	lookup_def_of_node_tree_loc(dc,&ndt,m)
 }
 
-fn dump_node_tree_loc(ndt:&NodeTreeLoc) {
+pub fn dump_node_tree_loc(ndt:&NodeTreeLoc) {
 //	for ndt.iter().advance |x|
 	for x in ndt.iter()
 	 {print(x.kind_to_str()+".");} print("\n");
 }
 
 
-fn dump_methods_of_type(tycx:&ty::ctxt_, type_node_id:ast::NodeId) {
+pub fn dump_methods_of_type(tycx:&ty::ctxt_, type_node_id:ast::NodeId) {
 	let ot = tycx.node_types.find(&(type_node_id as uint));
 	match ot {
 		None=> {}, 
@@ -757,44 +660,8 @@ pub fn text_file_pos_len_to_byte_pos(c:ty::ctxt,tfp:&TextFilePos,len:uint )->Opt
 }
 
 
-pub fn byte_pos_to_text_file_pos(c:ty::ctxt, pos:BytePos)->TextFilePos {
-	let mut i=c.sess.codemap.files.len();
-	while i>0 {	
-			// caution, need loop because we return, wait for new foreach ..in..
-		i-=1;
-		let fm=&c.sess.codemap.files[i];
-		let filemap_filename:&str=fm.name;
-		if *pos > *fm.start_pos {
-			let mut line=fm.lines.len();
-			while line>0 {
-				line-=1;
-				let lstart=*fm.lines[line];
-				if lstart > *pos {
-					return TextFilePos::new(fm.name, line, *pos-lstart)
-				}
-			}
-		}
-	}	
-	TextFilePos::new(c.sess.codemap.files[0].name,0,0)
-}
 
 
-pub fn text_file_pos_to_byte_pos(c:ty::ctxt,tfp:&TextFilePos)->Option<codemap::BytePos>
-{
-//	for c.sess.codemap.files.rev_iter().advance |fm:&codemap::FileMap| {
-	let mut i=c.sess.codemap.files.len();
-	while i>0 {	// caution, need loop because we return, wait for new foreach ..in..
-		i-=1;
-		let fm=&c.sess.codemap.files[i];
-		let filemap_filename:&str=fm.name;	
-		if filemap_filename==tfp.name {
-			let line_pos=*fm.lines[tfp.line-1];
-			let bp_start=*fm.lines[tfp.line-1]+tfp.col;
-			return Some(BytePos(bp_start))
-		}
-	}
-	return None;
-}
 
 pub fn text_offset_to_line_pos(text:&[u8], src_ofs:uint)->Option<(uint,uint)> {
 	// line as reported by grep & text editors,counted from '1' not '0'
@@ -989,6 +856,13 @@ pub fn def_of_symbol_to_str(dc:&DocContext, ns:&NodeInfoMap,ds:&HashMap<ast::Nod
 	~"TODO"	
 }
 
+pub fn write_source_as_html(dc:&DocContext) {
+	let nim=build_node_info_map(dc.crate);
+	let ndm = build_node_def_node_table(dc);
+	let jdm=build_jump_to_def_map(dc,nim,ndm);
+	rust2html::write_source_as_html_sub(dc,nim,ndm,jdm);
+
+}
 
 
 
