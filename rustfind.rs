@@ -232,7 +232,9 @@ fn flatten_to_str<T,U:ToStr>(xs:&[T],f:&fn(x:&T)->U, sep:&str)->~str {
 		i+=1;
 	}
 	acc
-}fn dump_json(dc:&DocContext) {
+}
+
+fn dump_json(dc:&DocContext) {
 	// TODO: full/partial options - we currently wwrite out all the nodes we find.
 	// need option to only write out nodes that map to definitons. 
 	println("{");

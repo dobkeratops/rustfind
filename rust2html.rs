@@ -257,7 +257,7 @@ fn text_here_is(line:&str, pos:uint,reftext:&str, color:int)->int {
 		i+=1;
 	}
 
-	return color;	
+	return color;
 }
 
 fn insert_links_in_line(dc:&DocContext,fm:&codemap::FileMap, nim:&FNodeInfoMap,jdm:&JumpToDefMap, jrm:&JumpToRefMap, line:&str, nodes:&[ast::NodeId],line_index:uint)->~str {
@@ -425,24 +425,24 @@ fn find_defs_in_file(fm:&codemap::FileMap, nim:&FNodeInfoMap)->~[ast::NodeId] {
 }
 
 /// K:[V]  insert(K, V) for many V;  find(K)->[V]
-struct MultiMap<K,V> {
+pub struct MultiMap<K,V> {
 	next_index:uint,
 	indices:HashMap<K,uint>,
 	items:~[~[V]],
 	empty:~[V]
 }
 impl<'self,K:IterBytes+Eq,V> MultiMap<K,V> {
-	fn new()->MultiMap<K,V> {
+	pub fn new()->MultiMap<K,V> {
 		MultiMap{ next_index:0, indices:HashMap::new(), items:~[], empty:~[] }
 	}
-	fn find(&'self self, k:K)->&'self~[V] {
+	pub fn find(&'self self, k:K)->&'self~[V] {
 		// TODO - return iterator, not collection
 		match self.indices.find(&k) {
 			None=>&self.empty,
 			Some(&ix)=>&self.items[ix]
 		}
 	}
-	fn insert(&'self mut self, k:K,v:V) {
+	pub fn insert(&'self mut self, k:K,v:V) {
 		let ix=match self.indices.find(&k) {
 			None=>{ self.indices.insert(k,self.next_index); self.next_index+=1; self.items.push(~[]); self.next_index-1},
 			Some(&ix)=> ix
@@ -457,7 +457,9 @@ type JumpToRefMap = MultiMap<ast::NodeId, ast::NodeId>;
 // 'this function, called from these locations' 
 // 'this function, called fromm these functions ... <<< BETTER
 // 'this type, used in these functions ... '
+
 fn get_source_line(fm:&codemap::FileMap, i:uint)->~str {
+
 	let le=if i<(fm.lines.len()-1) { *fm.lines[i+1] } else {fm.src.len()+*fm.start_pos};
 //	dump!(fm.lines[i-1],*fm.start_pos, fm.lines[i-1]-le);
 	if i>=0 {
@@ -466,6 +468,7 @@ fn get_source_line(fm:&codemap::FileMap, i:uint)->~str {
 		~""
 	}
 }
+
 fn write_references(doc:&mut HtmlWriter,dc:&DocContext, fm:&codemap::FileMap,nim:&FNodeInfoMap,jdm:&JumpToDefMap,jrm:&JumpToRefMap, nodes_per_line:&[~[ast::NodeId]]) {
 	doc.write_tag("div");
 	let file_def_nodes = find_defs_in_file(fm,nim);
@@ -520,12 +523,17 @@ fn write_references(doc:&mut HtmlWriter,dc:&DocContext, fm:&codemap::FileMap,nim
 
 	fn write_refs_header(doc:&mut HtmlWriter,dc:&DocContext,nim:&FNodeInfoMap, fm:&codemap::FileMap, nid:ast::NodeId) {
 		doc.writeln("");
-		let ifp=get_node_index_file_pos(dc,nim,nid);
-		let def_info=nim.find(&nid).unwrap();
+		let info=nim.find(&nid).unwrap();
+		let ifp=byte_pos_to_index_file_pos(dc.tycx, info.span.lo).unwrap();
+		let ifpe=byte_pos_to_index_file_pos(dc.tycx, info.span.hi).unwrap();
+//		let def_info=nim.find(&nid).unwrap();
+//		let ifpe=get_node_index_file_pos(dc,nim,nid).unwrap();
 
 		doc.begin_tag_anchor(ifp.line.to_str()+"_"+ifp.col.to_str() + "_refs" );
 		doc.begin_tag("c24");
-		doc.writeln(dc.sess.codemap.files[ifp.file_index].name+":"+(ifp.line+1).to_str()+":"+ifp.col.to_str()+"  ("+def_info.kind+") references:-");
+		doc.writeln(dc.sess.codemap.files[ifp.file_index].name+":"+(ifp.line+1).to_str()+":"+ifp.col.to_str()
+					+"-"+(ifpe.line+1).to_str()+":"+ifpe.col.to_str()
+					+"  ("+info.kind+") references:-");
 		doc.end_tag();
 		doc.begin_tag_link( change_file_name_ext(fm.name,"html")+"#"+(ifp.line+1).to_str());
 		doc.begin_tag("pr");
