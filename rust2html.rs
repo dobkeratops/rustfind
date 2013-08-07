@@ -11,10 +11,13 @@ pub fn make_html(dc:&DocContext, fm:&codemap::FileMap,nim:&FNodeInfoMap,jdm:&Jum
 	// todo - Rust2HtmlCtx { fm,nim,jdm,jrm } .. cleanup common intermediates
 	let mut doc= HtmlWriter::new::();
 	write_head(&mut doc);
-	write_styles(&mut doc);
+	write_styles(&mut doc,fm.name);
 
+	let hash=get_str_hash(fm.name);
+	let bg=(~[~"383838",~"34383c",~"3c3834",~"383c34",~"343c38",~"38343c",~"3a343a",
+			~"3a343a",~"36363a",~"363a36",~"3a3636",~"3a3a34",~"3a333a",~"343a3a",~"343a3c",~"343838"])[hash&15];
 	// write the doc lines..
-	doc.begin_tag_ext("body",&[(~"style",~"background-color:#303438;")]);
+	doc.begin_tag_ext("body",&[(~"style",~"background-color:#"+bg+";")]);
 	doc.begin_tag("maintext");
 	let mut line=0;
 	let fstart = *fm.start_pos;
@@ -59,13 +62,19 @@ pub fn write_source_as_html_sub(dc:&DocContext, nim:&FNodeInfoMap,ndn:&HashMap<a
 }
 
 fn write_head(doc:&mut HtmlWriter) {
+	
 	doc.begin_tag("head");
 	doc.write_tag_ext("link",&[(~"href",~"css/shCore.css"),(~"rel",~"stylesheet"),(~"type",~"text/css")]);
 	doc.write_tag_ext("link",&[(~"href",~"css/shThemeDefault.css"),(~"rel",~"stylesheet"),(~"type",~"text/css")]);
 	doc.end_tag();
 }
 
-pub fn write_styles(doc:&mut HtmlWriter){
+fn get_str_hash(s:&str)->uint{
+	let mut acc=0;
+	for x in s.iter() { acc=((acc<<5)-acc)^(acc>>12); acc+=x as uint;}
+	acc 
+}
+pub fn write_styles(doc:&mut HtmlWriter,fname:&str){
 	// write the styles..
 	doc.begin_tag_ext("style",&[(~"type",~"text/css")]);
 	doc.write("maintext {color:#f0f0f0; font-size:12px; font-family:\"Courier New\"}\n");
