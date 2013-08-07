@@ -6,7 +6,9 @@ use htmlwriter::*;
 use std::hashmap::*;
 use std::vec;
 
-pub fn make_html(dc:&DocContext, fm:&codemap::FileMap,nim:&FNodeInfoMap,jdm:&JumpToDefMap, nodes_per_line:&[~[ast::NodeId]])->~str {
+
+pub fn make_html(dc:&DocContext, fm:&codemap::FileMap,nim:&FNodeInfoMap,jdm:&JumpToDefMap, jrm:&JumpToRefMap, nodes_per_line:&[~[ast::NodeId]])->~str {
+	// todo - Rust2HtmlCtx { fm,nim,jdm,jrm } .. cleanup common intermediates
 	let mut doc= HtmlWriter::new::();
 	write_head(&mut doc);
 	write_styles(&mut doc);
@@ -20,18 +22,18 @@ pub fn make_html(dc:&DocContext, fm:&codemap::FileMap,nim:&FNodeInfoMap,jdm:&Jum
 
 	while line<fm.lines.len() {
 		// todo: line numbers want to go in a seperate column so they're unselectable..
-		doc.write_tagged("ln",pad_to_length(line.to_str(),max_digits,"0"));
-		doc.begin_tag_anchor(line.to_str());
+		doc.write_tagged("ln",pad_to_length((line+1).to_str(),max_digits,"&nbsp;"));
+		doc.begin_tag_anchor((line+1).to_str());
 		let lend=if line<(fm.lines.len()-1){*fm.lines[line+1]-fstart}else{fm.src.len()};
 		doc.write("&emsp;");
 		let line_str=fm.src.slice(*fm.lines[line]-fstart,lend);
 		//doc.writeln(line_str);
 		doc.end_tag();
-		let markup_line=insert_links_in_line(dc,fm, nim, jdm,line_str, nodes_per_line[line],line);
+		let markup_line=insert_links_in_line(dc,fm, nim, jdm,jrm, line_str, nodes_per_line[line],line);
 		doc.writeln(markup_line);
 		line+=1;
 	}
-	write_references(&mut doc,dc,fm,nim,jdm,nodes_per_line);
+	write_references(&mut doc,dc,fm,nim,jdm,jrm, nodes_per_line);
 	
 	doc.end_tag();
 	doc.end_tag();
@@ -42,11 +44,15 @@ pub fn make_html(dc:&DocContext, fm:&codemap::FileMap,nim:&FNodeInfoMap,jdm:&Jum
 pub fn write_source_as_html_sub(dc:&DocContext, nim:&FNodeInfoMap,ndn:&HashMap<ast::NodeId,ast::def_id>, jdm:&JumpToDefMap) {
 	
 	let npl=NodesPerLinePerFile::new(dc,nim);
+	let mut def2refs = ~MultiMap::new();
+	for (&nref,&ndef) in jdm.iter() {
+		def2refs.insert(ndef,nref);
+	}
 
 	// ew
 	let mut fi=0;
 	for fm in dc.sess.codemap.files.iter() {
-		let doc_str=make_html(dc, *fm, nim,jdm, npl.m[fi]);
+		let doc_str=make_html(dc, *fm, nim,jdm, def2refs, npl.m[fi]);
 		fileSaveStr(doc_str,change_file_name_ext(fm.name,"html"));
 		fi+=1;
 	}
@@ -115,7 +121,7 @@ fn pad_to_length(a:&str,l:uint,pad:&str)->~str {
 	let mut i=(l-a.len()) as int;
 	while i>0 {
 		acc.push_str(pad);
-		i-=pad.len() as int;
+		i-=1;//pad.len() as int;
 	}
 	acc.push_str(a);
 	acc
@@ -162,7 +168,10 @@ impl NodesPerLinePerFile {
 				None=>{},
 				Some(ifp)=>{
 //					dump!(ifp);
-					npl.m[ifp.file_index][ifp.line].push(*k)
+					let ifpe=byte_pos_to_index_file_pos(dc.tycx,v.span.hi).unwrap();
+					for li in range(ifp.line,ifpe.line+1) {
+						npl.m[ifp.file_index][li].push(*k)
+					}
 				}
 			}
 		}
@@ -242,7 +251,7 @@ fn text_here_is(line:&str, pos:uint,reftext:&str, color:int)->int {
 	return color;	
 }
 
-fn insert_links_in_line(dc:&DocContext,fm:&codemap::FileMap, nim:&FNodeInfoMap,jdm:&JumpToDefMap, line:&str, nodes:&[ast::NodeId],line_index:uint)->~str {
+fn insert_links_in_line(dc:&DocContext,fm:&codemap::FileMap, nim:&FNodeInfoMap,jdm:&JumpToDefMap, jrm:&JumpToRefMap, line:&str, nodes:&[ast::NodeId],line_index:uint)->~str {
 
 	let node_infos=nodes.map(|id|{nim.find(id)});
 //	for x in node_infos.iter() { println(fmt!("%?", x));}
@@ -253,31 +262,39 @@ fn insert_links_in_line(dc:&DocContext,fm:&codemap::FileMap, nim:&FNodeInfoMap,j
 	let mut color:~[int] = vec::from_elem(line.len(),0 as int);
 	let mut depth:~[uint]= vec::from_elem(line.len(),0x7fffffff as uint);
 	let mut rndcolor=0;
-	let mut default_link_id=0 as ast::NodeId;;
+	let mut no_link=0 as ast::NodeId;;
 	for n in nodes.iter() {
 
 		match nim.find(n) {
 			None=>{},
 			Some(ni)=>{
-				let link_id=jdm.find(n).get_or_default(&default_link_id);
+				// link_id >0 = node def link. link_id<0 = node ref link
+				let link_id= match jdm.find(n) {
+					None=> if jrm.find(*n).len()>0 { - *n } else { no_link },
+					Some(x) =>*x
+				};
+				
 				let s=byte_pos_to_index_file_pos(dc.tycx, ni.span.lo).unwrap();
 				let e=byte_pos_to_index_file_pos(dc.tycx, ni.span.hi).unwrap();
 				let d=*ni.span.hi-*ni.span.lo;	// todo - get the actual hrc node depth in here!
-				let mut x=s.col;
+				let mut x=if line_index<=s.line {s.col}else{0};
+				// TODO: instead of this brute force 'painters-algorithm',
+				// clip spans, or at least have a seperate "buffer" for the line-coherent infill
+				// for multi-line spans
 
 				// 'paint' the nodes we have here.
 				//if (s.line==e.line) 
-				let xe = if e.line>s.line{line.len()}else{e.col};
+				let xe = if e.line>line_index{line.len()}else{e.col};
 				let ci = node_color_index(ni);
 				while x<xe && x<line.len() {
 					if d < depth[x] {
 						color[x]=ci;
 						depth[x]=d;
-						if *link_id!=0 {
-							link[x]=*link_id;
+						if link_id!=0 {
+							link[x]=link_id;
 						}
 					}
-					if link[x]==0 { link[x]=*link_id;}
+					if link[x]==0 { link[x]=link_id;}
 					x+=1;
 				}
 				rndcolor+=1;
@@ -334,13 +351,21 @@ fn insert_links_in_line(dc:&DocContext,fm:&codemap::FileMap, nim:&FNodeInfoMap,j
 			if curr_col>=0 {outp.end_tag();}
 			curr_col=-1;
 			curr_link=link[x];
-			if curr_link>0 {
-				match nim.find(&curr_link) {
-					None=>curr_link=0,	// link outside the crate.
-					Some(link_node_info)=>{
-						let tfp = byte_pos_to_text_file_pos(dc.tycx, link_node_info.span.lo);
-						outp.begin_tag_link(change_file_name_ext(tfp.name,"html")+"#"+tfp.line.to_str());
+
+			if curr_link!=no_link {
+				if curr_link>0 {
+					match nim.find(&curr_link) {
+						None=>curr_link=0,	// link outside the crate?
+						Some(link_node_info)=>{
+							let ifp = byte_pos_to_index_file_pos(dc.tycx, link_node_info.span.lo).unwrap();
+							let link_str="#"+(ifp.line+2).to_str();
+							outp.begin_tag_link(change_file_name_ext(dc.sess.codemap.files[ifp.file_index].name,"html")+link_str);
+						}
 					}
+				} else if curr_link<0{
+					let ifp= get_node_index_file_pos(dc,nim,-curr_link);
+					let link_str="#"+ifp.line.to_str()+"_"+ifp.col.to_str()+"_refs";
+					outp.begin_tag_link(change_file_name_ext(fm.name,"html")+link_str);
 				}
 			}
 		}
@@ -401,7 +426,8 @@ impl<'self,K:IterBytes+Eq,V> MultiMap<K,V> {
 	fn new()->MultiMap<K,V> {
 		MultiMap{ next_index:0, indices:HashMap::new(), items:~[], empty:~[] }
 	}
-	fn find(&'self mut self, k:K)->&'self~[V] {
+	fn find(&'self self, k:K)->&'self~[V] {
+		// TODO - return iterator, not collection
 		match self.indices.find(&k) {
 			None=>&self.empty,
 			Some(&ix)=>&self.items[ix]
@@ -416,6 +442,8 @@ impl<'self,K:IterBytes+Eq,V> MultiMap<K,V> {
 	}
 }
 
+type JumpToRefMap = MultiMap<ast::NodeId, ast::NodeId>;
+
 // TODO: find nodes of enclosing context.
 // 'this function, called from these locations' 
 // 'this function, called fromm these functions ... <<< BETTER
@@ -429,22 +457,18 @@ fn get_source_line(fm:&codemap::FileMap, i:uint)->~str {
 		~""
 	}
 }
-fn write_references(doc:&mut HtmlWriter,dc:&DocContext, fm:&codemap::FileMap,nim:&FNodeInfoMap,jdm:&JumpToDefMap,nodes_per_line:&[~[ast::NodeId]]) {
+fn write_references(doc:&mut HtmlWriter,dc:&DocContext, fm:&codemap::FileMap,nim:&FNodeInfoMap,jdm:&JumpToDefMap,jrm:&JumpToRefMap, nodes_per_line:&[~[ast::NodeId]]) {
 	doc.write_tag("div");
-	let def_nodes = find_defs_in_file(fm,nim);
+	let file_def_nodes = find_defs_in_file(fm,nim);
 	let mut defs_to_refs=MultiMap::new::<ast::NodeId, ast::NodeId>();
 
-	for (&nref,&ndef) in jdm.iter() {
-		defs_to_refs.insert(ndef,nref);
-	}
-
-	for &dn in def_nodes.iter() {
+	for &dn in file_def_nodes.iter() {
 		let opt_def_info = nim.find(&dn);
 		if !opt_def_info.is_some() {loop;}
 		let def_info = opt_def_info.unwrap();
 		if !(def_info.kind==~"fn" || def_info.kind==~"struct" || def_info.kind==~"trait" || def_info.kind==~"enum" || def_info.kind==~"ty") {loop}
 
-		let refs = defs_to_refs.find(dn);
+		let refs = jrm.find(dn);
 		let max_links=10;	// todo - sort..
 		
 		if refs.len()>0 {
@@ -468,19 +492,11 @@ fn write_references(doc:&mut HtmlWriter,dc:&DocContext, fm:&codemap::FileMap,nim
 
 							if header_written==false {					
 								header_written=true;
-								doc.writeln("");
-								doc.begin_tag_anchor(dn.to_str() + "_refs " );
-								doc.begin_tag_link( change_file_name_ext(fm.name,"html")+"#"+(def_tfp.line+1).to_str());
-								doc.begin_tag("pr");
-					//			dump!(def_tfp);
-								doc.writeln(get_source_line(fm,def_tfp.line+1)+"  ("+def_info.kind+") references:-" );
-								doc.end_tag();
-								doc.end_tag();
-								doc.end_tag();
+								write_refs_header(doc,dc,nim,fm,dn);
 							};
 					
 							let rfm=&dc.sess.codemap.files[ref_tfp.file_index];
-							doc.begin_tag_link( change_file_name_ext(rfm.name,"html")+"#"+ref_tfp.line.to_str());
+							doc.begin_tag_link( change_file_name_ext(rfm.name,"html")+"#"+(ref_tfp.line+1).to_str());
 							doc.writeln(get_source_line(dc.sess.codemap.files[ref_tfp.file_index],ref_tfp.line));
 							doc.end_tag();
 							links_written+=1;
@@ -493,6 +509,34 @@ fn write_references(doc:&mut HtmlWriter,dc:&DocContext, fm:&codemap::FileMap,nim
 		}
 	}
 
+	fn write_refs_header(doc:&mut HtmlWriter,dc:&DocContext,nim:&FNodeInfoMap, fm:&codemap::FileMap, nid:ast::NodeId) {
+		doc.writeln("");
+		let ifp=get_node_index_file_pos(dc,nim,nid);
+		let def_info=nim.find(&nid).unwrap();
+
+		doc.begin_tag_anchor(ifp.line.to_str()+"_"+ifp.col.to_str() + "_refs" );
+		doc.begin_tag("c24");
+		doc.writeln(dc.sess.codemap.files[ifp.file_index].name+":"+(ifp.line+1).to_str()+":"+ifp.col.to_str()+"  ("+def_info.kind+") references:-");
+		doc.end_tag();
+		doc.begin_tag_link( change_file_name_ext(fm.name,"html")+"#"+(ifp.line+1).to_str());
+		doc.begin_tag("pr");
+//			dump!(def_tfp);
+		doc.writeln(get_source_line(fm,ifp.line) );
+		doc.writeln(get_source_line(fm,ifp.line+1) );
+		doc.end_tag();
+		doc.end_tag();
+		doc.end_tag();
+	}
+}
+
+// TODO: a span index should uniquely identify the node.
+// This adress form is a reasonable compromise between things we can see,
+// things that are robust when some source changes, etc.
+// file_index:line_index:col_index:length
+
+fn get_node_index_file_pos(dc:&DocContext,nim:&FNodeInfoMap,nid:ast::NodeId)->IndexFilePos {
+	let ni=nim.find(&nid).unwrap();
+	byte_pos_to_index_file_pos(dc.tycx,ni.span.lo).unwrap()
 }
 
 

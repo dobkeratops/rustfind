@@ -175,8 +175,7 @@ impl ToJsonStr for HashMap<ast::NodeId,ast::def_id> {
 // struct HrcNode{ parent:Option<HrcNode>, node:AstNode}
 // or even AstNode{ .../* each type has (sParent,content)*/}
 
-pub enum AstNode 
-{
+pub enum AstNode {
 	astnode_mod(@_mod),
 	astnode_view_item(@view_item),
 	astnode_item(@item),
@@ -726,8 +725,7 @@ fn find_struct_field(a:@struct_field, (s,v):FindAstNodeSV) {
 
 pub fn get_node_info_str(dc:&DocContext,node:&NodeTreeLoc)->~str
 {
-	fn path_to_str(dc:&DocContext, path:&ast::Path)->~str
-	{
+	fn path_to_str(dc:&DocContext, path:&ast::Path)->~str {
 		let mut acc=~"";
 		let mut first=true;
 //		for path.idents.iter().advance |x|{

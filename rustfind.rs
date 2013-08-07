@@ -195,21 +195,17 @@ fn get_ast_and_resolve(cpath: &Path, libs: ~[Path]) -> DocContext {
 //	let t=tycx.unwrap();
     DocContext { crate: crate2, tycx: ca.ty_cx, sess: sess, ca:ca }
 }
-
 fn get_filename_only(fnm:&str)->~str {
 	let toks:~[&str]=fnm.split_iter(':').collect();
 	return toks[0].to_str();
 }
-
 fn option_to_str<T:ToStr>(opt:&Option<T>)->~str {
 	match *opt { Some(ref s)=>~"("+s.to_str()+~")",None=>~"(None)" }
 }
-
 trait MyToStr {  fn my_to_str(&self)->~str; }
 impl MyToStr for codemap::span {
 	fn my_to_str(&self)->~str { ~"("+self.lo.to_str()+~".."+self.hi.to_str() }
 }
-
 /// Todo , couldn't quite see how to declare this as a generic method of Option<T>
 pub fn some<T>(o:&Option<T>,f:&fn(t:&T)) {
 	match *o {
@@ -236,10 +232,7 @@ fn flatten_to_str<T,U:ToStr>(xs:&[T],f:&fn(x:&T)->U, sep:&str)->~str {
 		i+=1;
 	}
 	acc
-
-}
-
-fn dump_json(dc:&DocContext) {
+}fn dump_json(dc:&DocContext) {
 	// TODO: full/partial options - we currently wwrite out all the nodes we find.
 	// need option to only write out nodes that map to definitons. 
 	println("{");
@@ -603,19 +596,22 @@ pub fn dump_span(text:&[u8], sp:&codemap::span) {
 }
 
 
-pub fn def_info_from_node_id<'a,'b>(dc:&'a DocContext, node_spans:&'b FNodeInfoMap, id:ast::NodeId)->(int,Option<&'b FNodeInfo>) {
+pub fn def_info_from_node_id<'a,'b>(dc:&'a DocContext, node_info:&'b FNodeInfoMap, id:ast::NodeId)->(int,Option<&'b FNodeInfo>) {
 	let crate_num=0;
 	match dc.tycx.def_map.find(&id) { // finds a def..
 		Some(a)=>{
 			match get_def_id(crate_num,*a){
-				Some(b)=>(b.node,node_spans.find(&b.node)),
+				Some(b)=>match b.crate {
+					0=>(b.node,node_info.find(&b.node)),
+					_ => (id as int, None)
+				},
 				None=>(id as int,None)
 			}
 		},
 		None=>(id as int,None)
 	}
-	
 }
+
 
 // see: tycx.node_types:node_type_table:HashMap<id,t>
 // 't'=opaque ptr, ty::get(:t)->t_box_ to resolve it
