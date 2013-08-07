@@ -5,7 +5,7 @@ use ioutil::*;
 use htmlwriter::*;
 use std::hashmap::*;
 use std::vec;
-
+use extra::sort;
 
 pub fn make_html(dc:&DocContext, fm:&codemap::FileMap,nim:&FNodeInfoMap,jdm:&JumpToDefMap, jrm:&JumpToRefMap, nodes_per_line:&[~[ast::NodeId]])->~str {
 	// todo - Rust2HtmlCtx { fm,nim,jdm,jrm } .. cleanup common intermediates
@@ -469,11 +469,13 @@ fn get_source_line(fm:&codemap::FileMap, i:uint)->~str {
 	}
 }
 
+//fn split_by_key<T,K>(src:&[T],f:&fn(t:&T)->K)->(K,[&T])] {
+//}
+
 fn write_references(doc:&mut HtmlWriter,dc:&DocContext, fm:&codemap::FileMap,nim:&FNodeInfoMap,jdm:&JumpToDefMap,jrm:&JumpToRefMap, nodes_per_line:&[~[ast::NodeId]]) {
 	doc.write_tag("div");
 	let file_def_nodes = find_defs_in_file(fm,nim);
-	let mut defs_to_refs=MultiMap::new::<ast::NodeId, ast::NodeId>();
-
+	//let mut defs_to_refs=MultiMap::new::<ast::NodeId, ast::NodeId>();
 	for &dn in file_def_nodes.iter() {
 		let opt_def_info = nim.find(&dn);
 		if !opt_def_info.is_some() {loop;}
@@ -482,6 +484,7 @@ fn write_references(doc:&mut HtmlWriter,dc:&DocContext, fm:&codemap::FileMap,nim
 
 		let refs = jrm.find(dn);
 		let max_links=10;	// todo - sort..
+		let max_file_links=20;	// todo - sort..
 		
 		if refs.len()>0 {
 			let mut header_written=false;
@@ -489,34 +492,63 @@ fn write_references(doc:&mut HtmlWriter,dc:&DocContext, fm:&codemap::FileMap,nim
 			if !opt_def_tfp.is_some() { loop;}
 			let def_tfp=opt_def_tfp.unwrap();
 			let mut links_written=0;
-			let mut pass=0;
-			while pass<2 {
-				for r in refs.iter() {
-					if *r!=dn {
-						let opt_ref_info = nim.find(r);
-						if !opt_ref_info.is_some() {loop;}
-						let ref_info = opt_ref_info.unwrap();
-						let opt_ref_tfp = byte_pos_to_index_file_pos(dc.tycx,ref_info.span.lo);
-						if !opt_ref_tfp.is_some() {loop;}
-						let ref_tfp=opt_ref_tfp.unwrap();
-					
-						if (ref_tfp.file_index!=def_tfp.file_index || pass==1) && links_written<max_links{
 
-							if header_written==false {					
-								header_written=true;
-								write_refs_header(doc,dc,nim,fm,dn);
-							};
-					
-							let rfm=&dc.sess.codemap.files[ref_tfp.file_index];
-							doc.begin_tag_link( change_file_name_ext(rfm.name,"html")+"#"+(ref_tfp.line+1).to_str());
-							doc.writeln(get_source_line(dc.sess.codemap.files[ref_tfp.file_index],ref_tfp.line));
-							doc.end_tag();
-							links_written+=1;
-						}
+			// sort references by file [(file_index, [...])]
+
+//			let s2=refs_by(|x|{ let 
+//			let rf=refs.map(|x|{  })
+//			let refs1:~[&ast::NodeId]=refs.iter().filter(|&x|{nim.find(x).is_some()}).collect();
+//			let  refs1:() = refs.iter().filter(|&x|{true});	
+
+//			let  refs1:~[int] = refs.iter().filter(|x|{true}).collect();	
+//			dump!(refs1);
+			// just cannot get filter working here :(
+
+
+			let mut curr_file=def_tfp.file_index;
+
+			let  mut refs2=refs.iter()
+				.filter(|&id|{nim.find(id).is_some()})
+				.transform(|&id|{
+					let ni=nim.find(&id).unwrap();
+					let ifp=byte_pos_to_index_file_pos(dc.tycx, ni.span.lo).unwrap();
+					(ni,ifp,id)})
+				.to_owned_vec();
+
+			let l=refs2.len();
+			sort::qsort(refs2,0,l-1, |&(_,ref ifp1,_),&(_,ref ifp2,_)|{ ifp1.file_index-curr_file<=ifp2.file_index-curr_file });
+
+			for &(ref ref_info,ref ref_ifp,ref id) in refs2.iter() {
+				if *id!=dn {
+					//let opt_ref_info = nim.find(r);
+					//if !opt_ref_info.is_some() {loop;}
+					//let ref_info = opt_ref_info.unwrap();
+					//let opt_ref_tfp = byte_pos_to_index_file_pos(dc.tycx,ref_info.span.lo);
+					//if !opt_ref_tfp.is_some() {loop;}
+					//let ref_tfp=opt_ref_tfp.unwrap();
+
+					if header_written==false {					
+						header_written=true;
+						write_refs_header(doc,dc,nim,fm,dn);
+					};
+					if curr_file!=ref_ifp.file_index {
+						curr_file=ref_ifp.file_index;
+						write_file_ref(doc,dc,curr_file);
+					}
+
+					if  (links_written<max_links){				
+						let rfm=&dc.sess.codemap.files[ref_ifp.file_index];
+						doc.begin_tag_link( change_file_name_ext(rfm.name,"html")+"#"+(ref_ifp.line+1).to_str());
+						doc.begin_tag("c24"); 
+						doc.write((ref_ifp.line+1).to_str()+&": ");
+						doc.end_tag();
+						doc.writeln(get_source_line(dc.sess.codemap.files[ref_ifp.file_index],ref_ifp.line));
+						doc.end_tag();
+						links_written+=1;
 					}
 				}
-				pass+=1;
 			}
+			if header_written {doc.writeln("");}
 	//		info=nim.find(dn);
 		}
 	}
@@ -533,7 +565,7 @@ fn write_references(doc:&mut HtmlWriter,dc:&DocContext, fm:&codemap::FileMap,nim
 		doc.begin_tag("c24");
 		doc.writeln(dc.sess.codemap.files[ifp.file_index].name+":"+(ifp.line+1).to_str()+":"+ifp.col.to_str()
 					+"-"+(ifpe.line+1).to_str()+":"+ifpe.col.to_str()
-					+"  ("+info.kind+") references:-");
+					+"  ("+info.kind+") references:");
 		doc.end_tag();
 		doc.begin_tag_link( change_file_name_ext(fm.name,"html")+"#"+(ifp.line+1).to_str());
 		doc.begin_tag("pr");
@@ -544,6 +576,15 @@ fn write_references(doc:&mut HtmlWriter,dc:&DocContext, fm:&codemap::FileMap,nim
 		doc.end_tag();
 		doc.end_tag();
 	}
+
+	fn write_file_ref(doc:&mut HtmlWriter, dc:&DocContext,fi:uint) {
+		let fname = dc.tycx.sess.codemap.files[fi].name;
+		doc.begin_tag_link( change_file_name_ext(fname, "html"));
+		doc.begin_tag("c24");
+		doc.writeln(".. in "+fname + ":");
+		doc.end_tag();
+	}
+
 }
 
 // TODO: a span index should uniquely identify the node.
