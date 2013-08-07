@@ -82,7 +82,7 @@ pub fn write_styles(doc:&mut HtmlWriter,fname:&str){
 	doc.write("a:visited{ color:#f0f0f0; font-style:normal;   text-decoration:none;}\n");
 	doc.write("a:link:hover{ color:#f0f0f0; font-style:normal; background-color:#606060; }\n");
 	doc.write("pr{font-weight:bold}\n");
-	doc.write("ln{color:#606060;background-color:#101010; }\n");
+	doc.write("ln{color:#606060; }\n");
 	doc.write("c24{color:#ffffff; font-style:italic; opacity:0.5}\n");
 	doc.write("c25{color:#ffffff; opacity:0.92}\n");
 	doc.write("c26{color:#ffffff; font-weight:bold; }\n");
