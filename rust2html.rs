@@ -6,7 +6,7 @@ use htmlwriter::*;
 use std::hashmap::*;
 use std::vec;
 
-pub fn make_html(dc:&DocContext, fm:&codemap::FileMap,nim:&NodeInfoMap,jdm:&JumpToDefMap, nodes_per_line:&[~[ast::NodeId]])->~str {
+pub fn make_html(dc:&DocContext, fm:&codemap::FileMap,nim:&FNodeInfoMap,jdm:&JumpToDefMap, nodes_per_line:&[~[ast::NodeId]])->~str {
 	let mut doc= HtmlWriter::new::();
 	write_head(&mut doc);
 	write_styles(&mut doc);
@@ -31,13 +31,15 @@ pub fn make_html(dc:&DocContext, fm:&codemap::FileMap,nim:&NodeInfoMap,jdm:&Jump
 		doc.writeln(markup_line);
 		line+=1;
 	}
+	write_references(&mut doc,dc,fm,nim,jdm,nodes_per_line);
+	
 	doc.end_tag();
 	doc.end_tag();
 
 	doc.doc
 }
 
-pub fn write_source_as_html_sub(dc:&DocContext, nim:&NodeInfoMap,ndn:&HashMap<ast::NodeId,ast::def_id>, jdm:&JumpToDefMap) {
+pub fn write_source_as_html_sub(dc:&DocContext, nim:&FNodeInfoMap,ndn:&HashMap<ast::NodeId,ast::def_id>, jdm:&JumpToDefMap) {
 	
 	let npl=NodesPerLinePerFile::new(dc,nim);
 
@@ -73,6 +75,7 @@ pub fn write_styles(doc:&mut HtmlWriter){
 	doc.write("c28{color:#afffff; font-weight:bold; }\n");
 	doc.write("c29{color:#afffaf; font-weight:bold; }\n");
 	doc.write("c30{color:#cfcfff; font-weight:bold; }\n");
+	doc.write("c31{color:#ffffff; font-style:italic; opacity:0.6}\n");
 	doc.write("c1{color:#ffffc0;   font-weight:bold; }\n");
 	doc.write("c2{color:#60f0c0}\n");
 	doc.write("c3{color:#50e0ff; }\n");
@@ -140,7 +143,7 @@ pub fn get_file_index(dc:&DocContext,fname:&str)->Option<uint> {
 }
 
 impl NodesPerLinePerFile {
-	fn new(dc:&DocContext, nim:&NodeInfoMap)->~NodesPerLinePerFile {
+	fn new(dc:&DocContext, nim:&FNodeInfoMap)->~NodesPerLinePerFile {
 		// todo, figure this out functionally?!
 		//		dc.sess.codemap.files.map(
 		//				|fm:&@codemap::FileMap|{ vec::from_elem(fm.lines.len(), ~[]) }
@@ -180,7 +183,7 @@ impl NodesPerLinePerFile {
 		}
 	}
 }
-pub fn node_color_index(ni:&NodeInfo)->int {
+pub fn node_color_index(ni:&FNodeInfo)->int {
 	// TODO - map this a bit more intelligently..
 	match ni.kind {
 		~"fn"=>1,
@@ -191,7 +194,7 @@ pub fn node_color_index(ni:&NodeInfo)->int {
 		~"de"=>4,
 		~"type_param"=>5,
 		~"struct_field"|~"field"=>6,
-		~"keyword"|~"while"|~"match"|~"loop"|~"do"|~"cast"|~"if"|"return"=>7,
+		~"keyword"|~"while"|~"match"|~"loop"|~"do"|~"cast"|~"if"|~"return"=>7,
 		~"path"=>8,
 		~"call"=>9,
 		~"method_call"=>10,
@@ -239,7 +242,7 @@ fn text_here_is(line:&str, pos:uint,reftext:&str, color:int)->int {
 	return color;	
 }
 
-fn insert_links_in_line(dc:&DocContext,fm:&codemap::FileMap, nim:&NodeInfoMap,jdm:&JumpToDefMap, line:&str, nodes:&[ast::NodeId],line_index:uint)->~str {
+fn insert_links_in_line(dc:&DocContext,fm:&codemap::FileMap, nim:&FNodeInfoMap,jdm:&JumpToDefMap, line:&str, nodes:&[ast::NodeId],line_index:uint)->~str {
 
 	let node_infos=nodes.map(|id|{nim.find(id)});
 //	for x in node_infos.iter() { println(fmt!("%?", x));}
@@ -287,17 +290,21 @@ fn insert_links_in_line(dc:&DocContext,fm:&codemap::FileMap, nim:&NodeInfoMap,jd
 
 	{
 		let mut x=0;
-		while x<(line.len()-1) {
+		while x<(line.len()) {
 			match line[x] as char{
 				'{'|'}'|'['|']'|';'|',' => {color[x]=4;},
 				'('|')'=> {color[x]=25;},
 				_=>{}
 			}
 
-			if line[x+0]=='/' as u8 && line[x+1]=='/' as u8 {
-				while x<line.len() {
-					color[x]=24;
-					x+=1;
+			if x<line.len()-1 {
+				if line[x+0]=='/' as u8 && line[x+1]=='/' as u8 {
+					let mut comment_color=24;
+					if x<line.len()-2 { if line[x+2]as char=='/' { comment_color=31 }}// doc-comments are a bit brighter
+					while x<line.len() {
+						color[x]=comment_color;
+						x+=1;
+					}
 				}
 			}
 			// override color for top level decls
@@ -370,6 +377,114 @@ fn insert_links_in_line(dc:&DocContext,fm:&codemap::FileMap, nim:&NodeInfoMap,jd
 	if curr_col>=0 {outp.end_tag();}
 	if curr_link>0 {outp.end_tag();}
 	outp.doc
+}
+
+fn find_defs_in_file(fm:&codemap::FileMap, nim:&FNodeInfoMap)->~[ast::NodeId] {
+	// todo - functional way..
+	let mut acc=~[];
+	for (n,info) in nim.iter() {
+		if info.span.lo >= fm.start_pos && (info.span.lo < (fm.start_pos+codemap::BytePos(fm.src.len()))) {
+			acc.push(*n);
+		}
+	}
+	acc
+}
+
+/// K:[V]  insert(K, V) for many V;  find(K)->[V]
+struct MultiMap<K,V> {
+	next_index:uint,
+	indices:HashMap<K,uint>,
+	items:~[~[V]],
+	empty:~[V]
+}
+impl<'self,K:IterBytes+Eq,V> MultiMap<K,V> {
+	fn new()->MultiMap<K,V> {
+		MultiMap{ next_index:0, indices:HashMap::new(), items:~[], empty:~[] }
+	}
+	fn find(&'self mut self, k:K)->&'self~[V] {
+		match self.indices.find(&k) {
+			None=>&self.empty,
+			Some(&ix)=>&self.items[ix]
+		}
+	}
+	fn insert(&'self mut self, k:K,v:V) {
+		let ix=match self.indices.find(&k) {
+			None=>{ self.indices.insert(k,self.next_index); self.next_index+=1; self.items.push(~[]); self.next_index-1},
+			Some(&ix)=> ix
+		};
+		self.items[ix].push(v);
+	}
+}
+
+// TODO: find nodes of enclosing context.
+// 'this function, called from these locations' 
+// 'this function, called fromm these functions ... <<< BETTER
+// 'this type, used in these functions ... '
+fn get_source_line(fm:&codemap::FileMap, i:uint)->~str {
+	let le=if i<(fm.lines.len()-1) { *fm.lines[i+1] } else {fm.src.len()+*fm.start_pos};
+//	dump!(fm.lines[i-1],*fm.start_pos, fm.lines[i-1]-le);
+	if i>=0 {
+		fm.src.slice( *fm.lines[i]-*fm.start_pos, le-*fm.start_pos).to_owned()
+	} else {
+		~""
+	}
+}
+fn write_references(doc:&mut HtmlWriter,dc:&DocContext, fm:&codemap::FileMap,nim:&FNodeInfoMap,jdm:&JumpToDefMap,nodes_per_line:&[~[ast::NodeId]]) {
+	doc.write_tag("div");
+	let def_nodes = find_defs_in_file(fm,nim);
+	let mut defs_to_refs=MultiMap::new::<ast::NodeId, ast::NodeId>();
+
+	for (&nref,&ndef) in jdm.iter() {
+		defs_to_refs.insert(ndef,nref);
+	}
+
+	for &dn in def_nodes.iter() {
+		let def_info = nim.find(&dn).unwrap();
+		if !(def_info.kind==~"fn" || def_info.kind==~"struct" || def_info.kind==~"trait" || def_info.kind==~"enum" || def_info.kind==~"ty") {loop}
+
+		let refs = defs_to_refs.find(dn);
+		let max_links=10;	// todo - sort..
+		
+		if refs.len()>0 {
+			let mut header_written=false;
+			let def_tfp = byte_pos_to_index_file_pos(dc.tycx,def_info.span.lo).unwrap();
+			let mut links_written=0;
+			let mut pass=0;
+			while pass<2 {
+				for r in refs.iter() {
+					if *r!=dn {
+						let ref_info = nim.find(r).unwrap();
+						let ref_tfp = byte_pos_to_index_file_pos(dc.tycx,ref_info.span.lo).unwrap();
+					
+						if (ref_tfp.file_index!=def_tfp.file_index || pass==1) && links_written<max_links{
+
+							if header_written==false {					
+								header_written=true;
+								doc.writeln("");
+								doc.begin_tag_anchor(dn.to_str() + "_refs " );
+								doc.begin_tag_link( change_file_name_ext(fm.name,"html")+"#"+(def_tfp.line+1).to_str());
+								doc.begin_tag("pr");
+					//			dump!(def_tfp);
+								doc.writeln(get_source_line(fm,def_tfp.line+1)+"  ("+def_info.kind+") references:-" );
+								doc.end_tag();
+								doc.end_tag();
+								doc.end_tag();
+							};
+					
+							let rfm=&dc.sess.codemap.files[ref_tfp.file_index];
+							doc.begin_tag_link( change_file_name_ext(rfm.name,"html")+"#"+ref_tfp.line.to_str());
+							doc.writeln(get_source_line(dc.sess.codemap.files[ref_tfp.file_index],ref_tfp.line));
+							doc.end_tag();
+							links_written+=1;
+						}
+					}
+				}
+				pass+=1;
+			}
+	//		info=nim.find(dn);
+		}
+	}
+
 }
 
 

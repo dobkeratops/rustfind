@@ -92,15 +92,15 @@ pub fn find_node_tree_loc_at_byte_pos(c:@Crate,_location:codemap::BytePos)->Node
 	s.result.clone()
 }
 
-pub struct NodeInfo {
+pub struct FNodeInfo {
 	//name:ident, .. TODO - does it make sense to cache an ident here? not all nodes have..
 	kind:~str,
 	span:codemap::span,
 	node:AstNode,
 }
-pub type NodeInfoMap= HashMap<ast::NodeId,NodeInfo>;
+pub type FNodeInfoMap= HashMap<ast::NodeId,FNodeInfo>;
 
-pub fn build_node_info_map(c:@Crate)->@mut NodeInfoMap {
+pub fn build_node_info_map(c:@Crate)->@mut FNodeInfoMap {
 	// todo-lambdas, big fcuntion but remove the extraneous symbols
 	let node_spans=@mut HashMap::new();
 	let vt=mk_vt(@Visitor{
@@ -122,7 +122,7 @@ pub fn build_node_info_map(c:@Crate)->@mut NodeInfoMap {
 		visit_struct_def:fcns_struct_def,
 		visit_struct_field:fcns_struct_field,
 
-		.. *default_visitor::<@mut NodeInfoMap>()
+		.. *default_visitor::<@mut FNodeInfoMap>()
 		}
 	);
 	visit_crate(c,(node_spans,vt));
@@ -134,7 +134,7 @@ pub trait ToJsonStr {
 	fn to_json_str(&self)->~str;
 }
 
-pub fn node_spans_table_to_json_sub(ns:&NodeInfoMap)->~str {
+pub fn node_spans_table_to_json_sub(ns:&FNodeInfoMap)->~str {
 	// TODO - is there a cleaner functional way,
 	// map (|x| fmt...).flatten_to_str() or something like that..
 	let mut r=~"";
@@ -146,7 +146,7 @@ pub fn node_spans_table_to_json_sub(ns:&NodeInfoMap)->~str {
 	r
 }
 
-impl ToJsonStr for NodeInfoMap {
+impl ToJsonStr for FNodeInfoMap {
 	pub fn to_json_str(&self)->~str {
 		~"[\n"+node_spans_table_to_json_sub(self)+~"]\n"
 	}
@@ -356,16 +356,6 @@ impl KindToStr for AstNode {
 pub trait AstNodeAccessors {
 	pub fn get_id(&self)->Option<ast::NodeId>;
 }
-impl AstNodeAccessors for ast::item {
-	pub fn get_id(&self)->Option<ast::NodeId> {
-		Some(self.id)
-	}
-}
-impl AstNodeAccessors for ast::Local {
-	pub fn get_id(&self)->Option<ast::NodeId> {
-		Some(self.id)
-	}
-}
 
 impl AstNodeAccessors for ast::item_ {
 	pub fn get_id(&self)->Option<ast::NodeId> {
@@ -383,6 +373,19 @@ impl AstNodeAccessors for ast::item_ {
 		}
 	}
 }
+
+
+impl AstNodeAccessors for ast::item {
+	pub fn get_id(&self)->Option<ast::NodeId> {
+		Some(self.id)
+	}
+}
+impl AstNodeAccessors for ast::Local {
+	pub fn get_id(&self)->Option<ast::NodeId> {
+		Some(self.id)
+	}
+}
+
 
 impl AstNodeAccessors for ast::decl_ {
 	pub fn get_id(&self)->Option<NodeId> {
@@ -487,20 +490,20 @@ pub struct FindAstNodeSt {
 //	node_spans: HashMap<ast::node_id,codemap::span>
 }
 
-pub fn get_ast_node_of_node_id(info:&NodeInfoMap,id:ast::NodeId)->Option<AstNode> {
+pub fn get_ast_node_of_node_id(info:&FNodeInfoMap,id:ast::NodeId)->Option<AstNode> {
 	match info.find(&id) {
 		None=>None,
 		Some(node_info)=>Some(node_info.node)
 	}
 }
 
-pub fn push_span(spt:&mut NodeInfoMap,n:ast::NodeId,idt:Option<ident>,k:&str, s:codemap::span,nd:AstNode) {
-	spt.insert(n,NodeInfo{kind:k.to_str(),span:s,node:nd});
+pub fn push_span(spt:&mut FNodeInfoMap,n:ast::NodeId,idt:Option<ident>,k:&str, s:codemap::span,nd:AstNode) {
+	spt.insert(n,FNodeInfo{kind:k.to_str(),span:s,node:nd});
 }
 
-pub fn push_spanned<T:AstNodeAccessors>(spt:&mut NodeInfoMap,k:&str,s:&codemap::spanned<T>,nd:AstNode) {
+pub fn push_spanned<T:AstNodeAccessors>(spt:&mut FNodeInfoMap,k:&str,s:&codemap::spanned<T>,nd:AstNode) {
 	match s.node.get_id() {
-		Some(id)=>{spt.insert(id,NodeInfo{kind:k.to_str(),span:s.span,node:nd});}
+		Some(id)=>{spt.insert(id,FNodeInfo{kind:k.to_str(),span:s.span,node:nd});}
 		None=>{}
 	}
 }
@@ -510,11 +513,11 @@ pub fn span_contains(l:uint,s:span)->bool {
 	let BytePos(hi)=s.hi;
 	l>=lo && l<hi
 }
-type NodeInfoMapSV = (@mut NodeInfoMap, vt<@mut NodeInfoMap>);
-fn fcns_view_item(a:&view_item, (s,v):NodeInfoMapSV) {
+type FNodeInfoMapSV = (@mut FNodeInfoMap, vt<@mut FNodeInfoMap>);
+fn fcns_view_item(a:&view_item, (s,v):FNodeInfoMapSV) {
 	visit_view_item(a,(s,v))
 }
-fn fcns_item(a:@item, (s,v):NodeInfoMapSV) {
+fn fcns_item(a:@item, (s,v):FNodeInfoMapSV) {
 	push_span(s,a.id,item_get_ident(a),a.kind_to_str(),a.span,astnode_item(a));
 	match (a.node) {
 		item_impl(ref typarams,ref traitref,ref self_ty, ref methods)=> {
@@ -527,66 +530,66 @@ fn fcns_item(a:@item, (s,v):NodeInfoMapSV) {
 	}
 	visit_item(a,(s,v))
 }
-fn fcns_local(a:@Local, (s,v):NodeInfoMapSV) {
+fn fcns_local(a:@Local, (s,v):FNodeInfoMapSV) {
 //	push_spanned(s,"local",a);
 	// local var? pattern not ident..
 	push_span(s, a.id, None,"local",a.span,astnode_local(a));
 	visit_local(a,(s,v))
 }
-fn fcns_block(a:&Block, (s,v):NodeInfoMapSV) {
+fn fcns_block(a:&Block, (s,v):FNodeInfoMapSV) {
 //	push_spanned(s,"block",a);
 	push_span(s, a.id, None, "block",a.span,astnode_none);
 	visit_block(a,(s,v))
 }
-fn fcns_stmt(a:@stmt, (s,v):NodeInfoMapSV) {
+fn fcns_stmt(a:@stmt, (s,v):FNodeInfoMapSV) {
 	push_spanned(s,"stmt",a,astnode_stmt(a));
 	visit_stmt(a,(s,v))
 }
-fn fcns_arm(a:&arm, (s,v):NodeInfoMapSV) {
+fn fcns_arm(a:&arm, (s,v):FNodeInfoMapSV) {
 //	push_spanned(s,"arm",&a.body);
 	// todo - does an arm even have a node id?
 //	push_span(s, a.body.id, None,"arm", a.span);
 // ERRORTODO..
 	visit_arm(a,(s,v))
 }
-fn fcns_pat(a:@pat, (s,v):NodeInfoMapSV) {
+fn fcns_pat(a:@pat, (s,v):FNodeInfoMapSV) {
 	push_span(s,a.id,None,"pat",a.span,astnode_pat(a));
 	visit_pat(a,(s,v))
 }
-fn fcns_decl(a:@decl, (s,v):NodeInfoMapSV) {
+fn fcns_decl(a:@decl, (s,v):FNodeInfoMapSV) {
 	push_spanned(s,"decl",a,astnode_decl(a));
 	visit_decl(a,(s,v))
 }
-fn fcns_struct_def(sd:@struct_def, ide:ident, g:&Generics, id:NodeId, (s,b):NodeInfoMapSV) {
+fn fcns_struct_def(sd:@struct_def, ide:ident, g:&Generics, id:NodeId, (s,b):FNodeInfoMapSV) {
 	visit_struct_def(sd,ide,g,id,(s,b))
 }
 
 // struct Visitor<E>.visit_expr: @fn(@expr, (E, vt<E>)),
-fn fcns_expr(a:@expr, (s,v):NodeInfoMapSV) {
+fn fcns_expr(a:@expr, (s,v):FNodeInfoMapSV) {
 	push_span(s,a.id,expr_get_ident(a),a.kind_to_str(),a.span,astnode_expr(a));
 	visit_expr(a,(s,v))
 }
 
 // struct Visitor<E>.visit_expr_post: @fn(@expr, (E, vt<E>)),
-fn fcns_expr_post(a:@expr, (s,v):NodeInfoMapSV) {
+fn fcns_expr_post(a:@expr, (s,v):FNodeInfoMapSV) {
 	visit_expr(a,(s,v))
 }
 
 // struct Visitor<E>.visit_ty: @fn(&Ty, (E, vt<E>)),
-fn fcns_ty(a:&Ty, (s,v):NodeInfoMapSV) {
+fn fcns_ty(a:&Ty, (s,v):FNodeInfoMapSV) {
 	//todo - can't we borrow? do we need opaque hack? can we access another way?
 	push_span(s,a.id,None,"ty",a.span,astnode_ty(@a.clone()));
 	visit_ty(a,(s,v))
 }
-fn fcns_fn(fk:&fn_kind, fd:&fn_decl, body:&Block, sp:span, nid:NodeId, (s,v):NodeInfoMapSV) {
+fn fcns_fn(fk:&fn_kind, fd:&fn_decl, body:&Block, sp:span, nid:NodeId, (s,v):FNodeInfoMapSV) {
 	visit_fn(fk,fd,body,sp,nid,(s,v))
 }
-fn fcns_struct_field(a:@struct_field, (s,v):NodeInfoMapSV) {
+fn fcns_struct_field(a:@struct_field, (s,v):FNodeInfoMapSV) {
 	push_spanned(s,"struct_field",a,astnode_struct_field(a));
 	visit_struct_field(a,(s,v))
 }
 
-fn fcns_type_method(a:&TypeMethod, (s,v):NodeInfoMapSV) {
+fn fcns_type_method(a:&TypeMethod, (s,v):FNodeInfoMapSV) {
 	//todo - can't we borrow? do we need opaque hack? can we access another way?
 	push_span(s,a.id,Some(a.ident),"type_method",a.span,astnode_ty_method(@a.clone()));
 	visit_ty_method(a,(s,v))

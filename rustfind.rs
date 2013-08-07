@@ -267,7 +267,7 @@ fn dump_json(dc:&DocContext) {
 
 
 
-pub fn build_jump_to_def_map(dc:&DocContext, nim:@mut NodeInfoMap,nd:&HashMap<ast::NodeId,ast::def_id>)->~JumpToDefMap{
+pub fn build_jump_to_def_map(dc:&DocContext, nim:@mut FNodeInfoMap,nd:&HashMap<ast::NodeId,ast::def_id>)->~JumpToDefMap{
 // todo: NodeId->AStNode  .. lookup_def_ inner functionality extracted
 	let mut jdm=~HashMap::new();
 	for (k,_) in nim.iter() {
@@ -438,7 +438,7 @@ fn lookup_def_of_node(dc:&DocContext,node:&AstNode,m:ShowDefMode)->Option<~str> 
 	lookup_def_of_node_sub(dc,node,m,node_spans,node_def_node)
 }
 
-fn lookup_def_node_of_node(dc:&DocContext,node:&AstNode, node_spans:&NodeInfoMap, node_def_node:&HashMap<ast::NodeId,ast::def_id>)->Option<ast::NodeId> {
+fn lookup_def_node_of_node(dc:&DocContext,node:&AstNode, node_spans:&FNodeInfoMap, node_def_node:&HashMap<ast::NodeId,ast::def_id>)->Option<ast::NodeId> {
 	
 	match *node {
 		astnode_expr(e)=>match e.node {
@@ -503,11 +503,11 @@ fn lookup_def_node_of_node(dc:&DocContext,node:&AstNode, node_spans:&NodeInfoMap
 	return None;
 }
 
-fn lookup_def_of_node_sub(dc:&DocContext,node:&AstNode,m:ShowDefMode,node_spans:&NodeInfoMap, node_def_node:&HashMap<ast::NodeId,ast::def_id>)->Option<~str> {
+fn lookup_def_of_node_sub(dc:&DocContext,node:&AstNode,m:ShowDefMode,node_spans:&FNodeInfoMap, node_def_node:&HashMap<ast::NodeId,ast::def_id>)->Option<~str> {
 	// TODO - cache outside?
 
 
-	fn mk_result(dc:&DocContext,  m:ShowDefMode, node_spans:&NodeInfoMap, def_node_id:ast::NodeId, extra_str:&str)->Option<~str> {
+	fn mk_result(dc:&DocContext,  m:ShowDefMode, node_spans:&FNodeInfoMap, def_node_id:ast::NodeId, extra_str:&str)->Option<~str> {
 		match node_spans.find(&def_node_id) {
 			None=>None,
 			Some(def_info)=>{
@@ -567,7 +567,7 @@ fn loc_to_str(loc:codemap::Loc)->~str {
 	loc.file.name+":"+loc.line.to_str()+":"+loc.col.to_str()+":"
 }
 
-pub fn dump_node_source_for_single_file_only(text:&[u8], ns:&NodeInfoMap, id:ast::NodeId) {
+pub fn dump_node_source_for_single_file_only(text:&[u8], ns:&FNodeInfoMap, id:ast::NodeId) {
 	match(ns.find(&id)) {None=>logi!("()"),
 		Some(info)=>{
 			dump_span(text, &info.span);
@@ -576,7 +576,7 @@ pub fn dump_node_source_for_single_file_only(text:&[u8], ns:&NodeInfoMap, id:ast
 }
 
 // TODO- this should return a slice
-pub fn get_node_source(c:ty::ctxt, ns:&NodeInfoMap, id:ast::NodeId)->~str {
+pub fn get_node_source(c:ty::ctxt, ns:&FNodeInfoMap, id:ast::NodeId)->~str {
 	match (ns.find(&id)){
 		None=>~"",
 		Some(info)=>{
@@ -603,7 +603,7 @@ pub fn dump_span(text:&[u8], sp:&codemap::span) {
 }
 
 
-pub fn def_info_from_node_id<'a,'b>(dc:&'a DocContext, node_spans:&'b NodeInfoMap, id:ast::NodeId)->(int,Option<&'b NodeInfo>) {
+pub fn def_info_from_node_id<'a,'b>(dc:&'a DocContext, node_spans:&'b FNodeInfoMap, id:ast::NodeId)->(int,Option<&'b FNodeInfo>) {
 	let crate_num=0;
 	match dc.tycx.def_map.find(&id) { // finds a def..
 		Some(a)=>{
@@ -862,7 +862,7 @@ pub fn rustfind_interactive(dc:&DocContext) {
 	}
 }
 
-pub fn def_of_symbol_to_str(dc:&DocContext, ns:&NodeInfoMap,ds:&HashMap<ast::NodeId, ast::def_id>,s:&str)->~str {
+pub fn def_of_symbol_to_str(dc:&DocContext, ns:&FNodeInfoMap,ds:&HashMap<ast::NodeId, ast::def_id>,s:&str)->~str {
 	~"TODO"	
 }
 
