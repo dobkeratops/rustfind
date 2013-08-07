@@ -196,7 +196,6 @@ fn get_ast_and_resolve(cpath: &Path, libs: ~[Path]) -> DocContext {
     DocContext { crate: crate2, tycx: ca.ty_cx, sess: sess, ca:ca }
 }
 
-
 fn get_filename_only(fnm:&str)->~str {
 	let toks:~[&str]=fnm.split_iter(':').collect();
 	return toks[0].to_str();
