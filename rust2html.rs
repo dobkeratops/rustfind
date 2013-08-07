@@ -439,7 +439,9 @@ fn write_references(doc:&mut HtmlWriter,dc:&DocContext, fm:&codemap::FileMap,nim
 	}
 
 	for &dn in def_nodes.iter() {
-		let def_info = nim.find(&dn).unwrap();
+		let opt_def_info = nim.find(&dn);
+		if !opt_def_info.is_some() {loop;}
+		let def_info = opt_def_info.unwrap();
 		if !(def_info.kind==~"fn" || def_info.kind==~"struct" || def_info.kind==~"trait" || def_info.kind==~"enum" || def_info.kind==~"ty") {loop}
 
 		let refs = defs_to_refs.find(dn);
@@ -447,14 +449,20 @@ fn write_references(doc:&mut HtmlWriter,dc:&DocContext, fm:&codemap::FileMap,nim
 		
 		if refs.len()>0 {
 			let mut header_written=false;
-			let def_tfp = byte_pos_to_index_file_pos(dc.tycx,def_info.span.lo).unwrap();
+			let opt_def_tfp = byte_pos_to_index_file_pos(dc.tycx,def_info.span.lo);
+			if !opt_def_tfp.is_some() { loop;}
+			let def_tfp=opt_def_tfp.unwrap();
 			let mut links_written=0;
 			let mut pass=0;
 			while pass<2 {
 				for r in refs.iter() {
 					if *r!=dn {
-						let ref_info = nim.find(r).unwrap();
-						let ref_tfp = byte_pos_to_index_file_pos(dc.tycx,ref_info.span.lo).unwrap();
+						let opt_ref_info = nim.find(r);
+						if !opt_ref_info.is_some() {loop;}
+						let ref_info = opt_ref_info.unwrap();
+						let opt_ref_tfp = byte_pos_to_index_file_pos(dc.tycx,ref_info.span.lo);
+						if !opt_ref_tfp.is_some() {loop;}
+						let ref_tfp=opt_ref_tfp.unwrap();
 					
 						if (ref_tfp.file_index!=def_tfp.file_index || pass==1) && links_written<max_links{
 
