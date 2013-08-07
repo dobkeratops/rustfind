@@ -67,12 +67,17 @@ pub fn write_styles(doc:&mut HtmlWriter){
 	doc.write("pr{font-weight:bold}\n");
 	doc.write("ln{color:#606060;background-color:#101010; }\n");
 	doc.write("c24{color:#ffffff; font-style:italic; opacity:0.5}\n");
-	doc.write("c25{color:#ffffff; opacity:0.95}\n");
+	doc.write("c25{color:#ffffff; opacity:0.92}\n");
+	doc.write("c26{color:#ffffff; font-weight:bold; }\n");
+	doc.write("c27{color:#ffffa0; font-weight:bold; }\n");
+	doc.write("c28{color:#afffff; font-weight:bold; }\n");
+	doc.write("c29{color:#afffaf; font-weight:bold; }\n");
+	doc.write("c30{color:#cfcfff; font-weight:bold; }\n");
 	doc.write("c1{color:#ffffc0;   font-weight:bold; }\n");
 	doc.write("c2{color:#60f0c0}\n");
-	doc.write("c3{color:#a0c0ff; font-weight:bold;}\n");
+	doc.write("c3{color:#50e0ff; }\n");
 	doc.write("c4{color:#f090f0}\n");
-	doc.write("c5{color:#a0e0e0; font-weight:bold}\n");
+	doc.write("c5{color:#50ff80; }\n");
 	doc.write("c6{color:#f0f0e0}\n");
 	doc.write("c7{color:#fff0d0}\n");
 	doc.write("c8{color:#e0d0f0}\n");
@@ -87,10 +92,10 @@ pub fn write_styles(doc:&mut HtmlWriter){
 	doc.write("c17{color:#90d0f0}\n");
 	doc.write("c18{color:#f0a0d0}\n");
 	doc.write("c19{color:#d0f0a0}\n");
-	doc.write("c20{color:#a0a0ff}\n");
+	doc.write("c20{color:#0f0ff}\n");
 	doc.write("c21{color:#dde009; font-weight:bold}\n");
-	doc.write("c22{color:#09f00d; font-weight:bold}\n");
-	doc.write("c23{color:#b0e0c0; font-weight:bold}\n");
+	doc.write("c22{color:#e0f0d0; font-weight:bold}\n");
+	doc.write("c23{color:#e0f0ff; font-weight:bold}\n");
 
 	doc.end_tag();
 }
@@ -213,6 +218,26 @@ pub fn node_color_index(ni:&NodeInfo)->int {
 pub fn color_index_to_tag(i:int)->~str {
 	"c"+i.to_str()
 }
+fn is_alphanumeric(c:char)->bool {
+	match c {
+		'a'..'z'|'A'..'Z'|'0'..'9'|'_'=>true,
+		_=>false
+	}
+}
+fn text_here_is(line:&str, pos:uint,reftext:&str, color:int)->int {
+	if pos+reftext.len()+2>=line.len() { return 0}
+	if pos>0 {
+		if is_alphanumeric(line[pos-1] as char) { return 0 }// must be word start
+	}
+	if is_alphanumeric(line[pos+reftext.len()] as char) { return 0 }// must be word start
+	let mut i=0;
+	while i<reftext.len() {
+		if reftext[i]!=line[i+pos] {return 0}
+		i+=1;
+	}
+
+	return color;	
+}
 
 fn insert_links_in_line(dc:&DocContext,fm:&codemap::FileMap, nim:&NodeInfoMap,jdm:&JumpToDefMap, line:&str, nodes:&[ast::NodeId],line_index:uint)->~str {
 
@@ -259,6 +284,7 @@ fn insert_links_in_line(dc:&DocContext,fm:&codemap::FileMap, nim:&NodeInfoMap,jd
 	// paint comments out, mark delimiter symbols--override what we get from buggy tree picture...
 	// TODO ... need to figure out tree nodes encompasing the current line from above to 
 	// propogate information properly eg brackets inside a type ..
+
 	{
 		let mut x=0;
 		while x<(line.len()-1) {
@@ -274,9 +300,21 @@ fn insert_links_in_line(dc:&DocContext,fm:&codemap::FileMap, nim:&NodeInfoMap,jd
 					x+=1;
 				}
 			}
+			// override color for top level decls
+			let decl_color=text_here_is(line,x,"type",28)|text_here_is(line,x,"struct",27)|text_here_is(line,x,"trait",1)|text_here_is(line,x,"impl",29)|text_here_is(line,x,"enum",30)|text_here_is(line,x,"fn",26);
+			if decl_color>0{
+				let mut in_typaram=0;
+				while (x<line.len()) && (line[x] as char)!='{' && (line[x] as char)!='('{
+					in_typaram+=match line[x] as char {'<'=>1,_=>0};
+					color[x]=if in_typaram==0{decl_color}else{5};
+					in_typaram+=match line[x] as char {'>'=>-1,_=>0};
+					x+=1;
+				}
+			}
 			x+=1;
 		}
 	}
+	
 	// emit a span..
 	let mut x=0;
 	let mut curr_col=-1;

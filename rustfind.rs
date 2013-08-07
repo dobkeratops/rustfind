@@ -148,6 +148,11 @@ fn main() {
 	}
 }
 
+struct HrcNode<NODE> {
+	node:NODE,
+	child:~[HrcNode<NODE>]
+}
+
 /// tags: crate,ast,parse resolve
 /// Parses, resolves the given crate
 fn get_ast_and_resolve(cpath: &Path, libs: ~[Path]) -> DocContext {
