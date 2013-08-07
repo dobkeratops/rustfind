@@ -1,5 +1,7 @@
-Attempt to use rust libsyntax to find symbol definitions
-finds struct-defs, functions, methods, fields 
+Uses rust libsyntax to find symbol definitions
+and generates  HTML view of source with links
+finds struct-defs, functions, methods, fields
+
 
 "make" to compile and run test program
 ./rustfind -h to display options
@@ -10,12 +12,16 @@ finds struct-defs, functions, methods, fields
 
 ./rustfind -j cratename.rs -- dump spans & node definition links as JSON
 
+./rustfind -w cratename.rs -- creates HTML view of sourcecode
+
+
 roadmap
 [1] a commandline tool rustfind sourcefile.rs:LINE:COLUMN: --> definition.rs:LINE:col
 (to add add hoc navigation tools eg gedit external tools)
   [.1] CTAGS generation  ??
   [.1] interactive commandline tool (enter src/location/symbol-> dump location)
   [.2] possibly queries like "list all the functions that use this type, list all the impls' for this type.."
+  [.3] links to Rustdoc ?
 
 [2] JSON / or other dump
 .. are there any formats IDE's read for their indexers?
@@ -24,6 +30,7 @@ roadmap
   
 [4] an html hyperlinked source generator, like woboq?
    ... + popup type annotaions?
+   
 
 [5] use components for IDE integration?
 

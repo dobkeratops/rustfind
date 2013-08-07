@@ -181,7 +181,7 @@ impl NodesPerLinePerFile {
 	}
 }
 pub fn node_color_index(ni:&NodeInfo)->int {
-	// todo, an enum ffs..
+	// TODO - map this a bit more intelligently..
 	match ni.kind {
 		~"fn"=>1,
 		~"add"|~"sub"|~"mul"|~"div"|~"assign"|~"eq"|~"le"|~"gt"|~"ge"|~"ne"|~"binop"|~"assign_op"
@@ -191,7 +191,7 @@ pub fn node_color_index(ni:&NodeInfo)->int {
 		~"de"=>4,
 		~"type_param"=>5,
 		~"struct_field"|~"field"=>6,
-		~"keyword"|~"while"|~"match"|~"loop"|~"do"|~"cast"|~"if"=>7,
+		~"keyword"|~"while"|~"match"|~"loop"|~"do"|~"cast"|~"if"|"return"=>7,
 		~"path"=>8,
 		~"call"=>9,
 		~"method_call"=>10,
