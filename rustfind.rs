@@ -40,7 +40,6 @@ pub mod ioutil;
 pub mod htmlwriter;
 pub mod rust2html;
 pub mod codemaput;
-pub mod interactive;
 
 enum ShowDefMode {
 	SDM_Line=0,

@@ -4,6 +4,7 @@ use ioutil::*;
 use htmlwriter::*;
 use std::hashmap::*;
 use std::vec;
+use std::str;
 use extra::sort;
 use codemaput::*;
 use find_ast_node::*;
@@ -57,6 +58,7 @@ pub fn write_source_as_html_sub(dc:&RFindCtx, nim:&FNodeInfoMap,ndn:&HashMap<ast
 	// ew
 	let mut fi=0;
 	for fm in dc.sess.codemap.files.iter() {
+		println("generating "+make_html_name(fm.name)+"..");
 		let doc_str=make_html(dc, *fm, nim,jdm, def2refs, npl.m[fi]);
 		fileSaveStr(doc_str,make_html_name(fm.name));
 		fi+=1;
@@ -179,9 +181,14 @@ impl NodesPerLinePerFile {
 				None=>{},
 				Some(ifp)=>{
 //					dump!(ifp);
-					let ifpe=byte_pos_to_index_file_pos(dc.tycx,v.span.hi).unwrap();
-					for li in range(ifp.line,ifpe.line+1) {
-						npl.m[ifp.file_index][li].push(*k)
+					match byte_pos_to_index_file_pos(dc.tycx,v.span.hi) {
+						None=>{
+						},
+						Some(ifpe)=>for li in range(ifp.line,ifpe.line+1) {
+							if li < npl.m[ifp.file_index].len() {
+								npl.m[ifp.file_index][li].push(*k)
+							}
+						}
 					}
 				}
 			}
@@ -263,6 +270,32 @@ fn text_here_is(line:&str, pos:uint,reftext:&str, color:int)->int {
 }
 
 fn insert_links_in_line(dc:&RFindCtx,fm:&codemap::FileMap, nim:&FNodeInfoMap,jdm:&JumpToDefMap, jrm:&JumpToRefMap, line:&str, nodes:&[ast::NodeId],line_index:uint)->~str {
+
+/*			match line[x] as char{
+			' ' =>"&nbsp;",
+			'<' =>"&lt;",
+			'>' =>"&gt;",
+			'&' =>"&amp;",
+			'\t' =>"&nbsp;&nbsp;&nbsp;&nbsp;",
+			c=>str::from_char(c as char)
+			}
+*/
+	let mut xlat=~[];
+	let mut i=0;
+	while i<256 {
+		
+		xlat.push(
+			match i as char{
+			' ' =>~"&nbsp;",
+			'<' =>~"&lt;",
+			'>' =>~"&gt;",
+			'&' =>~"&amp;",
+			'\t' =>~"&nbsp;&nbsp;&nbsp;&nbsp;",
+			c=>str::from_char(i as char)//x.slice(0,1)
+			});
+
+		i+=1;
+	}
 
 	let node_infos=nodes.map(|id|{nim.find(id)});
 //	for x in node_infos.iter() { println(fmt!("%?", x));}
@@ -387,6 +420,23 @@ fn insert_links_in_line(dc:&RFindCtx,fm:&codemap::FileMap, nim:&FNodeInfoMap,jdm
 			curr_col=color[x];
 			outp.begin_tag(color_index_to_tag(curr_col));
 		}
+
+
+//		let cstr=str::from_char(line[x] as char);
+//		outp.write(cstr);
+		outp.write(xlat[line[x]]);
+/*			match line[x] as char{
+			' ' =>"&nbsp;",
+			'<' =>"&lt;",
+			'>' =>"&gt;",
+			'&' =>"&amp;",
+			'\t' =>"&nbsp;&nbsp;&nbsp;&nbsp;",
+			c=>str::from_char(c as char)
+			}
+		);
+*/
+
+/*
 		outp.write(
 			match line[x] as char {
 			' '=>"&nbsp;",
@@ -394,9 +444,10 @@ fn insert_links_in_line(dc:&RFindCtx,fm:&codemap::FileMap, nim:&FNodeInfoMap,jdm
 			'>'=>"&gt;",
 			'&'=>"&amp;",
 			'\t'=>"&nbsp;&nbsp;&nbsp;&nbsp;",
-			_=>line.slice(x,x+1)
+			c=>cstr.slice(0,1)//line.slice(x,x+1)
 			}
 		);
+*/
 		/*
 		let chstr=line.slice(x,x+1);
 		if chstr==" " {

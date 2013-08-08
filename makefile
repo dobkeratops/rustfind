@@ -2,7 +2,7 @@ RF_LIBS= -L $(RUST)/x86_64-unknown-linux-gnu/stage2/lib
 OPTS= test_input.rs $(RF_LIBS)
 html: rustfind
 	./rustfind rustfind.rs -w $(RF_LIBS)
-	firefox rustfind.html &
+	firefox rustfind.rs.html &
 
 test1 : rustfind
 	@if [ ! $(RUST) ] ; then echo "set RUST to point to root of rust sourcetree" ; fi
@@ -26,4 +26,8 @@ SRC=$(wildcard *.rs)
 
 rustfind: rustfind.rs $(SRC)
 	rustc rustfind.rs
+
+clean:
+	rm rustfind
+	rm *.html
 
