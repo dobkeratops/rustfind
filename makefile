@@ -22,8 +22,8 @@ test : rustfind
 	./rustfind test_input.rs -w $(RF_LIBS)
 	firefox test_input.html
 
+SRC=$(wildcard *.rs)
 
-rustfind: rustfind.rs rsfind.rs find_ast_node.rs astdump.rs text_formatting.rs rust2html.rs htmlwriter.rs codemaput.rs interactive.rs 
+rustfind: rustfind.rs $(SRC)
 	rustc rustfind.rs
-
 

@@ -58,7 +58,7 @@ pub fn write_source_as_html_sub(dc:&RFindCtx, nim:&FNodeInfoMap,ndn:&HashMap<ast
 	let mut fi=0;
 	for fm in dc.sess.codemap.files.iter() {
 		let doc_str=make_html(dc, *fm, nim,jdm, def2refs, npl.m[fi]);
-		fileSaveStr(doc_str,change_file_name_ext(fm.name,"html"));
+		fileSaveStr(doc_str,make_html_name(fm.name));
 		fi+=1;
 	}
 }
@@ -370,13 +370,13 @@ fn insert_links_in_line(dc:&RFindCtx,fm:&codemap::FileMap, nim:&FNodeInfoMap,jdm
 						Some(link_node_info)=>{
 							let ifp = byte_pos_to_index_file_pos(dc.tycx, link_node_info.span.lo).unwrap();
 							let link_str="#"+(ifp.line+2).to_str();
-							outp.begin_tag_link(change_file_name_ext(dc.sess.codemap.files[ifp.file_index].name,"html")+link_str);
+							outp.begin_tag_link(make_html_name(dc.sess.codemap.files[ifp.file_index].name)+link_str);
 						}
 					}
 				} else if curr_link<0{
 					let ifp= get_node_index_file_pos(dc,nim,-curr_link);
 					let link_str="#"+ifp.line.to_str()+"_"+ifp.col.to_str()+"_refs";
-					outp.begin_tag_link(change_file_name_ext(fm.name,"html")+link_str);
+					outp.begin_tag_link(make_html_name(fm.name)+link_str);
 				}
 			}
 		}
@@ -534,6 +534,9 @@ fn write_references(doc:&mut HtmlWriter,dc:&RFindCtx, fm:&codemap::FileMap,nim:&
 						if newline==false {doc.writeln("");}
 						header_written=true;
 						write_refs_header(doc,dc,nim,fm,dn);
+						doc.begin_tag("c24"); 
+						doc.writeln("references:-");
+						doc.end_tag();
 						newline=true;
 					};
 					if curr_file!=ref_ifp.file_index {
@@ -548,7 +551,7 @@ fn write_references(doc:&mut HtmlWriter,dc:&RFindCtx, fm:&codemap::FileMap,nim:&
 							if newline==false {doc.writeln("");newline=true;}
 						}
 						let rfm=&dc.sess.codemap.files[ref_ifp.file_index];
-						doc.begin_tag_link( change_file_name_ext(rfm.name,"html")+"#"+(ref_ifp.line+1).to_str());
+						doc.begin_tag_link( make_html_name(rfm.name)+"#"+(ref_ifp.line+1).to_str());
 
 						if  links_written<max_links {
 							doc.begin_tag("c24"); 
@@ -585,11 +588,11 @@ fn write_references(doc:&mut HtmlWriter,dc:&RFindCtx, fm:&codemap::FileMap,nim:&
 //		let ifpe=get_node_index_file_pos(dc,nim,nid).unwrap();
 
 		doc.begin_tag_anchor(ifp.line.to_str()+"_"+ifp.col.to_str() + "_refs" );
+		doc.begin_tag_link( make_html_name(fm.name)+"#"+(ifp.line+1).to_str());
 		doc.begin_tag("c24");
 		doc.writeln(dc.sess.codemap.files[ifp.file_index].name+":"+(ifp.line+1).to_str()+":"+ifp.col.to_str()
-					+"-"+(ifpe.line+1).to_str()+":"+ifpe.col.to_str());
+					+"-"+(ifpe.line+1).to_str()+":"+ifpe.col.to_str() +" -" +info.kind + "- definition:");
 		doc.end_tag();
-		doc.begin_tag_link( change_file_name_ext(fm.name,"html")+"#"+(ifp.line+1).to_str());
 		doc.begin_tag("pr");
 //			dump!(def_tfp);
 		doc.writeln(get_source_line(fm,ifp.line) );
@@ -601,13 +604,15 @@ fn write_references(doc:&mut HtmlWriter,dc:&RFindCtx, fm:&codemap::FileMap,nim:&
 
 	fn write_file_ref(doc:&mut HtmlWriter, dc:&RFindCtx,fi:uint) {
 		let fname = dc.tycx.sess.codemap.files[fi].name;
-		doc.begin_tag_link( change_file_name_ext(fname, "html"));
+		doc.begin_tag_link( make_html_name(fname));
 		doc.begin_tag("c24");
 		doc.writeln(""+fname + ":");
 		doc.end_tag();
 	}
 
 }
+
+
 
 // TODO: a span index should uniquely identify the node.
 // This adress form is a reasonable compromise between things we can see,
@@ -619,6 +624,5 @@ fn get_node_index_file_pos(dc:&RFindCtx,nim:&FNodeInfoMap,nid:ast::NodeId)->Inde
 	byte_pos_to_index_file_pos(dc.tycx,ni.span.lo).unwrap()
 }
 
-
-
+fn make_html_name(f:&str)->~str { f+".html"}
 

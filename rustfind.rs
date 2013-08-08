@@ -40,6 +40,7 @@ pub mod ioutil;
 pub mod htmlwriter;
 pub mod rust2html;
 pub mod codemaput;
+pub mod interactive;
 
 enum ShowDefMode {
 	SDM_Line=0,
@@ -826,6 +827,18 @@ fn find_file_name_in(dc:&RFindCtx,fname:&str)->Option<~str> {
 	None
 }
 
+pub fn def_of_symbol_to_str(dc:&RFindCtx, ns:&FNodeInfoMap,ds:&HashMap<ast::NodeId, ast::def_id>,s:&str)->~str {
+	~"TODO"	
+}
+
+pub fn write_source_as_html(dc:&RFindCtx) {
+	let nim=build_node_info_map(dc.crate);
+	let ndm = build_node_def_node_table(dc);
+	let jdm=build_jump_to_def_map(dc,nim,ndm);
+	rust2html::write_source_as_html_sub(dc,nim,ndm,jdm);
+}
+
+
 pub fn rustfind_interactive(dc:&RFindCtx) {
 	// TODO - check if RUSTI can already do this.. it would be better there IMO
 	let node_spans=build_node_info_map(dc.crate);
@@ -864,18 +877,6 @@ pub fn rustfind_interactive(dc:&RFindCtx) {
 		}
 	}
 }
-
-pub fn def_of_symbol_to_str(dc:&RFindCtx, ns:&FNodeInfoMap,ds:&HashMap<ast::NodeId, ast::def_id>,s:&str)->~str {
-	~"TODO"	
-}
-
-pub fn write_source_as_html(dc:&RFindCtx) {
-	let nim=build_node_info_map(dc.crate);
-	let ndm = build_node_def_node_table(dc);
-	let jdm=build_jump_to_def_map(dc,nim,ndm);
-	rust2html::write_source_as_html_sub(dc,nim,ndm,jdm);
-}
-
 
 
 
