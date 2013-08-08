@@ -39,6 +39,35 @@ mod find_ast_node;
 mod htmlwriter;
 mod rust2html;
 
+enum ShowDefMode {
+	SDM_Line=0,
+	SDM_LineCol=1,
+	SDM_Source=2,
+	SDM_GeditCmd=3
+}
+
+pub fn build_jump_to_def_map(dc:&DocContext, nim:@mut FNodeInfoMap,nd:&HashMap<ast::NodeId,ast::def_id>)->~JumpToDefMap{
+// todo: NodeId->AStNode  .. lookup_def_ inner functionality extracted
+	let mut jdm=~HashMap::new();
+	for (k,_) in nim.iter() {
+		match get_ast_node_of_node_id(nim,*k) {
+			None=>{},
+			Some(ast_node)=>{
+				match lookup_def_node_of_node(dc,&ast_node,nim,nd) {
+					None=>{},
+					Some(def_node_id)=>{
+						if *k != def_node_id {
+							jdm.insert(*k,def_node_id);
+						}
+					}
+				}
+			}
+		}
+	}
+
+	jdm
+}
+
 
 pub static ctxtkey: local_data::Key<@DocContext> = &local_data::Key;
 
@@ -86,6 +115,7 @@ pub macro_rules! if_some {
 
 
 fn main() {
+
     use extra::getopts::*;
     use std::hashmap::HashMap;
 
@@ -262,27 +292,6 @@ fn dump_json(dc:&DocContext) {
 
 
 
-pub fn build_jump_to_def_map(dc:&DocContext, nim:@mut FNodeInfoMap,nd:&HashMap<ast::NodeId,ast::def_id>)->~JumpToDefMap{
-// todo: NodeId->AStNode  .. lookup_def_ inner functionality extracted
-	let mut jdm=~HashMap::new();
-	for (k,_) in nim.iter() {
-		match get_ast_node_of_node_id(nim,*k) {
-			None=>{},
-			Some(ast_node)=>{
-				match lookup_def_node_of_node(dc,&ast_node,nim,nd) {
-					None=>{},
-					Some(def_node_id)=>{
-						if *k != def_node_id {
-							jdm.insert(*k,def_node_id);
-						}
-					}
-				}
-			}
-		}
-	}
-
-	jdm
-}
 
 
 fn lookup_def_at_file_line_pos_old(dc:&DocContext,filepos:&str, show_all:ShowDefMode)->Option<~str> {
@@ -334,12 +343,6 @@ pub fn node_from_text_file_pos_str(dc:&DocContext, file_pos_str:&str)->Option<fi
 	}
 }
 
-enum ShowDefMode {
-	SDM_Line=0,
-	SDM_LineCol=1,
-	SDM_Source=2,
-	SDM_GeditCmd=3
-}
 
 pub fn lookup_def_at_byte_pos(dc:&DocContext, bp:BytePos, m:ShowDefMode)->Option<~str> {
 	let ndt=find_ast_node::find_node_tree_loc_at_byte_pos(dc.crate,bp);

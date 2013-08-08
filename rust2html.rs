@@ -484,14 +484,15 @@ fn write_references(doc:&mut HtmlWriter,dc:&DocContext, fm:&codemap::FileMap,nim
 
 		let refs = jrm.find(dn);
 		let max_links=10;	// todo - sort..
-		let max_file_links=20;	// todo - sort..
+		let max_short_links=30;	// todo - sort..
+
 		
 		if refs.len()>0 {
 			let mut header_written=false;
 			let opt_def_tfp = byte_pos_to_index_file_pos(dc.tycx,def_info.span.lo);
 			if !opt_def_tfp.is_some() { loop;}
 			let def_tfp=opt_def_tfp.unwrap();
-			let mut links_written=0;
+			let mut links_written=0 as uint;
 
 			// sort references by file [(file_index, [...])]
 
@@ -517,7 +518,7 @@ fn write_references(doc:&mut HtmlWriter,dc:&DocContext, fm:&codemap::FileMap,nim
 
 			let l=refs2.len();
 			sort::qsort(refs2,0,l-1, |&(_,ref ifp1,_),&(_,ref ifp2,_)|{ ifp1.file_index-curr_file<=ifp2.file_index-curr_file });
-
+			let mut newline=true;
 			for &(ref ref_info,ref ref_ifp,ref id) in refs2.iter() {
 				if *id!=dn {
 					//let opt_ref_info = nim.find(r);
@@ -528,25 +529,45 @@ fn write_references(doc:&mut HtmlWriter,dc:&DocContext, fm:&codemap::FileMap,nim
 					//let ref_tfp=opt_ref_tfp.unwrap();
 
 					if header_written==false {					
+						if newline==false {doc.writeln("");}
 						header_written=true;
 						write_refs_header(doc,dc,nim,fm,dn);
+						newline=true;
 					};
 					if curr_file!=ref_ifp.file_index {
+						if newline==false {doc.writeln("");}
 						curr_file=ref_ifp.file_index;
 						write_file_ref(doc,dc,curr_file);
+						newline=true;
 					}
 
-					if  (links_written<max_links){				
+					if links_written<(max_short_links+max_links) {
+						if  links_written<max_links {
+							if newline==false {doc.writeln("");newline=true;}
+						}
 						let rfm=&dc.sess.codemap.files[ref_ifp.file_index];
 						doc.begin_tag_link( change_file_name_ext(rfm.name,"html")+"#"+(ref_ifp.line+1).to_str());
-						doc.begin_tag("c24"); 
-						doc.write((ref_ifp.line+1).to_str()+&": ");
+
+						if  links_written<max_links {
+							doc.begin_tag("c24"); 
+							doc.write((ref_ifp.line+1).to_str()+&": ");
+							doc.end_tag();
+							doc.writeln(get_source_line(dc.sess.codemap.files[ref_ifp.file_index],ref_ifp.line));
+							newline=true;
+							links_written+=1;
+						} else {
+							doc.begin_tag("c24"); 
+							doc.write("("+(ref_ifp.line+1).to_str()+")");
+							doc.end_tag();
+							newline=false;
+							links_written+=1;
+						}
 						doc.end_tag();
-						doc.writeln(get_source_line(dc.sess.codemap.files[ref_ifp.file_index],ref_ifp.line));
-						doc.end_tag();
-						links_written+=1;
 					}
 				}
+			}
+			if links_written < refs2.len() { 
+				doc.begin_tag("c24").writeln(".."+(refs2.len()-links_written).to_str()+"more..").end_tag();
 			}
 			if header_written {doc.writeln("");}
 	//		info=nim.find(dn);
@@ -564,8 +585,7 @@ fn write_references(doc:&mut HtmlWriter,dc:&DocContext, fm:&codemap::FileMap,nim
 		doc.begin_tag_anchor(ifp.line.to_str()+"_"+ifp.col.to_str() + "_refs" );
 		doc.begin_tag("c24");
 		doc.writeln(dc.sess.codemap.files[ifp.file_index].name+":"+(ifp.line+1).to_str()+":"+ifp.col.to_str()
-					+"-"+(ifpe.line+1).to_str()+":"+ifpe.col.to_str()
-					+"  ("+info.kind+") references:");
+					+"-"+(ifpe.line+1).to_str()+":"+ifpe.col.to_str());
 		doc.end_tag();
 		doc.begin_tag_link( change_file_name_ext(fm.name,"html")+"#"+(ifp.line+1).to_str());
 		doc.begin_tag("pr");
@@ -581,7 +601,7 @@ fn write_references(doc:&mut HtmlWriter,dc:&DocContext, fm:&codemap::FileMap,nim
 		let fname = dc.tycx.sess.codemap.files[fi].name;
 		doc.begin_tag_link( change_file_name_ext(fname, "html"));
 		doc.begin_tag("c24");
-		doc.writeln(".. in "+fname + ":");
+		doc.writeln(""+fname + ":");
 		doc.end_tag();
 	}
 
