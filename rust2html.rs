@@ -28,15 +28,16 @@ pub fn make_html(dc:&RFindCtx, fm:&codemap::FileMap,nim:&FNodeInfoMap,jdm:&JumpT
 
 	while line<fm.lines.len() {
 		// todo: line numbers want to go in a seperate column so they're unselectable..
-		doc.write_tagged("ln",pad_to_length((line+1).to_str(),max_digits,"&nbsp;"));
+		doc.write_tagged("ln",pad_to_length((line+1).to_str(),max_digits," "));
 		doc.begin_tag_anchor((line+1).to_str());
 		let lend=if line<(fm.lines.len()-1){*fm.lines[line+1]-fstart}else{fm.src.len()};
-		doc.write("&emsp;");
+		doc.write(" ");
 		let line_str=fm.src.slice(*fm.lines[line]-fstart,lend);
 		//doc.writeln(line_str);
 		doc.end_tag();
-		let markup_line=insert_links_in_line(dc,fm, nim, jdm,jrm, line_str, nodes_per_line[line],line);
-		doc.writeln(markup_line);
+		write_line_with_links(&mut doc,dc,fm, nim, jdm,jrm, line_str, nodes_per_line[line],line);
+		doc.writeln("");
+//		doc.writeln(markup_line);
 		line+=1;
 	}
 	write_references(&mut doc,dc,fm,nim,jdm,jrm, nodes_per_line);
@@ -81,43 +82,43 @@ fn get_str_hash(s:&str)->uint{
 pub fn write_styles(doc:&mut HtmlWriter,fname:&str){
 	// write the styles..
 	doc.begin_tag_ext("style",&[(~"type",~"text/css")]);
-	doc.write("maintext {color:#f0f0f0; font-size:12px; font-family:\"Courier New\"}\n");
-	doc.write("a:link{ color:#f0f0f0; font-style:normal;   text-decoration:none;}\n");
-	doc.write("a:visited{ color:#f0f0f0; font-style:normal;   text-decoration:none;}\n");
-	doc.write("a:link:hover{ color:#f0f0f0; font-style:normal; background-color:#606060; }\n");
-	doc.write("pr{font-weight:bold}\n");
-	doc.write("ln{color:#606060; }\n");
-	doc.write("c24{color:#ffffff; font-style:italic; opacity:0.5}\n");
-	doc.write("c25{color:#ffffff; opacity:0.92}\n");
-	doc.write("c26{color:#ffffff; font-weight:bold; }\n");
-	doc.write("c27{color:#ffffa0; font-weight:bold; }\n");
-	doc.write("c28{color:#afffff; font-weight:bold; }\n");
-	doc.write("c29{color:#afffaf; font-weight:bold; }\n");
-	doc.write("c30{color:#cfcfff; font-weight:bold; }\n");
-	doc.write("c31{color:#ffffff; font-style:italic; opacity:0.6}\n");
-	doc.write("c1{color:#ffffc0;   font-weight:bold; }\n");
-	doc.write("c2{color:#60f0c0}\n");
-	doc.write("c3{color:#50e0ff; }\n");
-	doc.write("c4{color:#f090f0}\n");
-	doc.write("c5{color:#50ff80; }\n");
-	doc.write("c6{color:#f0f0e0}\n");
-	doc.write("c7{color:#fff0d0}\n");
-	doc.write("c8{color:#e0d0f0}\n");
-	doc.write("c9{color:#70f0f0}\n");
-	doc.write("c10{color:#f0f070}\n");
-	doc.write("c11{color:#c0f070}\n");
-	doc.write("c12{color:#70c0f0}\n");
-	doc.write("c13{color:#c0f070}\n");
-	doc.write("c14{color:#f0ffc0}\n");
-	doc.write("c15{color:#f0f0e0}\n");
-	doc.write("c16{color:#c0ffe0}\n");
-	doc.write("c17{color:#90d0f0}\n");
-	doc.write("c18{color:#f0a0d0}\n");
-	doc.write("c19{color:#d0f0a0}\n");
-	doc.write("c20{color:#0f0ff}\n");
-	doc.write("c21{color:#dde009; font-weight:bold}\n");
-	doc.write("c22{color:#e0f0d0; font-weight:bold}\n");
-	doc.write("c23{color:#e0f0ff; font-weight:bold}\n");
+	doc.write_html("maintext {color:#f0f0f0; font-size:12px; font-family:\"Courier New\"}\n");
+	doc.write_html("a:link{ color:#f0f0f0; font-style:normal;   text-decoration:none;}\n");
+	doc.write_html("a:visited{ color:#f0f0f0; font-style:normal;   text-decoration:none;}\n");
+	doc.write_html("a:link:hover{ color:#f0f0f0; font-style:normal; background-color:#606060; }\n");
+	doc.write_html("pr{font-weight:bold}\n");
+	doc.write_html("ln{color:#606060; }\n");
+	doc.write_html("c24{color:#ffffff; font-style:italic; opacity:0.5}\n");
+	doc.write_html("c25{color:#ffffff; opacity:0.92}\n");
+	doc.write_html("c26{color:#ffffff; font-weight:bold; }\n");
+	doc.write_html("c27{color:#ffffa0; font-weight:bold; }\n");
+	doc.write_html("c28{color:#afffff; font-weight:bold; }\n");
+	doc.write_html("c29{color:#afffaf; font-weight:bold; }\n");
+	doc.write_html("c30{color:#cfcfff; font-weight:bold; }\n");
+	doc.write_html("c31{color:#ffffff; font-style:italic; opacity:0.6}\n");
+	doc.write_html("c1{color:#ffffc0;   font-weight:bold; }\n");
+	doc.write_html("c2{color:#60f0c0}\n");
+	doc.write_html("c3{color:#50e0ff; }\n");
+	doc.write_html("c4{color:#f090f0}\n");
+	doc.write_html("c5{color:#50ff80; }\n");
+	doc.write_html("c6{color:#f0f0e0}\n");
+	doc.write_html("c7{color:#fff0d0}\n");
+	doc.write_html("c8{color:#e0d0f0}\n");
+	doc.write_html("c9{color:#70f0f0}\n");
+	doc.write_html("c10{color:#f0f070}\n");
+	doc.write_html("c11{color:#c0f070}\n");
+	doc.write_html("c12{color:#70c0f0}\n");
+	doc.write_html("c13{color:#c0f070}\n");
+	doc.write_html("c14{color:#f0ffc0}\n");
+	doc.write_html("c15{color:#f0f0e0}\n");
+	doc.write_html("c16{color:#c0ffe0}\n");
+	doc.write_html("c17{color:#90d0f0}\n");
+	doc.write_html("c18{color:#f0a0d0}\n");
+	doc.write_html("c19{color:#d0f0a0}\n");
+	doc.write_html("c20{color:#0f0ff}\n");
+	doc.write_html("c21{color:#dde009; font-weight:bold}\n");
+	doc.write_html("c22{color:#e0f0d0; font-weight:bold}\n");
+	doc.write_html("c23{color:#e0f0ff; font-weight:bold}\n");
 
 	doc.end_tag();
 }
@@ -269,7 +270,7 @@ fn text_here_is(line:&str, pos:uint,reftext:&str, color:int)->int {
 	return color;
 }
 
-fn insert_links_in_line(dc:&RFindCtx,fm:&codemap::FileMap, nim:&FNodeInfoMap,jdm:&JumpToDefMap, jrm:&JumpToRefMap, line:&str, nodes:&[ast::NodeId],line_index:uint)->~str {
+fn write_line_with_links(outp:&mut HtmlWriter,dc:&RFindCtx,fm:&codemap::FileMap, nim:&FNodeInfoMap,jdm:&JumpToDefMap, jrm:&JumpToRefMap, line:&str, nodes:&[ast::NodeId],line_index:uint) {
 
 /*			match line[x] as char{
 			' ' =>"&nbsp;",
@@ -280,22 +281,7 @@ fn insert_links_in_line(dc:&RFindCtx,fm:&codemap::FileMap, nim:&FNodeInfoMap,jdm
 			c=>str::from_char(c as char)
 			}
 */
-	let mut xlat=~[];
-	let mut i=0;
-	while i<256 {
-		
-		xlat.push(
-			match i as char{
-			' ' =>~"&nbsp;",
-			'<' =>~"&lt;",
-			'>' =>~"&gt;",
-			'&' =>~"&amp;",
-			'\t' =>~"&nbsp;&nbsp;&nbsp;&nbsp;",
-			c=>str::from_char(i as char)//x.slice(0,1)
-			});
 
-		i+=1;
-	}
 
 	let node_infos=nodes.map(|id|{nim.find(id)});
 //	for x in node_infos.iter() { println(fmt!("%?", x));}
@@ -390,7 +376,7 @@ fn insert_links_in_line(dc:&RFindCtx,fm:&codemap::FileMap, nim:&FNodeInfoMap,jdm
 	let mut x=0;
 	let mut curr_col=-1;
 	let mut curr_link=0;
-	let mut outp=HtmlWriter::new();
+	//let mut outp=HtmlWriter::new();
 	while x<line.len() {
 		// link overrides color..
 		if curr_link!=link[x] {
@@ -400,19 +386,19 @@ fn insert_links_in_line(dc:&RFindCtx,fm:&codemap::FileMap, nim:&FNodeInfoMap,jdm
 			curr_link=link[x];
 
 			if curr_link!=no_link {
-				if curr_link>0 {
+				if curr_link>0 /* value is link node index*/ {
 					match nim.find(&curr_link) {
 						None=>curr_link=0,	// link outside the crate?
 						Some(link_node_info)=>{
 							let ifp = byte_pos_to_index_file_pos(dc.tycx, link_node_info.span.lo).unwrap();
 							let link_str="#"+(ifp.line+2).to_str();
-							outp.begin_tag_link(make_html_name(dc.sess.codemap.files[ifp.file_index].name)+link_str);
+							outp.begin_tag_link(make_rel_html_name(dc.sess.codemap.files[ifp.file_index].name,fm.name)+link_str);
 						}
 					}
-				} else if curr_link<0{
+				} else if curr_link<0/* link to refs block,value is -(this node index)*/{
 					let ifp= get_node_index_file_pos(dc,nim,-curr_link);
-					let link_str="#"+ifp.line.to_str()+"_"+ifp.col.to_str()+"_refs";
-					outp.begin_tag_link(make_html_name(fm.name)+link_str);
+					let ref_block_link_str="#"+ifp.line.to_str()+"_"+ifp.col.to_str()+"_refs";
+					outp.begin_tag_link(ref_block_link_str);
 				}
 			}
 		}
@@ -427,7 +413,9 @@ fn insert_links_in_line(dc:&RFindCtx,fm:&codemap::FileMap, nim:&FNodeInfoMap,jdm
 
 //		let cstr=str::from_char(line[x] as char);
 //		outp.write(cstr);
-		outp.write(xlat[line[x]]);
+
+		outp.write_u8_(line[x]);
+
 /*			match line[x] as char{
 			' ' =>"&nbsp;",
 			'<' =>"&lt;",
@@ -466,7 +454,10 @@ fn insert_links_in_line(dc:&RFindCtx,fm:&codemap::FileMap, nim:&FNodeInfoMap,jdm
 	}
 	if curr_col>=0 {outp.end_tag();}
 	if curr_link>0 {outp.end_tag();}
-	outp.doc
+	//todo - we prefered this functional, "build a line, assemble lines"..
+	// but we hacked it this way because of plain text->translated text issue. < > &lt; &gt; etc
+	// need to split doc writerinterface into functions that take plain text and html fragments
+	//outp.doc
 }
 
 fn find_defs_in_file(fm:&codemap::FileMap, nim:&FNodeInfoMap)->~[ast::NodeId] {
@@ -605,7 +596,7 @@ fn write_references(doc:&mut HtmlWriter,dc:&RFindCtx, fm:&codemap::FileMap,nim:&
 							if newline==false {doc.writeln("");newline=true;}
 						}
 						let rfm=&dc.sess.codemap.files[ref_ifp.file_index];
-						doc.begin_tag_link( make_html_name(rfm.name)+"#"+(ref_ifp.line+1).to_str());
+						doc.begin_tag_link( make_rel_html_name(rfm.name,fm.name)+"#"+(ref_ifp.line+1).to_str());
 
 						if  links_written<max_links {
 							doc.begin_tag("c24"); 
@@ -648,7 +639,7 @@ fn write_references(doc:&mut HtmlWriter,dc:&RFindCtx, fm:&codemap::FileMap,nim:&
 	//		let ifpe=get_node_index_file_pos(dc,nim,nid).unwrap();
 
 				doc.begin_tag_anchor(ifp.line.to_str()+"_"+ifp.col.to_str() + "_refs" );
-				doc.begin_tag_link( make_html_name(fm.name)+"#"+(ifp.line+1).to_str());
+				doc.begin_tag_link( "#"+(ifp.line+1).to_str());
 				doc.begin_tag("c24");
 				doc.writeln(dc.sess.codemap.files[ifp.file_index].name+":"+(ifp.line+1).to_str()+":"+ifp.col.to_str()
 							+"-"+(ifpe.line+1).to_str()+":"+ifpe.col.to_str() +" -" +info.kind + "- definition:");
@@ -687,4 +678,24 @@ fn get_node_index_file_pos(dc:&RFindCtx,nim:&FNodeInfoMap,nid:ast::NodeId)->Inde
 }
 
 fn make_html_name(f:&str)->~str { f+".html"}
+
+fn count_chars_in(f:&str, x:char)->uint{
+	let mut n=0;
+	for c in f.iter() { if c==x {n+=1} }
+	n
+}
+
+fn make_rel_html_name(f:&str, origin:&str)->~str {
+	let mut acc=~"";
+	let mut i=0;
+	let depth_change=count_chars_in(origin,'/');//-count_chars_in(origin,'/')
+	while i<depth_change {
+		acc.push_str("../");
+		i+=1;
+	}
+	acc.push_str(f);
+	make_html_name(acc)
+}
+
+
 

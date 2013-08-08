@@ -1,12 +1,34 @@
-
+use std::str;
 pub struct HtmlWriter {
 	doc:~str,
 	tag_stack:~[~str],
+	xlat:~[~str]
 }
 
+/// convert u8 into html char.
+fn mk_xlat_table()->~[~str]
+{
+	let mut xlat=~[];
+	let mut i=0;
+	while i<256 {
+		
+		xlat.push(
+			match i as char{
+			' ' =>~"&nbsp;",
+			'<' =>~"&lt;",
+			'>' =>~"&gt;",
+			'&' =>~"&amp;",
+			'\t' =>~"&nbsp;&nbsp;&nbsp;&nbsp;",
+			c=>str::from_char(i as char)//x.slice(0,1)
+			});
+
+		i+=1;
+	}
+	xlat
+}
 /// helper object for building html docs, puts tags in a stack for convinient close
 impl<'self> HtmlWriter {
-	pub fn new()->HtmlWriter { HtmlWriter { doc:~"", tag_stack:~[]}}
+	pub fn new()->HtmlWriter { HtmlWriter { doc:~"", tag_stack:~[], xlat:mk_xlat_table()}}
 
 	pub fn write_quoted_str(&'self mut self, a:&str)->&'self mut HtmlWriter {
 		self.doc.push_str("\"");
@@ -57,19 +79,30 @@ impl<'self> HtmlWriter {
 		self
 	}
 	pub fn write(&'self mut self,t:&str)->&'self mut HtmlWriter {
+		for x in t.iter() {
+			self.doc.push_str(self.xlat[x]);
+		};
+		self
+	}
+	// todo rename "write_raw?"
+	pub fn write_html(&'self mut self,t:&str)->&'self mut HtmlWriter {
 		self.doc.push_str(t);
 		self
 	}
 	pub fn write_tagged(&'self mut self, tagname:&str, text:&str)->&'self mut HtmlWriter {
 		self.begin_tag(tagname);
-		self.doc.push_str(text);
+		self.write(text);
 		self.end_tag();
 		self
 	}
 	pub fn writeln(&'self mut self, text:&str)->&'self mut HtmlWriter {
-		self.doc.push_str(text);
+		self.write(text);
 		self.write_tag("br");
 		self
+	}
+	pub fn write_u8_(&'self mut self, x:u8)->&'self mut HtmlWriter {
+			self.doc.push_str(self.xlat[x]);
+			self
 	}
 	pub fn begin_tag_anchor(&'self mut self, anchor:&str)->&'self mut HtmlWriter {
 		self.begin_tag_ext("a",[(~"id",anchor.to_owned())])
@@ -78,7 +111,8 @@ impl<'self> HtmlWriter {
 		self.begin_tag_ext("a",[(~"href",link.to_owned())])
 	}
 	pub fn write_space(&'self mut self)->&'self mut HtmlWriter {
-		self.write("&emsp;")
+		self.doc.push_str("&emsp;");
+		self
 	}
 }
 
