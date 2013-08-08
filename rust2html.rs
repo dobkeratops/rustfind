@@ -307,6 +307,7 @@ fn insert_links_in_line(dc:&RFindCtx,fm:&codemap::FileMap, nim:&FNodeInfoMap,jdm
 	let mut depth:~[uint]= vec::from_elem(line.len(),0x7fffffff as uint);
 	let mut rndcolor=0;
 	let mut no_link=0 as ast::NodeId;;
+
 	for n in nodes.iter() {
 
 		match nim.find(n) {
@@ -345,6 +346,8 @@ fn insert_links_in_line(dc:&RFindCtx,fm:&codemap::FileMap, nim:&FNodeInfoMap,jdm
 			}
 		}
 	}
+
+
 	// paint comments out, mark delimiter symbols--override what we get from buggy tree picture...
 	// TODO ... need to figure out tree nodes encompasing the current line from above to 
 	// propogate information properly eg brackets inside a type ..
@@ -529,6 +532,7 @@ fn write_references(doc:&mut HtmlWriter,dc:&RFindCtx, fm:&codemap::FileMap,nim:&
 	doc.write_tag("div");
 	let file_def_nodes = find_defs_in_file(fm,nim);
 	//let mut defs_to_refs=MultiMap::new::<ast::NodeId, ast::NodeId>();
+
 	for &dn in file_def_nodes.iter() {
 		let opt_def_info = nim.find(&dn);
 		if !opt_def_info.is_some() {loop;}
@@ -560,7 +564,6 @@ fn write_references(doc:&mut HtmlWriter,dc:&RFindCtx, fm:&codemap::FileMap,nim:&
 
 
 			let mut curr_file=def_tfp.file_index;
-
 			let  mut refs2=refs.iter()
 				.filter(|&id|{nim.find(id).is_some()})
 				.transform(|&id|{
@@ -631,26 +634,34 @@ fn write_references(doc:&mut HtmlWriter,dc:&RFindCtx, fm:&codemap::FileMap,nim:&
 	}
 
 	fn write_refs_header(doc:&mut HtmlWriter,dc:&RFindCtx,nim:&FNodeInfoMap, fm:&codemap::FileMap, nid:ast::NodeId) {
-		doc.writeln("");
-		let info=nim.find(&nid).unwrap();
-		let ifp=byte_pos_to_index_file_pos(dc.tycx, info.span.lo).unwrap();
-		let ifpe=byte_pos_to_index_file_pos(dc.tycx, info.span.hi).unwrap();
-//		let def_info=nim.find(&nid).unwrap();
-//		let ifpe=get_node_index_file_pos(dc,nim,nid).unwrap();
 
-		doc.begin_tag_anchor(ifp.line.to_str()+"_"+ifp.col.to_str() + "_refs" );
-		doc.begin_tag_link( make_html_name(fm.name)+"#"+(ifp.line+1).to_str());
-		doc.begin_tag("c24");
-		doc.writeln(dc.sess.codemap.files[ifp.file_index].name+":"+(ifp.line+1).to_str()+":"+ifp.col.to_str()
-					+"-"+(ifpe.line+1).to_str()+":"+ifpe.col.to_str() +" -" +info.kind + "- definition:");
-		doc.end_tag();
-		doc.begin_tag("pr");
-//			dump!(def_tfp);
-		doc.writeln(get_source_line(fm,ifp.line) );
-		doc.writeln(get_source_line(fm,ifp.line+1) );
-		doc.end_tag();
-		doc.end_tag();
-		doc.end_tag();
+		doc.writeln("");
+		match nim.find(&nid) {
+			None=>{},
+			Some(info)=>{
+				let oifp=byte_pos_to_index_file_pos(dc.tycx, info.span.lo);//.unwrap();
+				let oifpe=byte_pos_to_index_file_pos(dc.tycx, info.span.hi);//.unwrap();
+				if (oifp.is_some() && oifpe.is_some())==false{ return;}
+				let ifp=oifp.unwrap();
+				let ifpe=oifp.unwrap();
+	//		let def_info=nim.find(&nid).unwrap();
+	//		let ifpe=get_node_index_file_pos(dc,nim,nid).unwrap();
+
+				doc.begin_tag_anchor(ifp.line.to_str()+"_"+ifp.col.to_str() + "_refs" );
+				doc.begin_tag_link( make_html_name(fm.name)+"#"+(ifp.line+1).to_str());
+				doc.begin_tag("c24");
+				doc.writeln(dc.sess.codemap.files[ifp.file_index].name+":"+(ifp.line+1).to_str()+":"+ifp.col.to_str()
+							+"-"+(ifpe.line+1).to_str()+":"+ifpe.col.to_str() +" -" +info.kind + "- definition:");
+				doc.end_tag();
+				doc.begin_tag("pr");
+		//			dump!(def_tfp);
+				doc.writeln(get_source_line(fm,ifp.line) );
+				doc.writeln(get_source_line(fm,ifp.line+1) );
+				doc.end_tag();
+				doc.end_tag();
+				doc.end_tag();
+			}
+		}
 	}
 
 	fn write_file_ref(doc:&mut HtmlWriter, dc:&RFindCtx,fi:uint) {
