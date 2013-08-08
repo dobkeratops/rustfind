@@ -1,4 +1,3 @@
-use find_ast_node::*;
 use syntax::codemap;
 use syntax::ast;
 use ioutil::*;
@@ -6,8 +5,11 @@ use htmlwriter::*;
 use std::hashmap::*;
 use std::vec;
 use extra::sort;
+use codemaput::*;
+use find_ast_node::*;
+use syntax::*;
 
-pub fn make_html(dc:&DocContext, fm:&codemap::FileMap,nim:&FNodeInfoMap,jdm:&JumpToDefMap, jrm:&JumpToRefMap, nodes_per_line:&[~[ast::NodeId]])->~str {
+pub fn make_html(dc:&RFindCtx, fm:&codemap::FileMap,nim:&FNodeInfoMap,jdm:&JumpToDefMap, jrm:&JumpToRefMap, nodes_per_line:&[~[ast::NodeId]])->~str {
 	// todo - Rust2HtmlCtx { fm,nim,jdm,jrm } .. cleanup common intermediates
 	let mut doc= HtmlWriter::new::();
 	write_head(&mut doc);
@@ -44,7 +46,7 @@ pub fn make_html(dc:&DocContext, fm:&codemap::FileMap,nim:&FNodeInfoMap,jdm:&Jum
 	doc.doc
 }
 
-pub fn write_source_as_html_sub(dc:&DocContext, nim:&FNodeInfoMap,ndn:&HashMap<ast::NodeId,ast::def_id>, jdm:&JumpToDefMap) {
+pub fn write_source_as_html_sub(dc:&RFindCtx, nim:&FNodeInfoMap,ndn:&HashMap<ast::NodeId,ast::def_id>, jdm:&JumpToDefMap) {
 	
 	let npl=NodesPerLinePerFile::new(dc,nim);
 	let mut def2refs = ~MultiMap::new();
@@ -147,7 +149,7 @@ struct NodesPerLinePerFile {
 }
 //type NodesPerLine=&[~[ast::NodeId]];
 
-pub fn get_file_index(dc:&DocContext,fname:&str)->Option<uint> {
+pub fn get_file_index(dc:&RFindCtx,fname:&str)->Option<uint> {
 	// todo - functional
 	let mut index=0;
 	while index<dc.sess.codemap.files.len() {
@@ -158,7 +160,7 @@ pub fn get_file_index(dc:&DocContext,fname:&str)->Option<uint> {
 }
 
 impl NodesPerLinePerFile {
-	fn new(dc:&DocContext, nim:&FNodeInfoMap)->~NodesPerLinePerFile {
+	fn new(dc:&RFindCtx, nim:&FNodeInfoMap)->~NodesPerLinePerFile {
 		// todo, figure this out functionally?!
 		//		dc.sess.codemap.files.map(
 		//				|fm:&@codemap::FileMap|{ vec::from_elem(fm.lines.len(), ~[]) }
@@ -260,7 +262,7 @@ fn text_here_is(line:&str, pos:uint,reftext:&str, color:int)->int {
 	return color;
 }
 
-fn insert_links_in_line(dc:&DocContext,fm:&codemap::FileMap, nim:&FNodeInfoMap,jdm:&JumpToDefMap, jrm:&JumpToRefMap, line:&str, nodes:&[ast::NodeId],line_index:uint)->~str {
+fn insert_links_in_line(dc:&RFindCtx,fm:&codemap::FileMap, nim:&FNodeInfoMap,jdm:&JumpToDefMap, jrm:&JumpToRefMap, line:&str, nodes:&[ast::NodeId],line_index:uint)->~str {
 
 	let node_infos=nodes.map(|id|{nim.find(id)});
 //	for x in node_infos.iter() { println(fmt!("%?", x));}
@@ -472,7 +474,7 @@ fn get_source_line(fm:&codemap::FileMap, i:uint)->~str {
 //fn split_by_key<T,K>(src:&[T],f:&fn(t:&T)->K)->(K,[&T])] {
 //}
 
-fn write_references(doc:&mut HtmlWriter,dc:&DocContext, fm:&codemap::FileMap,nim:&FNodeInfoMap,jdm:&JumpToDefMap,jrm:&JumpToRefMap, nodes_per_line:&[~[ast::NodeId]]) {
+fn write_references(doc:&mut HtmlWriter,dc:&RFindCtx, fm:&codemap::FileMap,nim:&FNodeInfoMap,jdm:&JumpToDefMap,jrm:&JumpToRefMap, nodes_per_line:&[~[ast::NodeId]]) {
 	doc.write_tag("div");
 	let file_def_nodes = find_defs_in_file(fm,nim);
 	//let mut defs_to_refs=MultiMap::new::<ast::NodeId, ast::NodeId>();
@@ -574,7 +576,7 @@ fn write_references(doc:&mut HtmlWriter,dc:&DocContext, fm:&codemap::FileMap,nim
 		}
 	}
 
-	fn write_refs_header(doc:&mut HtmlWriter,dc:&DocContext,nim:&FNodeInfoMap, fm:&codemap::FileMap, nid:ast::NodeId) {
+	fn write_refs_header(doc:&mut HtmlWriter,dc:&RFindCtx,nim:&FNodeInfoMap, fm:&codemap::FileMap, nid:ast::NodeId) {
 		doc.writeln("");
 		let info=nim.find(&nid).unwrap();
 		let ifp=byte_pos_to_index_file_pos(dc.tycx, info.span.lo).unwrap();
@@ -597,7 +599,7 @@ fn write_references(doc:&mut HtmlWriter,dc:&DocContext, fm:&codemap::FileMap,nim
 		doc.end_tag();
 	}
 
-	fn write_file_ref(doc:&mut HtmlWriter, dc:&DocContext,fi:uint) {
+	fn write_file_ref(doc:&mut HtmlWriter, dc:&RFindCtx,fi:uint) {
 		let fname = dc.tycx.sess.codemap.files[fi].name;
 		doc.begin_tag_link( change_file_name_ext(fname, "html"));
 		doc.begin_tag("c24");
@@ -612,7 +614,7 @@ fn write_references(doc:&mut HtmlWriter,dc:&DocContext, fm:&codemap::FileMap,nim
 // things that are robust when some source changes, etc.
 // file_index:line_index:col_index:length
 
-fn get_node_index_file_pos(dc:&DocContext,nim:&FNodeInfoMap,nid:ast::NodeId)->IndexFilePos {
+fn get_node_index_file_pos(dc:&RFindCtx,nim:&FNodeInfoMap,nid:ast::NodeId)->IndexFilePos {
 	let ni=nim.find(&nid).unwrap();
 	byte_pos_to_index_file_pos(dc.tycx,ni.span.lo).unwrap()
 }

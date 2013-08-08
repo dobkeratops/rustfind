@@ -16,7 +16,7 @@ use syntax::visit;
 use syntax::parse::token;
 use syntax::visit::*;
 use syntax::visit::{Visitor, fn_kind};
-use find_ast_node::*;
+use self::find_ast_node::*;
 use text_formatting::*;
 use syntax::diagnostic;
 use syntax::codemap::BytePos;
@@ -32,12 +32,14 @@ use std::local_data;
 use extra::json::ToJson;
 
 use rust2html::*;
+use codemaput::*;
 
-mod text_formatting;
-mod ioutil;
-mod find_ast_node;
-mod htmlwriter;
-mod rust2html;
+pub mod find_ast_node;
+pub mod text_formatting;
+pub mod ioutil;
+pub mod htmlwriter;
+pub mod rust2html;
+pub mod codemaput;
 
 enum ShowDefMode {
 	SDM_Line=0,
@@ -46,7 +48,33 @@ enum ShowDefMode {
 	SDM_GeditCmd=3
 }
 
-pub fn build_jump_to_def_map(dc:&DocContext, nim:@mut FNodeInfoMap,nd:&HashMap<ast::NodeId,ast::def_id>)->~JumpToDefMap{
+fn dump_json(dc:&RFindCtx) {
+	// TODO: full/partial options - we currently wwrite out all the nodes we find.
+	// need option to only write out nodes that map to definitons. 
+	println("{");
+	println("\tcode_map:[");
+//	for dc.sess.codemap.files.iter().advance |f| {
+	for f in dc.sess.codemap.files.iter() {
+		print("\t\t{ name:\""+f.name+"\",\tstart_pos:"+f.start_pos.to_str()+
+			",\tlines:[\n"+ flatten_to_str(*f.lines, |&x|{*x} ,",") +
+			"\n\t\t]\n\t},\n");
+	}
+	println("\t]");
+	println("\tnode_spans:");
+	let nim=build_node_info_map(dc.crate);
+	let node_def_node = build_node_def_node_table(dc);
+	let jdm=build_jump_to_def_map(dc,nim,node_def_node);
+	println(nim.to_json_str());	
+	println(",");
+	println("\tnode_defs [\n");
+	println(jdm.to_json_str());
+	println("\t],\n");
+	println("\tdef_ids:");
+	println(node_def_node.to_json_str());
+	println("}");
+}
+
+pub fn build_jump_to_def_map(dc:&RFindCtx, nim:@mut FNodeInfoMap,nd:&HashMap<ast::NodeId,ast::def_id>)->~JumpToDefMap{
 // todo: NodeId->AStNode  .. lookup_def_ inner functionality extracted
 	let mut jdm=~HashMap::new();
 	for (k,_) in nim.iter() {
@@ -69,7 +97,7 @@ pub fn build_jump_to_def_map(dc:&DocContext, nim:@mut FNodeInfoMap,nd:&HashMap<a
 }
 
 
-pub static ctxtkey: local_data::Key<@DocContext> = &local_data::Key;
+pub static ctxtkey: local_data::Key<@RFindCtx> = &local_data::Key;
 
 pub macro_rules! if_some {
 	($b:ident in $a:expr then $c:expr)=>(
@@ -185,7 +213,7 @@ struct HrcNode<NODE> {
 
 /// tags: crate,ast,parse resolve
 /// Parses, resolves the given crate
-fn get_ast_and_resolve(cpath: &Path, libs: ~[Path]) -> DocContext {
+fn get_ast_and_resolve(cpath: &std::path::PosixPath, libs: ~[std::path::PosixPath]) -> RFindCtx {
 	
 
 
@@ -223,7 +251,7 @@ fn get_ast_and_resolve(cpath: &Path, libs: ~[Path]) -> DocContext {
 	let ca=driver::driver::phase_3_run_analysis_passes(sess,crate2);  
 //	let c=crate.unwrap();
 //	let t=tycx.unwrap();
-    DocContext { crate: crate2, tycx: ca.ty_cx, sess: sess, ca:ca }
+    RFindCtx { crate: crate2, tycx: ca.ty_cx, sess: sess, ca:ca }
 }
 fn get_filename_only(fnm:&str)->~str {
 	let toks:~[&str]=fnm.split_iter(':').collect();
@@ -264,37 +292,13 @@ fn flatten_to_str<T,U:ToStr>(xs:&[T],f:&fn(x:&T)->U, sep:&str)->~str {
 	acc
 }
 
-fn dump_json(dc:&DocContext) {
-	// TODO: full/partial options - we currently wwrite out all the nodes we find.
-	// need option to only write out nodes that map to definitons. 
-	println("{");
-	println("\tcode_map:[");
-//	for dc.sess.codemap.files.iter().advance |f| {
-	for f in dc.sess.codemap.files.iter() {
-		print("\t\t{ name:\""+f.name+"\",\tstart_pos:"+f.start_pos.to_str()+
-			",\tlines:[\n"+ flatten_to_str(*f.lines, |&x|{*x} ,",") +
-			"\n\t\t]\n\t},\n");
-	}
-	println("\t]");
-	println("\tnode_spans:");
-	let nim=build_node_info_map(dc.crate);
-	let node_def_node = build_node_def_node_table(dc);
-	let jdm=build_jump_to_def_map(dc,nim,node_def_node);
-	println(nim.to_json_str());	
-	println(",");
-	println("\tnode_defs [\n");
-	println(jdm.to_json_str());
-	println("\t],\n");
-	println("\tdef_ids:");
-	println(node_def_node.to_json_str());
-	println("}");
-}
 
 
 
 
 
-fn lookup_def_at_file_line_pos_old(dc:&DocContext,filepos:&str, show_all:ShowDefMode)->Option<~str> {
+
+fn lookup_def_at_file_line_pos_old(dc:&RFindCtx,filepos:&str, show_all:ShowDefMode)->Option<~str> {
 
 	let toks:~[&str]=filepos.split_iter(':').collect();
 	if toks.len()<3 { return None }
@@ -316,27 +320,27 @@ fn lookup_def_at_file_line_pos_old(dc:&DocContext,filepos:&str, show_all:ShowDef
 }
 
 
-pub fn lookup_def_at_text_file_pos(dc:&DocContext, tfp:&TextFilePos, show_mode:ShowDefMode)->Option<~str> {
+pub fn lookup_def_at_text_file_pos(dc:&RFindCtx, tfp:&TextFilePos, show_mode:ShowDefMode)->Option<~str> {
 	match text_file_pos_to_byte_pos(dc.tycx, tfp) {
 		None=>None,
 		Some(bp)=>lookup_def_at_byte_pos(dc,bp,show_mode)
 	}
 }
 
-pub fn lookup_def_at_text_file_pos_str(dc:&DocContext,file_pos_str:&str, show_mode:ShowDefMode)->Option<~str> {
+pub fn lookup_def_at_text_file_pos_str(dc:&RFindCtx,file_pos_str:&str, show_mode:ShowDefMode)->Option<~str> {
 	match byte_pos_from_text_file_pos_str(dc,file_pos_str) {
 		None=>None,
 		Some(bp)=>lookup_def_at_byte_pos(dc,bp,show_mode),
 	}
 }
 
-pub fn node_id_from_text_file_pos_str(dc:&DocContext, file_pos_str:&str)->Option<ast::NodeId> {
+pub fn node_id_from_text_file_pos_str(dc:&RFindCtx, file_pos_str:&str)->Option<ast::NodeId> {
 	match node_from_text_file_pos_str(dc, file_pos_str) {
 		None=>None,
 		Some(an)=>an.get_id()
 	}
 }
-pub fn node_from_text_file_pos_str(dc:&DocContext, file_pos_str:&str)->Option<find_ast_node::AstNode> {
+pub fn node_from_text_file_pos_str(dc:&RFindCtx, file_pos_str:&str)->Option<find_ast_node::AstNode> {
 	match byte_pos_from_text_file_pos_str(dc,file_pos_str) {
 		Some(bp)=>{let ndt=find_node_tree_loc_at_byte_pos(dc.crate,bp);Some(ndt.last().clone())},
 		None=>None
@@ -344,7 +348,7 @@ pub fn node_from_text_file_pos_str(dc:&DocContext, file_pos_str:&str)->Option<fi
 }
 
 
-pub fn lookup_def_at_byte_pos(dc:&DocContext, bp:BytePos, m:ShowDefMode)->Option<~str> {
+pub fn lookup_def_at_byte_pos(dc:&RFindCtx, bp:BytePos, m:ShowDefMode)->Option<~str> {
 	let ndt=find_ast_node::find_node_tree_loc_at_byte_pos(dc.crate,bp);
 	lookup_def_of_node_tree_loc(dc,&ndt,m)
 }
@@ -425,18 +429,18 @@ fn some_or_else<T:Clone>(opt:&Option<T>,fallback_value:&T)->T {
 	}
 }
 
-fn lookup_def_of_node_tree_loc(dc:&DocContext,node_tree_loc:&NodeTreeLoc,m:ShowDefMode)->Option<~str> {
+fn lookup_def_of_node_tree_loc(dc:&RFindCtx,node_tree_loc:&NodeTreeLoc,m:ShowDefMode)->Option<~str> {
 	lookup_def_of_node(dc,node_tree_loc.last(),m)
 }
 
-fn lookup_def_of_node(dc:&DocContext,node:&AstNode,m:ShowDefMode)->Option<~str> {
+fn lookup_def_of_node(dc:&RFindCtx,node:&AstNode,m:ShowDefMode)->Option<~str> {
 	println("def of node:"+node.get_id().get_or_default(0).to_str());
 	let node_spans=build_node_info_map(dc.crate);
 	let node_def_node = build_node_def_node_table(dc);
 	lookup_def_of_node_sub(dc,node,m,node_spans,node_def_node)
 }
 
-fn lookup_def_node_of_node(dc:&DocContext,node:&AstNode, node_spans:&FNodeInfoMap, node_def_node:&HashMap<ast::NodeId,ast::def_id>)->Option<ast::NodeId> {
+fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, node_spans:&FNodeInfoMap, node_def_node:&HashMap<ast::NodeId,ast::def_id>)->Option<ast::NodeId> {
 	
 	match *node {
 		astnode_expr(e)=>match e.node {
@@ -501,11 +505,11 @@ fn lookup_def_node_of_node(dc:&DocContext,node:&AstNode, node_spans:&FNodeInfoMa
 	return None;
 }
 
-fn lookup_def_of_node_sub(dc:&DocContext,node:&AstNode,m:ShowDefMode,node_spans:&FNodeInfoMap, node_def_node:&HashMap<ast::NodeId,ast::def_id>)->Option<~str> {
+fn lookup_def_of_node_sub(dc:&RFindCtx,node:&AstNode,m:ShowDefMode,node_spans:&FNodeInfoMap, node_def_node:&HashMap<ast::NodeId,ast::def_id>)->Option<~str> {
 	// TODO - cache outside?
 
 
-	fn mk_result(dc:&DocContext,  m:ShowDefMode, node_spans:&FNodeInfoMap, def_node_id:ast::NodeId, extra_str:&str)->Option<~str> {
+	fn mk_result(dc:&RFindCtx,  m:ShowDefMode, node_spans:&FNodeInfoMap, def_node_id:ast::NodeId, extra_str:&str)->Option<~str> {
 		match node_spans.find(&def_node_id) {
 			None=>None,
 			Some(def_info)=>{
@@ -551,14 +555,12 @@ fn get_file_line_str(cx:ty::ctxt, filename:&str, src_line:uint)->~str {
 			} else {
 				*fm.lines[src_line]
 			};
-
 		}
 	}
 	return ~"";
-	
 }
 
-fn get_source_loc(dc:&DocContext, pos:codemap::BytePos)->codemap::Loc {
+fn get_source_loc(dc:&RFindCtx, pos:codemap::BytePos)->codemap::Loc {
 	dc.tycx.sess.codemap.lookup_char_pos(pos)
 }
 fn loc_to_str(loc:codemap::Loc)->~str {
@@ -573,7 +575,7 @@ pub fn dump_node_source_for_single_file_only(text:&[u8], ns:&FNodeInfoMap, id:as
 	}
 }
 
-// TODO- this should return a slice
+// TODO- this should return a slice?
 pub fn get_node_source(c:ty::ctxt, ns:&FNodeInfoMap, id:ast::NodeId)->~str {
 	match (ns.find(&id)){
 		None=>~"",
@@ -601,7 +603,7 @@ pub fn dump_span(text:&[u8], sp:&codemap::span) {
 }
 
 
-pub fn def_info_from_node_id<'a,'b>(dc:&'a DocContext, node_info:&'b FNodeInfoMap, id:ast::NodeId)->(int,Option<&'b FNodeInfo>) {
+pub fn def_info_from_node_id<'a,'b>(dc:&'a RFindCtx, node_info:&'b FNodeInfoMap, id:ast::NodeId)->(int,Option<&'b FNodeInfo>) {
 	let crate_num=0;
 	match dc.tycx.def_map.find(&id) { // finds a def..
 		Some(a)=>{
@@ -621,7 +623,7 @@ pub fn def_info_from_node_id<'a,'b>(dc:&'a DocContext, node_info:&'b FNodeInfoMa
 // see: tycx.node_types:node_type_table:HashMap<id,t>
 // 't'=opaque ptr, ty::get(:t)->t_box_ to resolve it
 
-pub fn dump_ctxt_def_map(dc:&DocContext) {
+pub fn dump_ctxt_def_map(dc:&RFindCtx) {
 //	let a:()=ctxt.tycx.node_types
 	logi!("===Test ctxt def-map table..===");
 	for (key,value) in dc.tycx.def_map.iter(){
@@ -701,7 +703,7 @@ pub fn text_span<'a,'b>(text:&'a [u8],s:&'b codemap::span)->&'a[u8] {
 	text.slice(*s.lo,*s.hi)
 }
 
-pub fn build_node_def_node_table(dc:&DocContext)->~HashMap<ast::NodeId, ast::def_id>
+pub fn build_node_def_node_table(dc:&RFindCtx)->~HashMap<ast::NodeId, ast::def_id>
 {
 	let mut r=~HashMap::new();
 	let curr_crate_id_hack=0;	// TODO WHAT IS CRATE ID REALLY?!
@@ -720,7 +722,7 @@ pub fn build_node_def_node_table(dc:&DocContext)->~HashMap<ast::NodeId, ast::def
 	r
 }
 
-pub fn def_node_id_from_node_id(dc:&DocContext, id:ast::NodeId)->ast::NodeId {
+pub fn def_node_id_from_node_id(dc:&RFindCtx, id:ast::NodeId)->ast::NodeId {
 	let crate_num=0;	// TODO - whats crate Id really???
 	match dc.tycx.def_map.find(&id) { // finds a def..
 		Some(a)=>{
@@ -734,7 +736,7 @@ pub fn def_node_id_from_node_id(dc:&DocContext, id:ast::NodeId)->ast::NodeId {
 }
 
 
-fn debug_test(dc:&DocContext) {
+fn debug_test(dc:&RFindCtx) {
 
 	// TODO: parse commandline source locations,convert to codemap locations
 	//dump!(ctxt.tycx);
@@ -811,11 +813,11 @@ fn debug_test(dc:&DocContext) {
 	
 }
 
-fn first_file_name(dc:&DocContext)->~str {
+fn first_file_name(dc:&RFindCtx)->~str {
 	dc.tycx.sess.codemap.files[0].name.to_str() // clone?
 }
 
-fn find_file_name_in(dc:&DocContext,fname:&str)->Option<~str> {
+fn find_file_name_in(dc:&RFindCtx,fname:&str)->Option<~str> {
 	// todo subsequence match..
 	// TODO - is there an existing way of doing this, "index_of.." ..contains()..?
 	for f in dc.tycx.sess.codemap.files.iter() {
@@ -824,7 +826,7 @@ fn find_file_name_in(dc:&DocContext,fname:&str)->Option<~str> {
 	None
 }
 
-pub fn rustfind_interactive(dc:&DocContext) {
+pub fn rustfind_interactive(dc:&RFindCtx) {
 	// TODO - check if RUSTI can already do this.. it would be better there IMO
 	let node_spans=build_node_info_map(dc.crate);
 
@@ -863,16 +865,15 @@ pub fn rustfind_interactive(dc:&DocContext) {
 	}
 }
 
-pub fn def_of_symbol_to_str(dc:&DocContext, ns:&FNodeInfoMap,ds:&HashMap<ast::NodeId, ast::def_id>,s:&str)->~str {
+pub fn def_of_symbol_to_str(dc:&RFindCtx, ns:&FNodeInfoMap,ds:&HashMap<ast::NodeId, ast::def_id>,s:&str)->~str {
 	~"TODO"	
 }
 
-pub fn write_source_as_html(dc:&DocContext) {
+pub fn write_source_as_html(dc:&RFindCtx) {
 	let nim=build_node_info_map(dc.crate);
 	let ndm = build_node_def_node_table(dc);
 	let jdm=build_jump_to_def_map(dc,nim,ndm);
 	rust2html::write_source_as_html_sub(dc,nim,ndm,jdm);
-
 }
 
 

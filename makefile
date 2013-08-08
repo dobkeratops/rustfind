@@ -23,7 +23,7 @@ test : rustfind
 	firefox test_input.html
 
 
-rustfind: rustfind.rs rsfind.rs find_ast_node.rs astdump.rs text_formatting.rs rust2html.rs htmlwriter.rs
+rustfind: rustfind.rs rsfind.rs find_ast_node.rs astdump.rs text_formatting.rs rust2html.rs htmlwriter.rs codemaput.rs interactive.rs 
 	rustc rustfind.rs
 
 
