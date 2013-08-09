@@ -455,7 +455,6 @@ fn write_line_with_links(outp:&mut HtmlWriter,dc:&RFindCtx,fm:&codemap::FileMap,
 		}
 	}
 	
-	
 	// emit a span..
 	let mut x=0;
 	let mut curr_col=-1;
