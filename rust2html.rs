@@ -272,6 +272,12 @@ fn is_alphanumeric(c:char)->bool {
 		_=>false
 	}
 }
+fn is_alphanumeric_u8(c:u8)->bool {
+	match c as char{
+		'a' ..'z'|'A'..'Z'|'0'..'9'|'_'=>true,
+		_=>false
+	}
+}
 type ColorIndex=int;
 /// todo .. option type!!!
 fn is_text_here(line:&str, pos:uint,reftext:&str, color:ColorIndex)->Option<(ColorIndex,uint)> {
@@ -291,15 +297,20 @@ fn is_text_here(line:&str, pos:uint,reftext:&str, color:ColorIndex)->Option<(Col
 
 fn sub_match(mut line:&str,x:uint,opts:&[&str])->Option<(uint,uint)>{
 	let mut smp=x;
-	if is_alphanumeric(line[smp] as char)==false{ return None;} // not alpha
+	if is_alphanumeric_u8(line[smp])==false{ return None;} // not alpha
 	let mut opti=0;
+	if line.is_char_boundary(x)==false { return None; }
 	for o in opts.iter() {
 		if (o.len()+x)>line.len() {loop;} // not enough chars in line
 		if (o.len()+x+1)<line.len() {
-			if is_alphanumeric(line[o.len()+x] as char) {loop;}// not word boundary for this one
+			if is_alphanumeric_u8(line[o.len()+x]) {loop;}// not word boundary for this one
 		}
-		if line.slice(x,o.len()+x) == o.slice(0,o.len()) {
-			return Some((opti,o.len()));
+
+		let ex=o.len()+x;
+		if line.is_char_boundary(ex) {
+			if line.slice(x,ex) == o.slice(0,o.len()) {
+				return Some((opti,o.len()));
+			}
 		}
 		opti+=1;
 		
@@ -430,7 +441,7 @@ fn write_line_with_links(outp:&mut HtmlWriter,dc:&RFindCtx,fm:&codemap::FileMap,
 					}
 				}
 			} else {
-				wb= !is_alphanumeric(line[x] as char);
+				wb= !is_alphanumeric_u8(line[x]);
 			}
 			x+=1;
 		}
@@ -447,7 +458,7 @@ fn write_line_with_links(outp:&mut HtmlWriter,dc:&RFindCtx,fm:&codemap::FileMap,
 					}
 				}
 			}
-			if is_alphanumeric(line[x] as char) {wb=false}
+			if is_alphanumeric_u8(line[x]) {wb=false}
 			x+=1;
 		}
 
@@ -460,19 +471,20 @@ fn write_line_with_links(outp:&mut HtmlWriter,dc:&RFindCtx,fm:&codemap::FileMap,
 					let mut comment_color=24;
 					if x<line.len()-2 { if line[x+2]as char=='/' { comment_color=32 }}// doc-comments are a bit brighter
 					let mut slc=false;
-					if line[x+1]=='*' as u8 {multiline_comment_depth+=1;} else {slc=true;}
+					if line[x]=='/' as u8 && line[x+1]=='*' as u8 {multiline_comment_depth+=1;} else {slc=true;}
 					while x<line.len() && (slc || multiline_comment_depth>0){
 						color[x]=comment_color;
 						link[x]=0;
 						
 						x+=1;
-						if line[if x>2{x-2}else{0}]=='*' as u8 && line[x-1]=='/' as u8 {multiline_comment_depth-=1;}
+						if line[if x>=2{x-2}else{0}]=='*' as u8 && line[x-1]=='/' as u8 {multiline_comment_depth-=1;}
 					}
 				}
 			}
 			x+=1;
 		}
 	}
+
 	// emit a span..
 	let mut x=0;
 	let no_color=-1;

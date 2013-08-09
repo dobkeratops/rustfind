@@ -41,6 +41,10 @@ pub mod htmlwriter;
 pub mod rust2html;
 pub mod codemaput;
 
+/*
+  test multiline
+  */
+
 #[deriving(Clone, Eq, Encodable, Decodable)]
 enum ShowDefMode {
 	SDM_Line=0,
