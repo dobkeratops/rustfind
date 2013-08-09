@@ -211,7 +211,7 @@ fn main() {
 		// Dump as html..
 		if opt_present(&matches,"w") || !(done) {
 			println("Creating HTML pages from source:-");
-			write_source_as_html(dc);
+			write_source_as_html(dc,rust2html::DefaultOptions);
 			println("Creating HTML pages from source.. done");
 		}
 
@@ -842,11 +842,11 @@ pub fn def_of_symbol_to_str(dc:&RFindCtx, ns:&FNodeInfoMap,ds:&HashMap<ast::Node
 	~"TODO"	
 }
 
-pub fn write_source_as_html(dc:&RFindCtx) {
+pub fn write_source_as_html(dc:&RFindCtx,opts:uint) {
 	let nim=build_node_info_map(dc.crate);
 	let ndm = build_node_def_node_table(dc);
 	let jdm=build_jump_to_def_map(dc,nim,ndm);
-	rust2html::write_source_as_html_sub(dc,nim,ndm,jdm);
+	rust2html::write_source_as_html_sub(dc,nim,ndm,jdm,opts);
 }
 
 

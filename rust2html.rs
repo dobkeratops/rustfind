@@ -23,11 +23,16 @@ use syntax::*;
 // and link to their *nodes* instead of source-lines? or would the spans still work?
 // we could give the whole generator a root dir to look for crates? ... and assume html is generated in there..
 
-pub fn make_html(dc:&RFindCtx, fm:&codemap::FileMap,nim:&FNodeInfoMap,jdm:&JumpToDefMap, jrm:&JumpToRefMap, nodes_per_line:&[~[ast::NodeId]])->~str {
+pub static WriteFilePath:uint	=0x0001;
+pub static WriteReferences:uint	=0x0002;
+pub static DefaultOptions:uint 	=WriteFilePath | WriteReferences;
+// todo: options struct.
+
+pub fn make_html(dc:&RFindCtx, fm:&codemap::FileMap,nim:&FNodeInfoMap,jdm:&JumpToDefMap, jrm:&JumpToRefMap, nodes_per_line:&[~[ast::NodeId]],options:uint)->~str {
 	// todo - Rust2HtmlCtx { fm,nim,jdm,jrm } .. cleanup common intermediates
 	let mut doc= HtmlWriter::new::();
 	write_head(&mut doc);
-	write_styles(&mut doc,fm.name);
+	write_styles(&mut doc, fm.name);
 
 	let hash=get_str_hash(fm.name);
 	let bg=(~[~"383838",~"34383c",~"3c3834",~"383c34",~"343c38",~"38343c",~"3a343a",
@@ -38,6 +43,10 @@ pub fn make_html(dc:&RFindCtx, fm:&codemap::FileMap,nim:&FNodeInfoMap,jdm:&JumpT
 	let mut line=0;
 	let fstart = *fm.start_pos;
 	let max_digits=num_digits(fm.lines.len());
+	
+	if options & WriteFilePath!=0 {
+		write_path_links(&mut doc,fm.name);
+	}
 
 	let mut multiline_comment_depth=0;	//todo: general purpose state object.
 	while line<fm.lines.len() {
@@ -55,7 +64,9 @@ pub fn make_html(dc:&RFindCtx, fm:&codemap::FileMap,nim:&FNodeInfoMap,jdm:&JumpT
 //		doc.writeln(markup_line);
 		line+=1;
 	}
-	write_references(&mut doc,dc,fm,nim,jdm,jrm, nodes_per_line);
+	if options & WriteReferences!=0{
+		write_references(&mut doc,dc,fm,nim,jdm,jrm, nodes_per_line);
+	}
 	
 	doc.end_tag();
 	doc.end_tag();
@@ -63,7 +74,7 @@ pub fn make_html(dc:&RFindCtx, fm:&codemap::FileMap,nim:&FNodeInfoMap,jdm:&JumpT
 	doc.doc
 }
 
-pub fn write_source_as_html_sub(dc:&RFindCtx, nim:&FNodeInfoMap,ndn:&HashMap<ast::NodeId,ast::def_id>, jdm:&JumpToDefMap) {
+pub fn write_source_as_html_sub(dc:&RFindCtx, nim:&FNodeInfoMap,ndn:&HashMap<ast::NodeId,ast::def_id>, jdm:&JumpToDefMap,options:uint) {
 	
 	let npl=NodesPerLinePerFile::new(dc,nim);
 	let mut def2refs = ~MultiMap::new();
@@ -75,7 +86,7 @@ pub fn write_source_as_html_sub(dc:&RFindCtx, nim:&FNodeInfoMap,ndn:&HashMap<ast
 	let mut fi=0;
 	for fm in dc.sess.codemap.files.iter() {
 		println("generating "+make_html_name(fm.name)+"..");
-		let doc_str=make_html(dc, *fm, nim,jdm, def2refs, npl.m[fi]);
+		let doc_str=make_html(dc, *fm, nim,jdm, def2refs, npl.m[fi],options);
 		fileSaveStr(doc_str,make_html_name(fm.name));
 		fi+=1;
 	}
@@ -239,7 +250,7 @@ pub fn node_color_index(ni:&FNodeInfo)->int {
 		~"de"=>4,
 		~"type_param"=>5,
 		~"struct_field"|~"field"=>6,
-		~"keyword"|~"while"|~"match"|~"loop"|~"do"|~"cast"|~"if"|~"return"=>7,
+		~"keyword"|~"while"|~"match"|~"loop"|~"do"|~"cast"|~"if"|~"return"|~"unsafe"|~"extern"|~"as"|~"in"|~"for"=>7,
 		~"path"=>8,
 		~"call"=>9,
 		~"method_call"=>10,
@@ -449,7 +460,7 @@ fn write_line_with_links(outp:&mut HtmlWriter,dc:&RFindCtx,fm:&codemap::FileMap,
 		x=0; wb=true;
 		while x<line.len() {
 			if wb {
-				match sub_match(line,x,&[&"let",&"mut", &"const", &"use", &"mod", &"match",&"if",&"else",&"break",&"return",&"while",&"loop","for","do","ref","pub","priv"]) {
+				match sub_match(line,x,&[&"let",&"mut", &"const", &"use", &"mod", &"match",&"if",&"else",&"break",&"return",&"while",&"loop",&"for",&"do",&"ref",&"pub",&"priv",&"unsafe",&"extern",&"in",&"as"]) {
 				None=>{},
 				Some((ix,len))=>{
 					let me=x+len;
@@ -656,7 +667,7 @@ fn write_references(doc:&mut HtmlWriter,dc:&RFindCtx, fm:&codemap::FileMap,nim:&
 
 		let refs = jrm.find(dn);
 		let max_links=30;	// todo - sort..
-		let max_short_links=0;	// todo - sort..
+		let max_short_links=60;	// todo - sort..
 
 		
 		if refs.len()>0 {
@@ -790,10 +801,33 @@ fn write_references(doc:&mut HtmlWriter,dc:&RFindCtx, fm:&codemap::FileMap,nim:&
 		doc.writeln(""+fname + ":");
 		doc.end_tag();
 	}
-
 }
 
+fn write_path_links(doc:&mut HtmlWriter, file_name:&str) {
+	doc.writeln("");
+	let file_path_col=&"c0";
+	let file_delim_col=&"c1";
+	let name_parts = file_name.split_iter('/').to_owned_vec();
+	let num_dirs=name_parts.len()-1;
+	let mut link_target=~"./";
+	
 
+	for x in range(0,num_dirs) {link_target.push_str("../");}
+	doc.begin_tag_link(link_target).write("    ./").end_tag();
+
+	for (i,x) in name_parts.iter().enumerate() {
+		let is_dir = i < num_dirs;
+		link_target.push_str(*x);
+		if is_dir {link_target.push_str("/");}
+		else { link_target.push_str(".html");}
+		doc.begin_tag(file_path_col);
+		doc.begin_tag_link(link_target); doc.write(*x);
+		doc.end_tag();
+		if is_dir {doc.write_tagged(file_delim_col,"/");}
+	}
+	doc.writeln("");
+	doc.writeln("");
+}
 
 // TODO: a span index should uniquely identify the node.
 // This adress form is a reasonable compromise between things we can see,
