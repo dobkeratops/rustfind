@@ -39,6 +39,7 @@ pub fn make_html(dc:&RFindCtx, fm:&codemap::FileMap,nim:&FNodeInfoMap,jdm:&JumpT
 	let fstart = *fm.start_pos;
 	let max_digits=num_digits(fm.lines.len());
 
+	let mut multiline_comment_depth=0;	//todo: general purpose state object.
 	while line<fm.lines.len() {
 		// todo: line numbers want to go in a seperate column so they're unselectable..
 		doc.write_tagged("ln",pad_to_length((line+1).to_str(),max_digits," "));
@@ -48,7 +49,8 @@ pub fn make_html(dc:&RFindCtx, fm:&codemap::FileMap,nim:&FNodeInfoMap,jdm:&JumpT
 		let line_str=fm.src.slice(*fm.lines[line]-fstart,lend);
 		//doc.writeln(line_str);
 		doc.end_tag();
-		write_line_with_links(&mut doc,dc,fm, nim, jdm,jrm, line_str, nodes_per_line[line],line);
+		multiline_comment_depth=
+			write_line_with_links(&mut doc,dc,fm, nim, jdm,jrm, line_str, nodes_per_line[line],line,multiline_comment_depth);
 		doc.writeln("");
 //		doc.writeln(markup_line);
 		line+=1;
@@ -100,7 +102,7 @@ pub fn write_styles(doc:&mut HtmlWriter,fname:&str){
 	doc.write_html("a:visited{ color:#f0f0f0; font-style:normal;   text-decoration:none;}\n");
 	doc.write_html("a:link:hover{ color:#f0f0f0; font-style:normal; background-color:#606060; }\n");
 	doc.write_html("pr{font-weight:bold}\n");
-	doc.write_html("ln{color:#606060; }\n");
+	doc.write_html("ln{color:#606060; -moz-user-select:-moz-none; -khtml-user-select:none; -webkit-user-select:none; -ms-user-select:none; user-select:none;}\n");
 	doc.write_html("c24{color:#ffffff; font-style:italic; opacity:0.5}\n");
 	doc.write_html("c25{color:#ffffff; opacity:0.92}\n");
 	doc.write_html("c26{color:#ffffff; font-weight:bold; }\n");
@@ -270,19 +272,21 @@ fn is_alphanumeric(c:char)->bool {
 		_=>false
 	}
 }
-fn text_here_is(line:&str, pos:uint,reftext:&str, color:int)->int {
-	if pos+reftext.len()+2>=line.len() { return 0}
+type ColorIndex=int;
+/// todo .. option type!!!
+fn is_text_here(line:&str, pos:uint,reftext:&str, color:ColorIndex)->Option<(ColorIndex,uint)> {
+	if pos+reftext.len()+2>=line.len() { return None}
 	if pos>0 {
-		if is_alphanumeric(line[pos-1] as char) { return 0 }// must be word start
+		if is_alphanumeric(line[pos-1] as char) { return None }// must be word start
 	}
-	if is_alphanumeric(line[pos+reftext.len()] as char) { return 0 }// must be word start
+	if is_alphanumeric(line[pos+reftext.len()] as char) { return None }// must be word start
 	let mut i=0;
 	while i<reftext.len() {
-		if reftext[i]!=line[i+pos] {return 0}
+		if reftext[i]!=line[i+pos] {return None}
 		i+=1;
 	}
 
-	return color;
+	return Some((color,reftext.len()));
 }
 
 fn sub_match(mut line:&str,x:uint,opts:&[&str])->Option<(uint,uint)>{
@@ -303,7 +307,7 @@ fn sub_match(mut line:&str,x:uint,opts:&[&str])->Option<(uint,uint)>{
 	return None;
 }
 
-fn write_line_with_links(outp:&mut HtmlWriter,dc:&RFindCtx,fm:&codemap::FileMap, nim:&FNodeInfoMap,jdm:&JumpToDefMap, jrm:&JumpToRefMap, line:&str, nodes:&[ast::NodeId],line_index:uint) {
+fn write_line_with_links(outp:&mut HtmlWriter,dc:&RFindCtx,fm:&codemap::FileMap, nim:&FNodeInfoMap,jdm:&JumpToDefMap, jrm:&JumpToRefMap, line:&str, nodes:&[ast::NodeId],line_index:uint, mut multiline_comment_depth:int)->int {
 
 /*			match line[x] as char{
 			' ' =>"&nbsp;",
@@ -382,20 +386,21 @@ fn write_line_with_links(outp:&mut HtmlWriter,dc:&RFindCtx,fm:&codemap::FileMap,
 		if line[0]as char =='#' {
 			for x in range(0,line.len()) { color[x]=33 }
 		}
-		// delimiters
+		// delimiters/whitespace/special chars characters - disable links & override some coloring
 		x=0; wb=false;
 		while x<(line.len()) {
 			let c0=line[x] as char;
 
 			match c0 {
-				'{'|'}'|'['|']'|';'|',' => {color[x]=4;},
-				'('|')'=> {color[x]=25;},
+				' '|'\t'|'+'|'-'|'|'|':'|'*'|'&'|'\''|'/'|'@'|'~'|'^'|'%'|'$'|'!'|'>'|'<'|'.'|'#'=> {link[x]=0;}
+				'{'|'}'|'['|']'|';'|',' => {color[x]=4;	link[x]=0; },
+				'('|')'=> {color[x]=25;link[x]=0;},
 				_=>{}
 			}
 			if x<(line.len()-1) {
 				let c1=line[x+1] as char;
 				if ((c0=='-' || c0=='=') && c1=='>') {
-					color[x]=4;color[x+1]=4;
+					color[x]=4;color[x+1]=4; link[x]=0; link[x+1]=0;
 					x+=1;
 				}
 			}
@@ -406,8 +411,16 @@ fn write_line_with_links(outp:&mut HtmlWriter,dc:&RFindCtx,fm:&codemap::FileMap,
 		while x<(line.len()) {
 			// override color for top level decls
 			if wb && is_alphanumeric(line[x] as char){
-				let decl_color=text_here_is(line,x,"type",31)|text_here_is(line,x,"struct",27)|text_here_is(line,x,"trait",28)|text_here_is(line,x,"impl",30)|text_here_is(line,x,"enum",29)|text_here_is(line,x,"fn",26);
+				let (decl_color,len)=
+					is_text_here(line,x,"type",31)
+					.get_or_default(is_text_here(line,x,"struct",27)
+					.get_or_default(is_text_here(line,x,"trait",28)
+					.get_or_default(is_text_here(line,x,"impl",30)
+					.get_or_default(is_text_here(line,x,"enum",29)
+					.get_or_default(is_text_here(line,x,"fn",26)
+					.get_or_default((0,0)))))));
 				if decl_color>0{
+					for x in range(x,x+len) { link[x]=0;/* clear link on the keyword part..*/}
 					let mut in_typaram=0;
 					while (x<line.len()) && (line[x] as char)!='{' && (line[x] as char)!='('{
 						in_typaram+=match line[x] as char {'<'=>1,_=>0};
@@ -416,8 +429,8 @@ fn write_line_with_links(outp:&mut HtmlWriter,dc:&RFindCtx,fm:&codemap::FileMap,
 						x+=1;
 					}
 				}
-			} else if is_alphanumeric(line[x] as char)==false {
-				wb=false;
+			} else {
+				wb= !is_alphanumeric(line[x] as char);
 			}
 			x+=1;
 		}
@@ -425,11 +438,11 @@ fn write_line_with_links(outp:&mut HtmlWriter,dc:&RFindCtx,fm:&codemap::FileMap,
 		x=0; wb=true;
 		while x<line.len() {
 			if wb {
-				match sub_match(line,x,&[&"let",&"match",&"if",&"else",&"break",&"return",&"while",&"loop","for","do","ref","pub","priv"]) {
+				match sub_match(line,x,&[&"let",&"mut", &"const", &"use", &"mod", &"match",&"if",&"else",&"break",&"return",&"while",&"loop","for","do","ref","pub","priv"]) {
 				None=>{},
 				Some((ix,len))=>{
 					let me=x+len;
-					while x<me { color[x]=21; x+=1; }
+					while x<me { color[x]=21; link[x]=0;x+=1; }
 					loop
 					}
 				}
@@ -438,16 +451,22 @@ fn write_line_with_links(outp:&mut HtmlWriter,dc:&RFindCtx,fm:&codemap::FileMap,
 			x+=1;
 		}
 
-		// paint comments out
+		// paint comments out, & disable links
+		// TODO - multiline comments, feed in/out..
 		x=0; 
 		while x<(line.len()) {
 			if x<line.len()-1 {
-				if line[x+0]=='/' as u8 && line[x+1]=='/' as u8 {
+				if line[x+0]=='/' as u8 && (line[x+1]=='/' as u8|| line[x+1]=='*' as u8) || multiline_comment_depth>0{
 					let mut comment_color=24;
 					if x<line.len()-2 { if line[x+2]as char=='/' { comment_color=32 }}// doc-comments are a bit brighter
-					while x<line.len() {
+					let mut slc=false;
+					if line[x+1]=='*' as u8 {multiline_comment_depth+=1;} else {slc=true;}
+					while x<line.len() && (slc || multiline_comment_depth>0){
 						color[x]=comment_color;
+						link[x]=0;
+						
 						x+=1;
+						if line[if x>2{x-2}else{0}]=='*' as u8 && line[x-1]=='/' as u8 {multiline_comment_depth-=1;}
 					}
 				}
 			}
@@ -457,21 +476,23 @@ fn write_line_with_links(outp:&mut HtmlWriter,dc:&RFindCtx,fm:&codemap::FileMap,
 	
 	// emit a span..
 	let mut x=0;
-	let mut curr_col=-1;
+	let no_color=-1;
+	let mut curr_col=no_color;
 	let mut curr_link=0;
 	//let mut outp=HtmlWriter::new();
+	let tag_depth=outp.tag_stack.len();
 	while x<line.len() {
 		// link overrides color..
 		if curr_link!=link[x] {
-			if curr_link>0 {outp.end_tag();}
-			if curr_col>=0 {outp.end_tag();}
-			curr_col=-1;
+			if curr_link!=no_link {outp.end_tag();}
+			if curr_col!=no_color {outp.end_tag();}
+			curr_col=no_color;
 			curr_link=link[x];
 
 			if curr_link!=no_link {
 				if curr_link>0 /* value is link node index*/ {
 					match nim.find(&curr_link) {
-						None=>curr_link=0,	// link outside the crate?
+						None=>curr_link=no_link,	// link outside the crate?
 						Some(link_node_info)=>{
 							let oifp = byte_pos_to_index_file_pos(dc.tycx, link_node_info.span.lo);
 							if (oifp.is_some()) {
@@ -491,11 +512,13 @@ fn write_line_with_links(outp:&mut HtmlWriter,dc:&RFindCtx,fm:&codemap::FileMap,
 			}
 		}
 		if curr_col!=color[x] {
-			if curr_col>=0 {
+			if curr_col!=no_color {
 				outp.end_tag();
 			}
 			curr_col=color[x];
-			outp.begin_tag(color_index_to_tag(curr_col));
+			if curr_col!=no_color {
+				outp.begin_tag(color_index_to_tag(curr_col));
+			}
 		}
 
 
@@ -540,12 +563,14 @@ fn write_line_with_links(outp:&mut HtmlWriter,dc:&RFindCtx,fm:&codemap::FileMap,
 		*/
 		x+=1;
 	}
-	if curr_col>=0 {outp.end_tag();}
-	if curr_link>0 {outp.end_tag();}
+	if curr_col!=no_color {outp.end_tag();}
+	if curr_link!=no_link {outp.end_tag();}
+	assert!(tag_depth==outp.tag_stack.len());
 	//todo - we prefered this functional, "build a line, assemble lines"..
 	// but we hacked it this way because of plain text->translated text issue. < > &lt; &gt; etc
 	// need to split doc writerinterface into functions that take plain text and html fragments
 	//outp.doc
+	multiline_comment_depth
 }
 
 fn find_defs_in_file(fm:&codemap::FileMap, nim:&FNodeInfoMap)->~[ast::NodeId] {
