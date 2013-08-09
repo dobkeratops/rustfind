@@ -473,7 +473,6 @@ fn write_line_with_links(outp:&mut HtmlWriter,dc:&RFindCtx,fm:&codemap::FileMap,
 			x+=1;
 		}
 	}
-	
 	// emit a span..
 	let mut x=0;
 	let no_color=-1;
