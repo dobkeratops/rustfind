@@ -9,7 +9,7 @@ fn main() {
 	let a=Foo{foo_field_1:2};
 	a.my_method(1);
 	let c=a_cat(3);
-	let d=Foo{foo_field_1:a.foo_field_1+2};
+	let d=Foo{foo_field_1:a.foo_field_1+2}; a.test();
 	println(a.foo_field_1.to_str());
 }
 
@@ -21,6 +21,8 @@ impl Foo {
 }
 
 enum Animal {
+	a_anteater(int),
+	a_bear(int),
 	a_cat(int),
 	a_dog(int),
 }
@@ -28,9 +30,45 @@ enum Animal {
 trait Testable {
 	fn test(&self);
 }
+trait DoZ {
+	fn do_z(&self);
+}
 
 impl Testable for Foo {
 	fn test(&self) {
 		println(self.foo_field_1.to_str());
 	}
 }
+impl DoZ for Foo {
+	fn do_z(&self) {
+		println(self.foo_field_1.to_str());
+	}
+}
+
+trait SuperTraitTest:Testable+DoZ {
+}
+
+fn gfunc<X:Testable+DoZ>(x:&X) {
+	let a1=a_anteater(1);
+	let a2=a_bear(1);
+	let a3=a_cat(1);
+	let a4=a_dog(1);
+	x.test();
+	x.do_z();
+}
+struct TraitedStructTest<X> {
+	x:X
+}
+fn some2(a:Animal) {
+	match a {
+		a_cat(x)=> println("cat"),
+		_ => println("not a cat")
+	}
+
+}
+
+
+
+
+
+

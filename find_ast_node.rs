@@ -122,6 +122,7 @@ pub fn build_node_info_map(c:@ast::Crate)->@mut FNodeInfoMap {
 		//visit_trait_method
 		visit_struct_def:fcns_struct_def,
 		visit_struct_field:fcns_struct_field,
+		visit_generics:fcns_generics,
 
 		.. *default_visitor::<@mut FNodeInfoMap>()
 		}
@@ -194,6 +195,7 @@ pub enum AstNode {
 	astnode_struct_def(@ast::struct_def),
 	astnode_struct_field(@ast::struct_field),
 	astnode_trait_ref(@ast::trait_ref),
+	astnode_variant(@ast::variant),
 	astnode_root,
 	astnode_none
 }
@@ -349,6 +351,7 @@ impl KindToStr for AstNode {
 			astnode_struct_def(_)=>"struct_def",
 			astnode_struct_field(_)=>"struct_field",
 			astnode_trait_ref(_)=>"trait_ref",
+			astnode_variant(_)=>"variant",
 			astnode_root=>"root",
 			astnode_none=>"none"
 		}
@@ -468,6 +471,7 @@ impl AstNodeAccessors for AstNode {
 			astnode_struct_def(ref x)=>None,
 			astnode_struct_field(ref x)=>Some(x.node.id),
 			astnode_trait_ref(ref x)=>Some(x.ref_id),
+			astnode_variant(ref x)=>Some(x.node.id),
 			astnode_none|astnode_root=>None,
 			
 		}
@@ -518,23 +522,51 @@ type FNodeInfoMapSV = (@mut FNodeInfoMap, vt<@mut FNodeInfoMap>);
 fn fcns_view_item(a:&ast::view_item, (s,v):FNodeInfoMapSV) {
 	visit_view_item(a,(s,v))
 }
-fn fcns_item(a:@ast::item, (s,v):FNodeInfoMapSV) {
+
+fn fcns_generics(g:&ast::Generics,(s,v):FNodeInfoMapSV) {
+	for tp in g.ty_params.iter() {
+		for tb in tp.bounds.iter() {
+			match(tb) {
+				&ast::TraitTyParamBound(ref tr)=>fcns_trait_ref(tr,(s,v)),
+				_=>{}
+			}
+		}
+	}
+}
+
+fn fcns_trait_ref(tr:&ast::trait_ref, (s,v):FNodeInfoMapSV) {
+	push_span(s, tr.ref_id, None, "trait_ref", tr.path.span, astnode_trait_ref(@tr.clone()))
+}
+
+fn fcns_variant(va:&ast::variant, (s,v):FNodeInfoMapSV) {
+	push_span(s, va.node.id, Some(va.node.name),"variant", va.span, astnode_variant(@va.clone()))
+}
+
+fn fcns_item(a:@ast::item, sv:FNodeInfoMapSV) {
+	let (s,v)=sv;
 	push_span(s,a.id,item_get_ident(a),a.kind_to_str(),a.span,astnode_item(a));
 	// todo: Push nodes for type-params... since we want to click on their defs...
 	match (a.node) {
-		ast::item_impl(ref typarams,ref o_traitref,ref self_ty, ref methods)=> {
+		ast::item_impl(ref g,ref o_traitref,ref self_ty, ref methods)=> {
+//			fcns_generics(g,sv);
 			match *o_traitref {
 				None=>{},
-				Some(ref tr)=>push_span(s, tr.ref_id, None, "trait_ref", tr.path.span, astnode_trait_ref(@tr.clone()))
+				Some(ref tr)=>fcns_trait_ref(tr,sv)
 			};
 			for m in methods.iter() {
 				push_span(s,m.id,Some(a.ident),"method",m.span,astnode_method(*m));
 				// iterate sub??
 			}
-		}
+		},
+		ast::item_enum(ref ed, ref g)=>{
+			for v in ed.variants.iter() { println("adding variant");fcns_variant(v,sv) } 
+		},
+//		ast::item_fn(_,_,_,ref g,ref b)=>{fcns_generics(g,sv);},
+//		ast::item_struct(_,ref g)=>{fcns_generics(g,sv);},
+		ast::item_trait(ref g,ref tr, ref tm)=>{/*fcns_generics(g,sv);*/ for t in tr.iter() {fcns_trait_ref(t,sv)} },
 		_ => {}
 	}
-	visit_item(a,(s,v))
+	visit_item(a,sv)
 }
 fn fcns_local(a:@ast::Local, (s,v):FNodeInfoMapSV) {
 //	push_spanned(s,"local",a);

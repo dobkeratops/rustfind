@@ -552,7 +552,7 @@ fn write_references(doc:&mut HtmlWriter,dc:&RFindCtx, fm:&codemap::FileMap,nim:&
 		if !(def_info.kind==~"fn" || def_info.kind==~"struct" || def_info.kind==~"trait" || def_info.kind==~"enum" || def_info.kind==~"ty") {loop}
 
 		let refs = jrm.find(dn);
-		let max_links=10;	// todo - sort..
+		let max_links=20;	// todo - sort..
 		let max_short_links=30;	// todo - sort..
 
 		
@@ -587,7 +587,9 @@ fn write_references(doc:&mut HtmlWriter,dc:&RFindCtx, fm:&codemap::FileMap,nim:&
 				.to_owned_vec();
 
 			let l=refs2.len();
-			sort::qsort(refs2,0,l-1, |&(_,ref ifp1,_),&(_,ref ifp2,_)|{ ifp1.file_index-curr_file<=ifp2.file_index-curr_file });
+			fn pri_of(x:&FNodeInfo)->uint{ if &"impl"==x.kind{0} else {0x8000} }
+			// todo: we want to sort based on node type to find impls, but we dont quite find what we want..
+			sort::qsort(refs2,0,l-1, |&(ni1,ref ifp1,_),&( ni2,ref ifp2,_)|{ ((ifp1.file_index-curr_file)&0x7fff)+pri_of(ni1)<=((ifp2.file_index-curr_file)&0x7fff)+pri_of(ni2) });
 			let mut newline=true;
 			for &(ref ref_info,ref ref_ifp,ref id) in refs2.iter() {
 				if *id!=dn {
