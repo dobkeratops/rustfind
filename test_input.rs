@@ -24,3 +24,13 @@ enum Animal {
 	a_cat(int),
 	a_dog(int),
 }
+
+trait Testable {
+	fn test(&self);
+}
+
+impl Testable for Foo {
+	fn test(&self) {
+		println(self.foo_field_1.to_str());
+	}
+}

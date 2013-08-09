@@ -10,6 +10,19 @@ use codemaput::*;
 use find_ast_node::*;
 use syntax::*;
 
+// TODO: See how far we can decouple this from the link generation
+// could we have an abstract linked-AST format , and an html renderer for that..
+// eg incase this can be spun off as a completely seperate project
+// eg: could this be done more efficiently client-side-throw json +javascript decoder at the browser.
+// is there an existing cross-language linked-source generator? if not, could one be written? (would it get more traction?)
+
+// TODO: view_item 'mod path::....' could be converted to file reference?
+
+// TODO - how to handle out-of-crate references?
+// perhaps we could detect items with def_id crate indices outside the current crate,
+// and link to their *nodes* instead of source-lines? or would the spans still work?
+// we could give the whole generator a root dir to look for crates? ... and assume html is generated in there..
+
 pub fn make_html(dc:&RFindCtx, fm:&codemap::FileMap,nim:&FNodeInfoMap,jdm:&JumpToDefMap, jrm:&JumpToRefMap, nodes_per_line:&[~[ast::NodeId]])->~str {
 	// todo - Rust2HtmlCtx { fm,nim,jdm,jrm } .. cleanup common intermediates
 	let mut doc= HtmlWriter::new::();
@@ -305,30 +318,33 @@ fn write_line_with_links(outp:&mut HtmlWriter,dc:&RFindCtx,fm:&codemap::FileMap,
 					Some(x) =>*x
 				};
 				
-				let s=byte_pos_to_index_file_pos(dc.tycx, ni.span.lo).unwrap();
-				let e=byte_pos_to_index_file_pos(dc.tycx, ni.span.hi).unwrap();
-				let d=*ni.span.hi-*ni.span.lo;	// todo - get the actual hrc node depth in here!
-				let mut x=if line_index<=s.line {s.col}else{0};
-				// TODO: instead of this brute force 'painters-algorithm',
-				// clip spans, or at least have a seperate "buffer" for the line-coherent infill
-				// for multi-line spans
+				let os=byte_pos_to_index_file_pos(dc.tycx, ni.span.lo);
+				let oe=byte_pos_to_index_file_pos(dc.tycx, ni.span.hi);
+				if os.is_some() && oe.is_some() {
+					let e=oe.unwrap(); let s=os.unwrap();
+					let d=*ni.span.hi-*ni.span.lo;	// todo - get the actual hrc node depth in here!
+					let mut x=if line_index<=s.line {s.col}else{0};
+					// TODO: instead of this brute force 'painters-algorithm',
+					// clip spans, or at least have a seperate "buffer" for the line-coherent infill
+					// for multi-line spans
 
-				// 'paint' the nodes we have here.
-				//if (s.line==e.line) 
-				let xe = if e.line>line_index{line.len()}else{e.col};
-				let ci = node_color_index(ni);
-				while x<xe && x<line.len() {
-					if d < depth[x] {
-						color[x]=ci;
-						depth[x]=d;
-						if link_id!=0 {
-							link[x]=link_id;
+					// 'paint' the nodes we have here.
+					//if (s.line==e.line) 
+					let xe = if e.line>line_index{line.len()}else{e.col};
+					let ci = node_color_index(ni);
+					while x<xe && x<line.len() {
+						if d < depth[x] {
+							color[x]=ci;
+							depth[x]=d;
+							if link_id!=0 {
+								link[x]=link_id;
+							}
 						}
+						if link[x]==0 { link[x]=link_id;}
+						x+=1;
 					}
-					if link[x]==0 { link[x]=link_id;}
-					x+=1;
+					rndcolor+=1;
 				}
-				rndcolor+=1;
 			}
 		}
 	}
@@ -390,9 +406,14 @@ fn write_line_with_links(outp:&mut HtmlWriter,dc:&RFindCtx,fm:&codemap::FileMap,
 					match nim.find(&curr_link) {
 						None=>curr_link=0,	// link outside the crate?
 						Some(link_node_info)=>{
-							let ifp = byte_pos_to_index_file_pos(dc.tycx, link_node_info.span.lo).unwrap();
-							let link_str="#"+(ifp.line+2).to_str();
-							outp.begin_tag_link(make_rel_html_name(dc.sess.codemap.files[ifp.file_index].name,fm.name)+link_str);
+							let oifp = byte_pos_to_index_file_pos(dc.tycx, link_node_info.span.lo);
+							if (oifp.is_some()) {
+								let ifp=oifp.unwrap();
+								let link_str="#"+(ifp.line+2).to_str();
+								outp.begin_tag_link(make_rel_html_name(dc.sess.codemap.files[ifp.file_index].name,fm.name)+link_str);
+							} else {
+								outp.begin_tag_link("#node_"+curr_link.to_str());
+							}
 						}
 					}
 				} else if curr_link<0/* link to refs block,value is -(this node index)*/{
@@ -558,8 +579,10 @@ fn write_references(doc:&mut HtmlWriter,dc:&RFindCtx, fm:&codemap::FileMap,nim:&
 			let  mut refs2=refs.iter()
 				.filter(|&id|{nim.find(id).is_some()})
 				.transform(|&id|{
-					let ni=nim.find(&id).unwrap();
-					let ifp=byte_pos_to_index_file_pos(dc.tycx, ni.span.lo).unwrap();
+					let oni=nim.find(&id); assert!(oni.is_some());
+					let ni=oni.unwrap();
+					let oifp=byte_pos_to_index_file_pos(dc.tycx, ni.span.lo);
+					assert!(oifp.is_some()); let ifp=oifp.unwrap();
 					(ni,ifp,id)})
 				.to_owned_vec();
 
@@ -587,7 +610,7 @@ fn write_references(doc:&mut HtmlWriter,dc:&RFindCtx, fm:&codemap::FileMap,nim:&
 					if curr_file!=ref_ifp.file_index {
 						if newline==false {doc.writeln("");}
 						curr_file=ref_ifp.file_index;
-						write_file_ref(doc,dc,curr_file);
+						write_file_ref(doc,dc,fm,curr_file);
 						newline=true;
 					}
 
@@ -655,9 +678,9 @@ fn write_references(doc:&mut HtmlWriter,dc:&RFindCtx, fm:&codemap::FileMap,nim:&
 		}
 	}
 
-	fn write_file_ref(doc:&mut HtmlWriter, dc:&RFindCtx,fi:uint) {
+	fn write_file_ref(doc:&mut HtmlWriter, dc:&RFindCtx,origin_fm:&codemap::FileMap, fi:uint) {
 		let fname = dc.tycx.sess.codemap.files[fi].name;
-		doc.begin_tag_link( make_html_name(fname));
+		doc.begin_tag_link( make_rel_html_name(fname,origin_fm.name));
 		doc.begin_tag("c24");
 		doc.writeln(""+fname + ":");
 		doc.end_tag();
@@ -673,7 +696,9 @@ fn write_references(doc:&mut HtmlWriter,dc:&RFindCtx, fm:&codemap::FileMap,nim:&
 // file_index:line_index:col_index:length
 
 fn get_node_index_file_pos(dc:&RFindCtx,nim:&FNodeInfoMap,nid:ast::NodeId)->IndexFilePos {
-	let ni=nim.find(&nid).unwrap();
+	let oni=nim.find(&nid);
+	assert!(oni.is_some());
+	let ni=oni.unwrap();
 	byte_pos_to_index_file_pos(dc.tycx,ni.span.lo).unwrap()
 }
 

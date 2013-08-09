@@ -20,7 +20,7 @@ test : rustfind
 	echo $(RUST)
 	./rustfind test_input.rs -j $(RF_LIBS)
 	./rustfind test_input.rs -w $(RF_LIBS)
-	firefox test_input.html
+	firefox test_input.rs.html
 
 SRC=$(wildcard *.rs)
 

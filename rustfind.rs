@@ -56,6 +56,7 @@ fn dump_json(dc:&RFindCtx) {
 //	for dc.sess.codemap.files.iter().advance |f| {
 	for f in dc.sess.codemap.files.iter() {
 		print("\t\t{ name:\""+f.name+"\",\tstart_pos:"+f.start_pos.to_str()+
+			",\tend_pos:"+(*f.start_pos+f.src.len()).to_str()+
 			",\tlines:[\n"+ flatten_to_str(*f.lines, |&x|{*x} ,",") +
 			"\n\t\t]\n\t},\n");
 	}

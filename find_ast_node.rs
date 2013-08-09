@@ -193,6 +193,7 @@ pub enum AstNode {
 	astnode_method(@ast::method),
 	astnode_struct_def(@ast::struct_def),
 	astnode_struct_field(@ast::struct_field),
+	astnode_trait_ref(@ast::trait_ref),
 	astnode_root,
 	astnode_none
 }
@@ -347,6 +348,7 @@ impl KindToStr for AstNode {
 			astnode_trait_method(_)=>"trait_method",
 			astnode_struct_def(_)=>"struct_def",
 			astnode_struct_field(_)=>"struct_field",
+			astnode_trait_ref(_)=>"trait_ref",
 			astnode_root=>"root",
 			astnode_none=>"none"
 		}
@@ -465,6 +467,7 @@ impl AstNodeAccessors for AstNode {
 			astnode_method(ref m)=>Some(m.id),
 			astnode_struct_def(ref x)=>None,
 			astnode_struct_field(ref x)=>Some(x.node.id),
+			astnode_trait_ref(ref x)=>Some(x.ref_id),
 			astnode_none|astnode_root=>None,
 			
 		}
@@ -517,8 +520,13 @@ fn fcns_view_item(a:&ast::view_item, (s,v):FNodeInfoMapSV) {
 }
 fn fcns_item(a:@ast::item, (s,v):FNodeInfoMapSV) {
 	push_span(s,a.id,item_get_ident(a),a.kind_to_str(),a.span,astnode_item(a));
+	// todo: Push nodes for type-params... since we want to click on their defs...
 	match (a.node) {
-		ast::item_impl(ref typarams,ref traitref,ref self_ty, ref methods)=> {
+		ast::item_impl(ref typarams,ref o_traitref,ref self_ty, ref methods)=> {
+			match *o_traitref {
+				None=>{},
+				Some(ref tr)=>push_span(s, tr.ref_id, None, "trait_ref", tr.path.span, astnode_trait_ref(@tr.clone()))
+			};
 			for m in methods.iter() {
 				push_span(s,m.id,Some(a.ident),"method",m.span,astnode_method(*m));
 				// iterate sub??
