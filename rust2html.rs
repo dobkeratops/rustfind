@@ -111,7 +111,7 @@ pub fn write_styles(doc:&mut HtmlWriter,fname:&str){
 	doc.write_html("c31{color:#d0b0ff; font-weight:bold; }\n");
 	doc.write_html("c32{color:#ffffff; font-style:italic; opacity:0.6}\n");
 	doc.write_html("c1{color:#ffffc0;   font-weight:bold; }\n");
-	doc.write_html("c33{color:#d0b0d0;  }\n");
+	doc.write_html("c33{color:#e0a0d0;  }\n");
 	doc.write_html("c2{color:#60f0c0}\n");
 	doc.write_html("c3{color:#50e0ff; }\n");
 	doc.write_html("c4{color:#f090f0}\n");
@@ -375,14 +375,72 @@ fn write_line_with_links(outp:&mut HtmlWriter,dc:&RFindCtx,fm:&codemap::FileMap,
 	// propogate information properly eg brackets inside a type ..
 
 	{
-		let mut x=0;
+		// handle decls, todo - combine with keywords..
+		let mut x=0; let mut wb=true;
+		//attributes/"preprocessor"
+		x=0;
+		if line[0]as char =='#' {
+			for x in range(0,line.len()) { color[x]=33 }
+		}
+		// delimiters
+		x=0; wb=false;
 		while x<(line.len()) {
-			match line[x] as char{
+			let c0=line[x] as char;
+
+			match c0 {
 				'{'|'}'|'['|']'|';'|',' => {color[x]=4;},
 				'('|')'=> {color[x]=25;},
 				_=>{}
 			}
+			if x<(line.len()-1) {
+				let c1=line[x+1] as char;
+				if ((c0=='-' || c0=='=') && c1=='>') {
+					color[x]=4;color[x+1]=4;
+					x+=1;
+				}
+			}
 
+			x+=1;
+		}
+		x=0; wb=true;
+		while x<(line.len()) {
+			// override color for top level decls
+			if wb && is_alphanumeric(line[x] as char){
+				let decl_color=text_here_is(line,x,"type",31)|text_here_is(line,x,"struct",27)|text_here_is(line,x,"trait",28)|text_here_is(line,x,"impl",30)|text_here_is(line,x,"enum",29)|text_here_is(line,x,"fn",26);
+				if decl_color>0{
+					let mut in_typaram=0;
+					while (x<line.len()) && (line[x] as char)!='{' && (line[x] as char)!='('{
+						in_typaram+=match line[x] as char {'<'=>1,_=>0};
+						color[x]=if in_typaram==0{decl_color}else{5};
+						in_typaram+=match line[x] as char {'>'=>-1,_=>0};
+						x+=1;
+					}
+				}
+			} else if is_alphanumeric(line[x] as char)==false {
+				wb=false;
+			}
+			x+=1;
+		}
+				// paint keywords out, these dont seem to come through as distinct ast nodes - as they can be differnt parts of a node
+		x=0; wb=true;
+		while x<line.len() {
+			if wb {
+				match sub_match(line,x,&[&"let",&"match",&"if",&"else",&"break",&"return",&"while",&"loop","for","do","ref","pub","priv"]) {
+				None=>{},
+				Some((ix,len))=>{
+					let me=x+len;
+					while x<me { color[x]=21; x+=1; }
+					loop
+					}
+				}
+			}
+			if is_alphanumeric(line[x] as char) {wb=false}
+			x+=1;
+		}
+
+		// paint comments out
+		x=0; 
+		while x<(line.len()) {
 			if x<line.len()-1 {
 				if line[x+0]=='/' as u8 && line[x+1]=='/' as u8 {
 					let mut comment_color=24;
@@ -393,38 +451,6 @@ fn write_line_with_links(outp:&mut HtmlWriter,dc:&RFindCtx,fm:&codemap::FileMap,
 					}
 				}
 			}
-			// override color for top level decls
-			let decl_color=text_here_is(line,x,"type",31)|text_here_is(line,x,"struct",27)|text_here_is(line,x,"trait",28)|text_here_is(line,x,"impl",30)|text_here_is(line,x,"enum",29)|text_here_is(line,x,"fn",26);
-			if decl_color>0{
-				let mut in_typaram=0;
-				while (x<line.len()) && (line[x] as char)!='{' && (line[x] as char)!='('{
-					in_typaram+=match line[x] as char {'<'=>1,_=>0};
-					color[x]=if in_typaram==0{decl_color}else{5};
-					in_typaram+=match line[x] as char {'>'=>-1,_=>0};
-					x+=1;
-				}
-			}
-			x+=1;
-		}
-		x=0;
-		if line[0]as char =='#' {
-			for x in range(0,line.len()) { color[x]=33 }
-		}
-		// paint keywords out, these dont seem to come through as distinct ast nodes - as they can be differnt parts of a node
-		x=0;
-		let mut wb=true;
-		while x<line.len() {
-			if wb {
-				match sub_match(line,x,&[&"let",&"match",&"if",&"while",&"loop","for","do","ref","pub","priv"]) {
-				None=>{},
-				Some((ix,len))=>{
-					let me=x+len;
-					while x<me { color[x]=21; x+=1; }
-					loop
-					}
-				}
-			}
-			if is_alphanumeric(line[x] as char) {wb=false}
 			x+=1;
 		}
 	}

@@ -153,7 +153,7 @@ fn main() {
     let args = os::args();
 
     let opts = ~[
-        optmulti("L"),optflag("d"),optflag("j"),optflag("h"),optflag("i"),optflag("g"),optflag("w")
+        optmulti("L"),optflag("d"),optflag("j"),optflag("h"),optflag("i"),optflag("g"),optflag("w"),optflag("f")
     ];
 
     let matches = getopts(args.tail(), opts).get();
@@ -167,39 +167,45 @@ fn main() {
 
 	if opt_present(&matches,"h") {
 		println("rustfind: useage:-");
-		println(" -w filename.rs [-L<lib path>] : create linked html pages for sources in crate");
+		println(" filename.rs [-L<lib path>] : create linked html pages for sources in crate");
 		println(" -j filename.rs [-L<library path>]  : dump JSON map of the ast nodes & defintions");
 		println(" cratename.rs anotherfile.rs:line:col:");
 		println("    - load cratename.rs; look for definition at anotherfile.rs:line:col");
 		println("    - where anotherfile.rs is assumed to be a module of the crate");
-		println(" filename.rs:line:col : TODO return definition reference of symbol at given position");
+		println(" -f filename.rs:line:col : return definition reference of symbol at given position");
 		println(" -i filename.rs [-L<lib path>] : interactive mode");
 		println(" -d filename.rs [-L<lib path>] : debug for this tool");
 		println(" -g format output as gedit filepos +line filename");
 		println(" set RUST_LIBS for a default library search path");
 	};
 	if matches.free.len()>0 {
+		let mut done=false;
 		let filename=get_filename_only(matches.free[0]);
 		let dc = @get_ast_and_resolve(&Path(filename), libs);
 		local_data::set(ctxtkey, dc);
 	
 		if (opt_present(&matches,"d")) {
 			debug_test(dc);
+			done=true;
 		} else if (opt_present(&matches,"j")){
 			dump_json(dc);
 		}
 		let mut i=0;
-		while i<matches.free.len() {
-			let mode=if opt_present(&matches,"g"){SDM_GeditCmd} else {SDM_Source};
-			print(lookup_def_at_text_file_pos_str(dc,matches.free[i],mode).get_or_default(~"no def found\n"));
-			i+=1;
+		if (opt_present(&matches,"f")) {
+			while i<matches.free.len() {
+				let mode=if opt_present(&matches,"g"){SDM_GeditCmd} else {SDM_Source};
+				print(lookup_def_at_text_file_pos_str(dc,matches.free[i],mode).get_or_default(~"no def found\n"));
+				i+=1;
+				done=true;
+			}
 		}
 		if opt_present(&matches,"i") {
-			rustfind_interactive(dc)
+			rustfind_interactive(dc);
+			done=true;
 		}
 
 		// Dump as html..
-		if opt_present(&matches,"w") {
+		if opt_present(&matches,"w") || !(done) {
 			println("Creating HTML pages from source:-");
 			write_source_as_html(dc);
 			println("Creating HTML pages from source.. done");
