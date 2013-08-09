@@ -104,12 +104,14 @@ pub fn write_styles(doc:&mut HtmlWriter,fname:&str){
 	doc.write_html("c24{color:#ffffff; font-style:italic; opacity:0.5}\n");
 	doc.write_html("c25{color:#ffffff; opacity:0.92}\n");
 	doc.write_html("c26{color:#ffffff; font-weight:bold; }\n");
-	doc.write_html("c27{color:#ffffa0; font-weight:bold; }\n");
-	doc.write_html("c28{color:#afffff; font-weight:bold; }\n");
-	doc.write_html("c29{color:#afffaf; font-weight:bold; }\n");
-	doc.write_html("c30{color:#cfcfff; font-weight:bold; }\n");
-	doc.write_html("c31{color:#ffffff; font-style:italic; opacity:0.6}\n");
+	doc.write_html("c27{color:#b0ffff; font-weight:bold; }\n");
+	doc.write_html("c28{color:#b0ffb0; font-weight:bold; }\n");
+	doc.write_html("c29{color:#d0e0ff; font-weight:bold; }\n");
+	doc.write_html("c30{color:#fff0e0; font-weight:bold; }\n");
+	doc.write_html("c31{color:#d0b0ff; font-weight:bold; }\n");
+	doc.write_html("c32{color:#ffffff; font-style:italic; opacity:0.6}\n");
 	doc.write_html("c1{color:#ffffc0;   font-weight:bold; }\n");
+	doc.write_html("c33{color:#d0b0d0;  }\n");
 	doc.write_html("c2{color:#60f0c0}\n");
 	doc.write_html("c3{color:#50e0ff; }\n");
 	doc.write_html("c4{color:#f090f0}\n");
@@ -129,9 +131,9 @@ pub fn write_styles(doc:&mut HtmlWriter,fname:&str){
 	doc.write_html("c18{color:#f0a0d0}\n");
 	doc.write_html("c19{color:#d0f0a0}\n");
 	doc.write_html("c20{color:#0f0ff}\n");
-	doc.write_html("c21{color:#dde009; font-weight:bold}\n");
-	doc.write_html("c22{color:#e0f0d0; font-weight:bold}\n");
-	doc.write_html("c23{color:#e0f0ff; font-weight:bold}\n");
+	doc.write_html("c21{color:#d0d0d0; font-weight:bold}\n");
+	doc.write_html("c22{color:#c0ffd0; }\n");
+	doc.write_html("c23{color:#d0f0ff; }\n");
 
 	doc.end_tag();
 }
@@ -243,13 +245,13 @@ pub fn node_color_index(ni:&FNodeInfo)->int {
 		~"lit"=>12,
 		~"stmt"=>13,
 		~"mod"=>14,
-		~"struct"=>15,
+		~"struct"=>23,
 		~"local"=>16,
 		~"impl"=>17,
-		~"trait"=>18,
+		~"trait"=>28,
 		~"pat"=>20,
-		~"block"|~"blk"|~"fn_block"=>21,
-		~"method"|~"type_method"=>22,
+		~"block"|~"blk"|~"fn_block"=>22,
+		~"method"|~"type_method"=>18,
 		~"tup"=>4,
 		~"arm"=>11,
 		~"index"=>13,
@@ -281,6 +283,24 @@ fn text_here_is(line:&str, pos:uint,reftext:&str, color:int)->int {
 	}
 
 	return color;
+}
+
+fn sub_match(mut line:&str,x:uint,opts:&[&str])->Option<(uint,uint)>{
+	let mut smp=x;
+	if is_alphanumeric(line[smp] as char)==false{ return None;} // not alpha
+	let mut opti=0;
+	for o in opts.iter() {
+		if (o.len()+x)>line.len() {loop;} // not enough chars in line
+		if (o.len()+x+1)<line.len() {
+			if is_alphanumeric(line[o.len()+x] as char) {loop;}// not word boundary for this one
+		}
+		if line.slice(x,o.len()+x) == o.slice(0,o.len()) {
+			return Some((opti,o.len()));
+		}
+		opti+=1;
+		
+	}
+	return None;
 }
 
 fn write_line_with_links(outp:&mut HtmlWriter,dc:&RFindCtx,fm:&codemap::FileMap, nim:&FNodeInfoMap,jdm:&JumpToDefMap, jrm:&JumpToRefMap, line:&str, nodes:&[ast::NodeId],line_index:uint) {
@@ -366,7 +386,7 @@ fn write_line_with_links(outp:&mut HtmlWriter,dc:&RFindCtx,fm:&codemap::FileMap,
 			if x<line.len()-1 {
 				if line[x+0]=='/' as u8 && line[x+1]=='/' as u8 {
 					let mut comment_color=24;
-					if x<line.len()-2 { if line[x+2]as char=='/' { comment_color=31 }}// doc-comments are a bit brighter
+					if x<line.len()-2 { if line[x+2]as char=='/' { comment_color=32 }}// doc-comments are a bit brighter
 					while x<line.len() {
 						color[x]=comment_color;
 						x+=1;
@@ -374,7 +394,7 @@ fn write_line_with_links(outp:&mut HtmlWriter,dc:&RFindCtx,fm:&codemap::FileMap,
 				}
 			}
 			// override color for top level decls
-			let decl_color=text_here_is(line,x,"type",28)|text_here_is(line,x,"struct",27)|text_here_is(line,x,"trait",1)|text_here_is(line,x,"impl",29)|text_here_is(line,x,"enum",30)|text_here_is(line,x,"fn",26);
+			let decl_color=text_here_is(line,x,"type",31)|text_here_is(line,x,"struct",27)|text_here_is(line,x,"trait",28)|text_here_is(line,x,"impl",30)|text_here_is(line,x,"enum",29)|text_here_is(line,x,"fn",26);
 			if decl_color>0{
 				let mut in_typaram=0;
 				while (x<line.len()) && (line[x] as char)!='{' && (line[x] as char)!='('{
@@ -386,7 +406,29 @@ fn write_line_with_links(outp:&mut HtmlWriter,dc:&RFindCtx,fm:&codemap::FileMap,
 			}
 			x+=1;
 		}
+		x=0;
+		if line[0]as char =='#' {
+			for x in range(0,line.len()) { color[x]=33 }
+		}
+		// paint keywords out, these dont seem to come through as distinct ast nodes - as they can be differnt parts of a node
+		x=0;
+		let mut wb=true;
+		while x<line.len() {
+			if wb {
+				match sub_match(line,x,&[&"let",&"match",&"if",&"while",&"loop","for","do","ref","pub","priv"]) {
+				None=>{},
+				Some((ix,len))=>{
+					let me=x+len;
+					while x<me { color[x]=21; x+=1; }
+					loop
+					}
+				}
+			}
+			if is_alphanumeric(line[x] as char) {wb=false}
+			x+=1;
+		}
 	}
+	
 	
 	// emit a span..
 	let mut x=0;
@@ -552,8 +594,8 @@ fn write_references(doc:&mut HtmlWriter,dc:&RFindCtx, fm:&codemap::FileMap,nim:&
 		if !(def_info.kind==~"fn" || def_info.kind==~"struct" || def_info.kind==~"trait" || def_info.kind==~"enum" || def_info.kind==~"ty") {loop}
 
 		let refs = jrm.find(dn);
-		let max_links=20;	// todo - sort..
-		let max_short_links=30;	// todo - sort..
+		let max_links=30;	// todo - sort..
+		let max_short_links=0;	// todo - sort..
 
 		
 		if refs.len()>0 {

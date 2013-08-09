@@ -559,7 +559,7 @@ fn fcns_item(a:@ast::item, sv:FNodeInfoMapSV) {
 			}
 		},
 		ast::item_enum(ref ed, ref g)=>{
-			for v in ed.variants.iter() { println("adding variant");fcns_variant(v,sv) } 
+			for v in ed.variants.iter() { fcns_variant(v,sv) } 
 		},
 //		ast::item_fn(_,_,_,ref g,ref b)=>{fcns_generics(g,sv);},
 //		ast::item_struct(_,ref g)=>{fcns_generics(g,sv);},

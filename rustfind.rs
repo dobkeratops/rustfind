@@ -41,6 +41,7 @@ pub mod htmlwriter;
 pub mod rust2html;
 pub mod codemaput;
 
+#[deriving(Clone, Eq, Encodable, Decodable)]
 enum ShowDefMode {
 	SDM_Line=0,
 	SDM_LineCol=1,
