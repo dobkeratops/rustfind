@@ -8,6 +8,7 @@ use std::str;
 use extra::sort;
 use codemaput::*;
 use find_ast_node::*;
+use rfindctx::*;
 use syntax::*;
 
 // TODO: See how far we can decouple this from the link generation
@@ -811,6 +812,8 @@ fn write_path_links(doc:&mut HtmlWriter, file_name:&str) {
 	
 
 	for x in range(0,num_dirs) {link_target.push_str("../");}
+	doc.write("    ");
+	doc.begin_tag_link(link_target+"index.html").write("(index<- )").end_tag().write("    ");
 	doc.begin_tag_link(link_target).write("    ./").end_tag();
 
 	for (i,x) in name_parts.iter().enumerate() {

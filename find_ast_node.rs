@@ -12,9 +12,56 @@ use syntax::codemap;
 use rustc::{front, metadata, driver, middle};
 use rustc::middle::mem_categorization::ast_node;
 use rustc::middle::ty;
-
+use rfindctx::*;
 use std::hashmap;
 use codemaput::*;
+
+
+
+#[deriving(Clone)]
+pub enum AstNode {
+	astnode_mod(@ast::_mod),
+	astnode_view_item(@ast::view_item),
+	astnode_item(@ast::item),
+	astnode_local(@ast::Local),
+	astnode_block(@ast::Block),
+	astnode_stmt(@ast::stmt),
+	astnode_arm(@ast::arm),
+	astnode_pat(@ast::pat),
+	astnode_decl(@ast::decl),
+	astnode_expr(@ast::expr),
+	astnode_ty(@ast::Ty),
+	astnode_ty_method(@ast::TypeMethod),
+	astnode_trait_method(@ast::trait_method),
+	astnode_method(@ast::method),
+	astnode_struct_def(@ast::struct_def),
+	astnode_struct_field(@ast::struct_field),
+	astnode_trait_ref(@ast::trait_ref),
+	astnode_variant(@ast::variant),
+	astnode_root,
+	astnode_none
+}
+
+
+pub type JumpToDefMap = hashmap::HashMap<ast::NodeId,ast::NodeId> ;
+
+pub struct FNodeInfo {
+	//name:ident, .. TODO - does it make sense to cache an ident here? not all nodes have..
+	kind:~str,
+	span:codemap::span,
+	node:AstNode,
+}
+pub type FNodeInfoMap= hashmap::HashMap<ast::NodeId,FNodeInfo>;
+
+pub type NodeTreeLoc = ~[AstNode];
+
+pub trait AstNodeAccessors {
+	pub fn get_id(&self)->Option<ast::NodeId>;
+}
+pub trait KindToStr {
+	fn kind_to_str(&self)->&'static str;
+}
+pub trait ToJsonStr {fn to_json_str(&self)->~str;}
 
 
 // TODO Check with rust people what here can be replaced with existing code in from the compiler libs..
@@ -22,13 +69,6 @@ use codemaput::*;
 // (AstNode here could be replaced with a refernce to ctxt_ keeping the interface..)
 
 // TODO: code here only depends on ty::ctxt, sess:Session is held in there aswell.
-pub struct RFindCtx {
-    crate: @ast::Crate,
-    tycx: middle::ty::ctxt,
-    sess: driver::session::Session,
-	ca: driver::driver::CrateAnalysis
-}
-
 
 pub macro_rules! if_some {
 	($b:ident in $a:expr then $c:expr)=>(
@@ -54,7 +94,6 @@ pub fn find_node_at_byte_pos(c:@ast::Crate,_location:codemap::BytePos)->AstNode 
 	return tree_loc.last().clone();
 }
 
-pub type NodeTreeLoc = ~[AstNode];
 
 pub fn find_node_tree_loc_at_byte_pos(c:@ast::Crate,_location:codemap::BytePos)->NodeTreeLoc {
 	use syntax::oldvisit::*;
@@ -92,13 +131,6 @@ pub fn find_node_tree_loc_at_byte_pos(c:@ast::Crate,_location:codemap::BytePos)-
 	s.result.clone()
 }
 
-pub struct FNodeInfo {
-	//name:ident, .. TODO - does it make sense to cache an ident here? not all nodes have..
-	kind:~str,
-	span:codemap::span,
-	node:AstNode,
-}
-pub type FNodeInfoMap= hashmap::HashMap<ast::NodeId,FNodeInfo>;
 
 pub fn build_node_info_map(c:@ast::Crate)->@mut FNodeInfoMap {
 	// todo-lambdas, big fcuntion but remove the extraneous symbols
@@ -132,25 +164,39 @@ pub fn build_node_info_map(c:@ast::Crate)->@mut FNodeInfoMap {
 }
 
 
-pub trait ToJsonStr {
-	fn to_json_str(&self)->~str;
-}
+pub trait ToJsonStrFc {fn to_json_str(&self,c:&RFindCtx)->~str;}
 
-pub fn node_spans_table_to_json_sub(ns:&FNodeInfoMap)->~str {
+pub fn node_spans_table_to_json_sub(dc:&RFindCtx,ns:&FNodeInfoMap)->~str {
 	// TODO - is there a cleaner functional way,
 	// map (|x| fmt...).flatten_to_str() or something like that..
+	
+	// emit in a form more useable by external tools.
+	// not a serialization of the data used here.
 	let mut r=~"";
 //	for ns.iter().advance |(k,v)| {
 	for (k,v) in ns.iter() {
 		//let (_,line,_)=byte_pos_to_file_line_col(c,*v.span.lo);
-		r.push_str(fmt!("\t{node_id:%i,\tkind:\"%s\",\tspan:{lo:%u,\thi:%u}},\n",*k,v.kind,*v.span.lo,*v.span.hi));
+
+		let oifps=byte_pos_to_index_file_pos(dc.tycx,v.span.lo);
+		let oifpe=byte_pos_to_index_file_pos(dc.tycx,v.span.hi);
+		if oifps.is_some() && oifpe.is_some() {
+			let ifps=oifps.unwrap();
+			let ifpe=oifpe.unwrap();
+			// local node:-
+			//assert!(ifps.file_index==ifpe.file_index);
+			r.push_str(fmt!("\t{node_id:%i,\tkind:\"%s\",\tlspan:{ lo:{file:%u,line:%u ,ofs:%u},\thi:{file:%u,line:%u, ofs:%u}}},\n",*k,v.kind,
+				ifps.file_index, ifps.line, ifps.col,ifpe.file_index, ifpe.line, ifpe.col));
+		} else {
+			// external node:-
+			r.push_str(fmt!("\t{node_id:%i,\tkind:\"%s\"\trspan{lo:%u,hi:%u}}\n",*k,v.kind, *v.span.lo,*v.span.hi));
+		}
 	}
 	r
 }
 
-impl ToJsonStr for FNodeInfoMap {
-	pub fn to_json_str(&self)->~str {
-		~"[\n"+node_spans_table_to_json_sub(self)+~"]\n"
+impl ToJsonStrFc for FNodeInfoMap {
+	pub fn to_json_str(&self,dc:&RFindCtx)->~str {
+		~"[\n"+node_spans_table_to_json_sub(dc,self)+~"]\n"
 	}
 }
 
@@ -177,34 +223,8 @@ impl ToJsonStr for hashmap::HashMap<ast::NodeId,ast::def_id> {
 // struct HrcNode{ parent:Option<HrcNode>, node:AstNode}
 // or even AstNode{ .../* each type has (sParent,content)*/}
 
-pub enum AstNode {
-	astnode_mod(@ast::_mod),
-	astnode_view_item(@ast::view_item),
-	astnode_item(@ast::item),
-	astnode_local(@ast::Local),
-	astnode_block(@ast::Block),
-	astnode_stmt(@ast::stmt),
-	astnode_arm(@ast::arm),
-	astnode_pat(@ast::pat),
-	astnode_decl(@ast::decl),
-	astnode_expr(@ast::expr),
-	astnode_ty(@ast::Ty),
-	astnode_ty_method(@ast::TypeMethod),
-	astnode_trait_method(@ast::trait_method),
-	astnode_method(@ast::method),
-	astnode_struct_def(@ast::struct_def),
-	astnode_struct_field(@ast::struct_field),
-	astnode_trait_ref(@ast::trait_ref),
-	astnode_variant(@ast::variant),
-	astnode_root,
-	astnode_none
-}
-
 //
 
-pub trait KindToStr {
-	fn kind_to_str(&self)->&'static str;
-}
 impl KindToStr for ast::decl {
 	fn kind_to_str(&self)->&'static str {
 		match self.node {
@@ -358,9 +378,6 @@ impl KindToStr for AstNode {
 	}
 }
 
-pub trait AstNodeAccessors {
-	pub fn get_id(&self)->Option<ast::NodeId>;
-}
 
 impl AstNodeAccessors for ast::item_ {
 	pub fn get_id(&self)->Option<ast::NodeId> {
@@ -490,7 +507,7 @@ fn expr_get_ident(a:&ast::expr)->Option<ast::ident> {
 }
  
 
-pub struct FindAstNodeSt {
+struct FindAstNodeSt {
 	result: NodeTreeLoc,		// todo - full tree path, all the parent nodes.
 	location: uint,
 	stop: bool,
@@ -897,7 +914,6 @@ pub fn get_def_id(curr_crate:ast::CrateNum,src_def:ast::def)->Option<ast::def_id
 	}
 }
 
-pub type JumpToDefMap = hashmap::HashMap<ast::NodeId,ast::NodeId> ;
 
 impl ToJsonStr for JumpToDefMap {
 	pub fn to_json_str(&self)->~str {

@@ -16,7 +16,7 @@ use syntax::visit;
 use syntax::parse::token;
 use syntax::visit::*;
 use syntax::visit::{Visitor, fn_kind};
-use self::find_ast_node::*;
+use find_ast_node::*;
 use text_formatting::*;
 use syntax::diagnostic;
 use syntax::codemap::BytePos;
@@ -30,9 +30,11 @@ use std::hashmap::*;
 use std::os;
 use std::local_data;
 use extra::json::ToJson;
+use rfindctx::*;
 
 use rust2html::*;
 use codemaput::*;
+
 
 pub mod find_ast_node;
 pub mod text_formatting;
@@ -40,11 +42,10 @@ pub mod ioutil;
 pub mod htmlwriter;
 pub mod rust2html;
 pub mod codemaput;
-
+pub mod rfindctx;
 /*
   test multiline
   */
-
 #[deriving(Clone, Eq, Encodable, Decodable)]
 enum ShowDefMode {
 	SDM_Line=0,
@@ -60,9 +61,10 @@ fn dump_json(dc:&RFindCtx) {
 	println("\tcode_map:[");
 //	for dc.sess.codemap.files.iter().advance |f| {
 	for f in dc.sess.codemap.files.iter() {
-		print("\t\t{ name:\""+f.name+"\",\tstart_pos:"+f.start_pos.to_str()+
-			",\tend_pos:"+(*f.start_pos+f.src.len()).to_str()+
-			",\tlines:[\n"+ flatten_to_str(*f.lines, |&x|{*x} ,",") +
+		print("\t\t{ name:\""+f.name+"\",\tglobal_start_pos:"+f.start_pos.to_str()+
+			",\tlength:"+(f.src.len()).to_str()+
+			",\tnum_lines:"+f.lines.len().to_str()+
+			",\tlines:[\n"+ flatten_to_str(*f.lines, |&x|{*x-*f.start_pos} ,",") +
 			"\n\t\t]\n\t},\n");
 	}
 	println("\t]");
@@ -70,7 +72,7 @@ fn dump_json(dc:&RFindCtx) {
 	let nim=build_node_info_map(dc.crate);
 	let node_def_node = build_node_def_node_table(dc);
 	let jdm=build_jump_to_def_map(dc,nim,node_def_node);
-	println(nim.to_json_str());	
+	println(nim.to_json_str(dc));	
 	println(",");
 	println("\tnode_defs [\n");
 	println(jdm.to_json_str());
@@ -352,7 +354,7 @@ pub fn node_id_from_text_file_pos_str(dc:&RFindCtx, file_pos_str:&str)->Option<a
 		Some(an)=>an.get_id()
 	}
 }
-pub fn node_from_text_file_pos_str(dc:&RFindCtx, file_pos_str:&str)->Option<find_ast_node::AstNode> {
+pub fn node_from_text_file_pos_str(dc:&RFindCtx, file_pos_str:&str)->Option<AstNode> {
 	match byte_pos_from_text_file_pos_str(dc,file_pos_str) {
 		Some(bp)=>{let ndt=find_node_tree_loc_at_byte_pos(dc.crate,bp);Some(ndt.last().clone())},
 		None=>None
@@ -361,7 +363,7 @@ pub fn node_from_text_file_pos_str(dc:&RFindCtx, file_pos_str:&str)->Option<find
 
 
 pub fn lookup_def_at_byte_pos(dc:&RFindCtx, bp:BytePos, m:ShowDefMode)->Option<~str> {
-	let ndt=find_ast_node::find_node_tree_loc_at_byte_pos(dc.crate,bp);
+	let ndt=find_node_tree_loc_at_byte_pos(dc.crate,bp);
 	lookup_def_of_node_tree_loc(dc,&ndt,m)
 }
 
@@ -754,7 +756,7 @@ fn debug_test(dc:&RFindCtx) {
 	//dump!(ctxt.tycx);
 	logi!("==== Get table of node-spans...===")
 	let node_info_map=build_node_info_map(dc.crate);
-	println(node_info_map.to_json_str());
+	println(node_info_map.to_json_str(dc));
 
 	logi!("==== Node Definition mappings...===")
 	let node_def_node = build_node_def_node_table(dc);
@@ -778,15 +780,15 @@ fn debug_test(dc:&RFindCtx) {
 
 		logi!(~"\n=====Find AST node at: ",loc.file.name,":",loc.line,":",loc.col,":"," =========");
 
-		let nodetloc = find_ast_node::find_node_tree_loc_at_byte_pos(dc.crate,BytePos(test_cursor));
-		let node_info =  find_ast_node::get_node_info_str(dc,&nodetloc);
+		let nodetloc = find_node_tree_loc_at_byte_pos(dc.crate,BytePos(test_cursor));
+		let node_info =  get_node_info_str(dc,&nodetloc);
 		dump!(node_info);
 		println("node ast loc:"+(do nodetloc.map |x| { option_to_str(&x.get_id()) }).to_str());
 
 
 		if_some!(id in nodetloc.last().ty_node_id() then {
 			logi!("source=",get_node_source(dc.tycx, node_info_map,id));
-			if_some!(t in find_ast_node::safe_node_id_to_type(dc.tycx, id) then {
+			if_some!(t in safe_node_id_to_type(dc.tycx, id) then {
 				println(fmt!("typeinfo: %?",
 					{let ntt= rustc::middle::ty::get(t); ntt}));
 				dump!(id,dc.tycx.def_map.find(&id));
