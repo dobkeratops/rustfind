@@ -30,6 +30,6 @@ rustfind: rustfind.rs $(SRC)
 clean:
 	rm *~
 	rm *.*~
-	rm rustfind
 	rm *.html
+	rm rustfind
 
