@@ -14,17 +14,18 @@ pub macro_rules! if_some {
 	);
 }
 
-pub struct TextFilePos {
+//pub type ZeroBasedIndex=uint;
+pub struct ZTextFilePos {
 	name:~str,
 	line:uint,
 	col:uint
 }
 pub trait ToTextFilePos {
-	pub fn to_text_file_pos(self,cx:ty::ctxt)->Option<TextFilePos>;
+	pub fn to_text_file_pos(self,cx:ty::ctxt)->Option<ZTextFilePos>;
 }
 
 impl ToTextFilePos for codemap::BytePos {
-	pub fn to_text_file_pos(self, cx:ty::ctxt)->Option<TextFilePos> {
+	pub fn to_text_file_pos(self, cx:ty::ctxt)->Option<ZTextFilePos> {
 		let mut i=cx.sess.codemap.files.len();
 		while i>0 {
 			i-=1;
@@ -35,7 +36,7 @@ impl ToTextFilePos for codemap::BytePos {
 					line-=1;
 					let line_start=*fm.lines[line];
 					if line_start<=*self {
-						return Some(TextFilePos::new(fm.name.to_owned(), line+1,*self-line_start))
+						return Some(ZTextFilePos::new(fm.name.to_owned(), line,*self-line_start))
 					}
 				}
 			}
@@ -44,30 +45,30 @@ impl ToTextFilePos for codemap::BytePos {
 	}
 }
 
-impl FromStr for TextFilePos {
-	pub fn from_str(file_pos_str:&str)->Option<TextFilePos> {
+impl FromStr for ZTextFilePos {
+	pub fn from_str(file_pos_str:&str)->Option<ZTextFilePos> {
 		let toks:~[&str]=file_pos_str.split_iter(':').collect();
 		if toks.len()<=0 {
 			None 
 		} else if toks.len()==1 {
-			Some(TextFilePos::new(toks[0],1,0))
+			Some(ZTextFilePos::new(toks[0],0,0))
 		} else {
-			match FromStr::from_str(toks[1]) {
+			match FromStr::from_str::<uint>(toks[1]) {
 				None=>None,
-				Some(line)=>match FromStr::from_str(toks[2]) {
-					None=>Some(TextFilePos::new(toks[0],line,0)),
-					Some(col)=>Some(TextFilePos::new(toks[0],line,col))
+				Some(editor_line_number)=>match FromStr::from_str(toks[2]) {
+					None=>Some(ZTextFilePos::new(toks[0],editor_line_number-1,0)),
+					Some(col)=>Some(ZTextFilePos::new(toks[0],editor_line_number,col))
 				}
 			}
 		}
 	}
 }
 
-impl TextFilePos {
-	pub fn new(filename:&str,_line:uint,_col:uint)->TextFilePos { TextFilePos{name:filename.to_owned(),line:_line,col:_col}}
+impl ZTextFilePos {
+	pub fn new(filename:&str,_line:uint,_col:uint)->ZTextFilePos { ZTextFilePos{name:filename.to_owned(),line:_line,col:_col}}
 
 	pub fn to_str(&self)->~str {
-		self.name+":"+self.line.to_str()+":"+self.col.to_str()+":"		
+		self.name+":"+(self.line+1).to_str()+":"+self.col.to_str()+":"		
 	}
 
 	pub fn to_byte_pos(&self,cx:ty::ctxt)->Option<codemap::BytePos> {
@@ -77,8 +78,8 @@ impl TextFilePos {
 			let fm=&cx.sess.codemap.files[i];
 			let filemap_filename:&str=fm.name;	
 			if filemap_filename==self.name {
-				if self.line>fm.lines.len() { return None;}
-				return Some(codemap::BytePos(*fm.lines[self.line-1]+self.col));
+				if self.line>=fm.lines.len() { return None;}
+				return Some(codemap::BytePos(*fm.lines[self.line]+self.col));
 			}
 		}
 		return None;
@@ -86,7 +87,7 @@ impl TextFilePos {
 }
 
 
-pub fn text_file_pos_to_byte_pos(c:ty::ctxt,tfp:&TextFilePos)->Option<codemap::BytePos>
+pub fn text_file_pos_to_byte_pos(c:ty::ctxt,tfp:&ZTextFilePos)->Option<codemap::BytePos>
 {
 //	for c.sess.codemap.files.rev_iter().advance |fm:&codemap::FileMap| {
 	let mut i=c.sess.codemap.files.len();
@@ -95,15 +96,15 @@ pub fn text_file_pos_to_byte_pos(c:ty::ctxt,tfp:&TextFilePos)->Option<codemap::B
 		let fm=&c.sess.codemap.files[i];
 		let filemap_filename:&str=fm.name;	
 		if filemap_filename==tfp.name {
-			let line_pos=*fm.lines[tfp.line-1];
-			let bp_start=*fm.lines[tfp.line-1]+tfp.col;
+			let line_pos=*fm.lines[tfp.line];
+			let bp_start=*fm.lines[tfp.line]+tfp.col;
 			return Some(codemap::BytePos(bp_start))
 		}
 	}
 	return None;
 }
 
-pub fn byte_pos_to_text_file_pos(c:ty::ctxt, pos:codemap::BytePos)->TextFilePos {
+pub fn byte_pos_to_text_file_pos(c:ty::ctxt, pos:codemap::BytePos)->Option<ZTextFilePos> {
 	// TODO: cleanup with byte_pos_to_index_file_pos, one in terms of the other.
 	// TODO - functional, and with binary search or something ..
 	let mut i=c.sess.codemap.files.len();
@@ -118,21 +119,22 @@ pub fn byte_pos_to_text_file_pos(c:ty::ctxt, pos:codemap::BytePos)->TextFilePos 
 				line-=1;
 				let lstart=*fm.lines[line];
 				if lstart < *pos {
-					return TextFilePos::new(fm.name, line, *pos-lstart)
+					return Some(ZTextFilePos::new(fm.name, line, *pos-lstart))
 				}
 			}
 		}
 	}	
-	TextFilePos::new(c.sess.codemap.files[0].name,0,0)
+	None
+//	TextFilePos::new(c.sess.codemap.files[0].name,0,0)
 }
 
-pub struct IndexFilePos {
+pub struct ZIndexFilePos {
 	file_index:uint,
 	line:uint,
 	col:uint
 }
 
-pub fn byte_pos_to_index_file_pos(c:ty::ctxt, pos:codemap::BytePos)->Option<IndexFilePos> {
+pub fn byte_pos_to_index_file_pos(c:ty::ctxt, pos:codemap::BytePos)->Option<ZIndexFilePos> {
 	// TODO: cleanup with byte_pos_to_text_file_pos, one in terms of the other.
 	// TODO - functional, and with binary search or something ..
 	let mut i=c.sess.codemap.files.len();
@@ -147,7 +149,7 @@ pub fn byte_pos_to_index_file_pos(c:ty::ctxt, pos:codemap::BytePos)->Option<Inde
 				line-=1;
 				let lstart=*fm.lines[line];
 				if lstart < *pos {
-					return Some(IndexFilePos{ file_index:i, line:line, col:*pos-lstart});
+					return Some(ZIndexFilePos{ file_index:i, line:line, col:*pos-lstart});
 				}
 			}
 		}

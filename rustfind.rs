@@ -316,11 +316,11 @@ fn lookup_def_at_file_line_pos_old(dc:&RFindCtx,filepos:&str, show_all:ShowDefMo
 	if toks.len()<3 { return None }
 
 //	let line:Option<uint> = FromStr::from_str(toks[1]);
-	if_some!(line in FromStr::from_str(toks[1]) then {
-		if_some!(col in FromStr::from_str(toks[2]) then {
+	if_some!(line in FromStr::from_str::<uint>(toks[1]) then {
+		if_some!(col in FromStr::from_str::<uint>(toks[2]) then {
 			//todo - if no column specified, just lookup everything on that line!
 
-			match text_file_pos_to_byte_pos(dc.tycx,&TextFilePos::new(toks[0],line,col)) {
+			match text_file_pos_to_byte_pos(dc.tycx,&ZTextFilePos::new(toks[0],line-1,col-1)) {
 				None=>{},
 				Some(bp)=>{
 					return lookup_def_at_byte_pos(dc,bp,show_all)
@@ -332,7 +332,7 @@ fn lookup_def_at_file_line_pos_old(dc:&RFindCtx,filepos:&str, show_all:ShowDefMo
 }
 
 
-pub fn lookup_def_at_text_file_pos(dc:&RFindCtx, tfp:&TextFilePos, show_mode:ShowDefMode)->Option<~str> {
+pub fn lookup_def_at_text_file_pos(dc:&RFindCtx, tfp:&ZTextFilePos, show_mode:ShowDefMode)->Option<~str> {
 	match text_file_pos_to_byte_pos(dc.tycx, tfp) {
 		None=>None,
 		Some(bp)=>lookup_def_at_byte_pos(dc,bp,show_mode)
@@ -544,16 +544,16 @@ fn lookup_def_of_node_sub(dc:&RFindCtx,node:&AstNode,m:ShowDefMode,node_spans:&F
 	}
 }
 
-fn get_str_at_text_file_pos_len(cx:ty::ctxt, tfp:&TextFilePos,len:uint)->~str {
-	let x=text_file_pos_len_to_byte_pos(cx, tfp,len);
-	match  x  {
+fn get_str_at_text_file_pos_len(cx:ty::ctxt, tfp:&ZTextFilePos,len:uint)->~str {
+	let a=text_file_pos_len_to_byte_pos(cx, tfp,len);
+	match  a  {
 		Some((bp_lo,bp_hi))=>get_span_str(cx,
 			&codemap::span{lo:bp_lo,hi:bp_hi,expn_info:None}
 		),
 		None=>~""
 	}
 }
-fn get_file_line_str(cx:ty::ctxt, filename:&str, src_line:uint)->~str {
+fn zget_file_line_str(cx:ty::ctxt, filename:&str, src_line:uint)->~str {
 //	for c.sess.codemap.files.rev_iter().advance |fm:&codemap::FileMap| {
 	let mut i=cx.sess.codemap.files.len();
 	while i>0 {	// caution, need loop because we return, wait for new foreach ..in..
@@ -561,11 +561,11 @@ fn get_file_line_str(cx:ty::ctxt, filename:&str, src_line:uint)->~str {
 		let fm=&cx.sess.codemap.files[i];
 		let filemap_filename:&str=fm.name;	
 		if filename==filemap_filename {
-			let s=*fm.lines[src_line-1];
-			let e=if src_line>=fm.lines.len() {
+			let s=*fm.lines[src_line];
+			let e=if (src_line+1)>=fm.lines.len() {
 				*fm.start_pos+fm.src.len()
 			} else {
-				*fm.lines[src_line]
+				*fm.lines[src_line+1]
 			};
 		}
 	}
@@ -665,7 +665,7 @@ pub fn text_line_pos_to_offset(text:&[u8], (line,ofs_in_line):(uint,uint))->Opti
 }
 
 /// Get from text editor's description of location to inlined-crate byte-offset
-pub fn text_file_pos_len_to_byte_pos(c:ty::ctxt,tfp:&TextFilePos,len:uint )->Option<(codemap::BytePos,codemap::BytePos)>
+pub fn text_file_pos_len_to_byte_pos(c:ty::ctxt,tfp:&ZTextFilePos,len:uint )->Option<(codemap::BytePos,codemap::BytePos)>
 
 {
 //	for c.sess.codemap.files.rev_iter().advance |fm:&codemap::FileMap| {
@@ -675,8 +675,8 @@ pub fn text_file_pos_len_to_byte_pos(c:ty::ctxt,tfp:&TextFilePos,len:uint )->Opt
 		let fm=&c.sess.codemap.files[i];
 		let filemap_filename:&str=fm.name;	
 		if filemap_filename==tfp.name {
-			let line_pos=*fm.lines[tfp.line-1];
-			let bp_start=*fm.lines[tfp.line-1]+tfp.col;
+			let line_pos=*fm.lines[tfp.line];
+			let bp_start=*fm.lines[tfp.line]+tfp.col;
 			let bp_end=(bp_start+len).min(&(*fm.start_pos+fm.src.len()));
 			return Some((BytePos(bp_start), BytePos(bp_end)))
 		}
@@ -804,24 +804,24 @@ fn debug_test(dc:&RFindCtx) {
 
 	// test byte pos from file...
 	logi!("====test file:pos source lookup====");
-	dump!(get_str_at_text_file_pos_len(dc.tycx,&TextFilePos::new("test_input.rs",3,0),10));
-	dump!(get_str_at_text_file_pos_len(dc.tycx,&TextFilePos::new("test_input.rs",9,0),10));
-	dump!(get_str_at_text_file_pos_len(dc.tycx,&TextFilePos::new("test_input2.rs",4,0),10));
-	dump!(get_str_at_text_file_pos_len(dc.tycx,&TextFilePos::new("test_input2.rs",11,0),10));
-	let ospan=text_file_pos_len_to_byte_pos(dc.tycx, &TextFilePos::new("test_input2.rs", 10,0),32);
+	dump!(get_str_at_text_file_pos_len(dc.tycx,&ZTextFilePos::new("test_input.rs",3-1,0),10));
+	dump!(get_str_at_text_file_pos_len(dc.tycx,&ZTextFilePos::new("test_input.rs",9-1,0),10));
+	dump!(get_str_at_text_file_pos_len(dc.tycx,&ZTextFilePos::new("test_input2.rs",4-1,0),10));
+	dump!(get_str_at_text_file_pos_len(dc.tycx,&ZTextFilePos::new("test_input2.rs",11-1,0),10));
+	let ospan=text_file_pos_len_to_byte_pos(dc.tycx, &ZTextFilePos::new("test_input2.rs", 10-1,0),32);
 	if_some!(x in ospan then {
 		let (lo,hi)=x;
 		logi!(get_span_str(dc.tycx, &codemap::span{lo:lo,hi:hi,expn_info:None} ));
 	});
-	dump!(get_file_line_str(dc.tycx,"test_input2.rs",5));
-	dump!(get_file_line_str(dc.tycx,"test_input.rs",9));
+	dump!(zget_file_line_str(dc.tycx,"test_input2.rs",5-1));
+	dump!(zget_file_line_str(dc.tycx,"test_input.rs",9-1));
 	
 	logi!("\n====test full file:pos lookup====");
-	dump!(lookup_def_at_text_file_pos(dc, &TextFilePos::new("test_input.rs",8,21),SDM_Source));println("");
-	dump!(lookup_def_at_text_file_pos(dc, &TextFilePos::new("test_input2.rs",3,12),SDM_Source));println("");
-	dump!(lookup_def_at_text_file_pos(dc, &TextFilePos::new("test_input.rs",10,8),SDM_Source));println("");
-	dump!(lookup_def_at_text_file_pos(dc, &TextFilePos::new("test_input.rs",13,16),SDM_Source));println("");
-	dump!(lookup_def_at_text_file_pos(dc, &TextFilePos::new("test_input.rs",11,10),SDM_Source));println("");
+	dump!(lookup_def_at_text_file_pos(dc, &ZTextFilePos::new("test_input.rs",8-1,21),SDM_Source));println("");
+	dump!(lookup_def_at_text_file_pos(dc, &ZTextFilePos::new("test_input2.rs",3-1,12),SDM_Source));println("");
+	dump!(lookup_def_at_text_file_pos(dc, &ZTextFilePos::new("test_input.rs",10-1,8),SDM_Source));println("");
+	dump!(lookup_def_at_text_file_pos(dc, &ZTextFilePos::new("test_input.rs",13-1,16),SDM_Source));println("");
+	dump!(lookup_def_at_text_file_pos(dc, &ZTextFilePos::new("test_input.rs",11-1,10),SDM_Source));println("");
 	
 }
 

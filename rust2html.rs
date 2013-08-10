@@ -513,18 +513,21 @@ fn write_line_with_links(outp:&mut HtmlWriter,dc:&RFindCtx,fm:&codemap::FileMap,
 						None=>curr_link=no_link,	// link outside the crate?
 						Some(link_node_info)=>{
 							let oifp = byte_pos_to_index_file_pos(dc.tycx, link_node_info.span.lo);
-							if (oifp.is_some()) {
-								let ifp=oifp.unwrap();
-								let link_str="#"+(ifp.line+2).to_str();
-								outp.begin_tag_link(make_rel_html_name(dc.sess.codemap.files[ifp.file_index].name,fm.name)+link_str);
-							} else {
-								outp.begin_tag_link("#node_"+curr_link.to_str());
+							match oifp {
+								Some(ifp)=>{
+									let link_str="#"+(ifp.line+1).to_str();
+									outp.begin_tag_link(make_rel_html_name(dc.sess.codemap.files[ifp.file_index].name,fm.name)+link_str);
+								},
+								None=>{
+
+									outp.begin_tag_link("#node_"+curr_link.to_str());
+								}
 							}
 						}
 					}
 				} else if curr_link<0/* link to refs block,value is -(this node index)*/{
 					let ifp= get_node_index_file_pos(dc,nim,-curr_link);
-					let ref_block_link_str="#"+ifp.line.to_str()+"_"+ifp.col.to_str()+"_refs";
+					let ref_block_link_str="#"+(ifp.line+1).to_str()+"_"+ifp.col.to_str()+"_refs";
 					outp.begin_tag_link(ref_block_link_str);
 				}
 			}
@@ -762,9 +765,6 @@ fn write_references(doc:&mut HtmlWriter,dc:&RFindCtx, fm:&codemap::FileMap,nim:&
 	fn write_refs_header(doc:&mut HtmlWriter,dc:&RFindCtx,nim:&FNodeInfoMap, fm:&codemap::FileMap, nid:ast::NodeId) {
 
 		doc.writeln("");
-//		match nim.find(&nid) {
-//			None=>{},
-//			Some(info)=>{
 		do nim.find(&nid).for_some |info| {
 			let oifp=byte_pos_to_index_file_pos(dc.tycx, info.span.lo);//.unwrap();
 			let oifpe=byte_pos_to_index_file_pos(dc.tycx, info.span.hi);//.unwrap();
@@ -774,7 +774,7 @@ fn write_references(doc:&mut HtmlWriter,dc:&RFindCtx, fm:&codemap::FileMap,nim:&
 	//		let def_info=nim.find(&nid).unwrap();
 	//		let ifpe=get_node_index_file_pos(dc,nim,nid).unwrap();
 
-				doc.begin_tag_anchor(ifp.line.to_str()+"_"+ifp.col.to_str() + "_refs" );
+				doc.begin_tag_anchor((ifp.line+1).to_str()+"_"+ifp.col.to_str() + "_refs" );
 				doc.begin_tag_link( "#"+(ifp.line+1).to_str());
 				doc.begin_tag("c24");
 				doc.writeln(dc.sess.codemap.files[ifp.file_index].name+":"+(ifp.line+1).to_str()+":"+ifp.col.to_str()
@@ -832,7 +832,7 @@ fn write_path_links(doc:&mut HtmlWriter, file_name:&str) {
 // things that are robust when some source changes, etc.
 // file_index:line_index:col_index:length
 
-fn get_node_index_file_pos(dc:&RFindCtx,nim:&FNodeInfoMap,nid:ast::NodeId)->IndexFilePos {
+fn get_node_index_file_pos(dc:&RFindCtx,nim:&FNodeInfoMap,nid:ast::NodeId)->ZIndexFilePos {
 	let oni=nim.find(&nid);
 	assert!(oni.is_some());
 	let ni=oni.unwrap();

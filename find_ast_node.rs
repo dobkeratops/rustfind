@@ -525,6 +525,8 @@ fn fcns_view_item(a:&ast::view_item, (s,v):FNodeInfoMapSV) {
 
 fn fcns_generics(g:&ast::Generics,(s,v):FNodeInfoMapSV) {
 	for tp in g.ty_params.iter() {
+//		push_span(s, g.def_id.id, Some(g.ident), "ty_param_def", g.def_id.span, astnode_ty_param_def(tp))
+// todo - we dont have a span for the 'X' in <X>
 		for tb in tp.bounds.iter() {
 			match(tb) {
 				&ast::TraitTyParamBound(ref tr)=>fcns_trait_ref(tr,(s,v)),
@@ -909,16 +911,22 @@ impl ToJsonStr for JumpToDefMap {
 
 
 pub fn byte_pos_from_text_file_pos_str(dc:&RFindCtx,filepos:&str)->Option<codemap::BytePos> {
-	let toks:~[&str]=filepos.split_iter(':').collect();
+	let toks=filepos.split_iter(':').to_owned_vec();
 	if toks.len()<3 { return None; }
+//	let t0:()=toks[0];
 
 //	let line:Option<uint> = FromStr::from_str(toks[1]);
-	if_some!(line in FromStr::from_str(toks[1]) then {
-		if_some!(col in FromStr::from_str(toks[2]) then {
-			//todo - if no column specified, just lookup everything on that line!
-				return text_file_pos_to_byte_pos(dc.tycx,&TextFilePos::new(toks[0],line,col));
-		})
-	})
+//	if_some!(line in FromStr::from_str(toks[1]) then {
+//		if_some!(col in FromStr::from_str(toks[2]) then {
+	let line:Option<uint> =FromStr::from_str(toks[1]);
+	let col:Option<uint> =FromStr::from_str(toks[2]);
+	if line.is_some() && col.is_some() {
+		//todo - if no column specified, just lookup everything on that line!
+		let l0 = line.unwrap()-1;
+		let c0= col.unwrap()-1;
+		let foo= text_file_pos_to_byte_pos(dc.tycx,&ZTextFilePos::new(toks[0],l0,c0));
+		foo;
+	}
 	return None;
 }
 

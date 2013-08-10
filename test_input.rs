@@ -27,8 +27,10 @@ enum Animal {
 	a_dog(int),
 }
 
-trait Testable {
-	fn test(&self);
+trait Testable 
+{	fn test(&self);
+	fn test1(&self);
+	fn test2(&self);
 }
 trait DoZ {
 	fn do_z(&self);
@@ -38,6 +40,14 @@ impl Testable for Foo {
 	fn test(&self) {
 		println(self.foo_field_1.to_str());
 	}
+	fn test1(&self) 
+	{
+		println(self.foo_field_1.to_str());
+	}	fn test2(&self) 
+	{
+		println(self.foo_field_1.to_str());
+	}
+
 }
 impl DoZ for Foo {
 	fn do_z(&self) {
