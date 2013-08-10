@@ -28,8 +28,7 @@ rustfind: rustfind.rs $(SRC)
 	rustc rustfind.rs
 
 clean:
-	rm *~
-	rm *.*~
-	rm *.html
 	rm rustfind
+	rm *.html
+	rm *.*~
 

@@ -432,12 +432,12 @@ fn write_line_with_links(outp:&mut HtmlWriter,dc:&RFindCtx,fm:&codemap::FileMap,
 			if wb && is_alphanumeric(line[x] as char){
 				let (decl_color,len)=
 					is_text_here(line,x,"type",31)
-					.get_or_default(is_text_here(line,x,"struct",27)
-					.get_or_default(is_text_here(line,x,"trait",28)
-					.get_or_default(is_text_here(line,x,"impl",30)
-					.get_or_default(is_text_here(line,x,"enum",29)
-					.get_or_default(is_text_here(line,x,"fn",26)
-					.get_or_default((0,0)))))));
+					.unwrap_or_default(is_text_here(line,x,"struct",27)
+					.unwrap_or_default(is_text_here(line,x,"trait",28)
+					.unwrap_or_default(is_text_here(line,x,"impl",30)
+					.unwrap_or_default(is_text_here(line,x,"enum",29)
+					.unwrap_or_default(is_text_here(line,x,"fn",26)
+					.unwrap_or_default((0,0)))))));
 				if decl_color>0{
 					for x in range(x,x+len) { link[x]=0;/* clear link on the keyword part..*/}
 					let mut in_typaram=0;

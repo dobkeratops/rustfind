@@ -1,12 +1,13 @@
 #[macro_escape];
 
 pub use std::io::*;
-pub use std::str::*;
+pub use std::c_str::*;
 pub use std::libc::*;
 pub use std::ptr::*;
 pub use std::sys::*;	// for size_of
 pub use std::vec::*;
 pub use std::num::*;
+
 pub type Size_t=u64;	// todo - we're not sure this should be u64 
 						// as the libc stuff seems to want.
 						// should it be uint?
@@ -67,8 +68,10 @@ impl<T> VoidPtr for T {
 pub fn printStr<T:ToStr>(a:&T){println(a.to_str());}
 
 pub fn c_str(rustStr:&str)->*c_char {
+	unsafe {
 //	as_c_str(rustStr,|x|x)
-	rustStr.as_c_str(|x|x)
+		rustStr.to_c_str().unwrap()
+	}
 }
 pub unsafe fn fileOpen(filename:&str,mode:&str)-> *FILE {
 	fopen(c_str(filename),c_str(mode))

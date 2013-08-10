@@ -378,7 +378,6 @@ impl KindToStr for AstNode {
 	}
 }
 
-
 impl AstNodeAccessors for ast::item_ {
 	pub fn get_id(&self)->Option<ast::NodeId> {
 		match *self {
@@ -396,7 +395,6 @@ impl AstNodeAccessors for ast::item_ {
 	}
 }
 
-
 impl AstNodeAccessors for ast::item {
 	pub fn get_id(&self)->Option<ast::NodeId> {
 		Some(self.id)
@@ -408,7 +406,6 @@ impl AstNodeAccessors for ast::Local {
 	}
 }
 
-
 impl AstNodeAccessors for ast::decl_ {
 	pub fn get_id(&self)->Option<ast::NodeId> {
 		match *self{
@@ -417,6 +414,7 @@ impl AstNodeAccessors for ast::decl_ {
 		}
 	}
 }
+
 impl<T:AstNodeAccessors> AstNodeAccessors for codemap::spanned<T> {
 	pub fn get_id(&self)->Option<ast::NodeId> {
 		self.node.get_id()
@@ -446,7 +444,7 @@ impl AstNodeAccessors for ast::stmt_ {
 impl AstNodeAccessors for ast::view_item_ {
 	pub fn get_id(&self)->Option<ast::NodeId> {
 		match *self {
-			ast::view_item_extern_mod(_,_,node_id)=>Some(node_id),
+			ast::view_item_extern_mod(_,_,_,node_id)=>Some(node_id),
 			ast::view_item_use(_)=>None
 		}
 	}

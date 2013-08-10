@@ -162,7 +162,7 @@ fn main() {
         optmulti("L"),optflag("d"),optflag("j"),optflag("h"),optflag("i"),optflag("g"),optflag("w"),optflag("f")
     ];
 
-    let matches = getopts(args.tail(), opts).get();
+	let matches = getopts(args.tail(), opts).unwrap();
     let libs1 = opt_strs(&matches, "L").map(|s| Path(*s));
 	let libs=if libs1.len()>0 {libs1} else {
 		match (os::getenv(&"RUST_LIBS")) {
@@ -200,7 +200,7 @@ fn main() {
 		if (opt_present(&matches,"f")) {
 			while i<matches.free.len() {
 				let mode=if opt_present(&matches,"g"){SDM_GeditCmd} else {SDM_Source};
-				print(lookup_def_at_text_file_pos_str(dc,matches.free[i],mode).get_or_default(~"no def found\n"));
+				print(lookup_def_at_text_file_pos_str(dc,matches.free[i],mode).unwrap_or_default(~"no def found\n"));
 				i+=1;
 				done=true;
 			}
@@ -234,7 +234,7 @@ fn get_ast_and_resolve(cpath: &std::path::PosixPath, libs: ~[std::path::PosixPat
     let parsesess = parse::new_parse_sess(None);
     let sessopts = @driver::session::options {
         binary: @"rustdoc",
-        maybe_sysroot: Some(@std::os::self_exe_path().get().pop()),
+        maybe_sysroot: Some(@std::os::self_exe_path().unwrap().pop()),
         addl_lib_search_paths: @mut libs,
         ..  (*rustc::driver::session::basic_options()).clone()
     };
@@ -448,7 +448,7 @@ fn lookup_def_of_node_tree_loc(dc:&RFindCtx,node_tree_loc:&NodeTreeLoc,m:ShowDef
 }
 
 fn lookup_def_of_node(dc:&RFindCtx,node:&AstNode,m:ShowDefMode)->Option<~str> {
-	println("def of node:"+node.get_id().get_or_default(0).to_str());
+	println("def of node:"+node.get_id().unwrap_or_default(0).to_str());
 	let node_spans=build_node_info_map(dc.crate);
 	let node_def_node = build_node_def_node_table(dc);
 	lookup_def_of_node_sub(dc,node,m,node_spans,node_def_node)
@@ -491,7 +491,7 @@ fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, node_spans:&FNodeInfoMap,
 				let tydef=auto_deref_ty(ty::get(*obj_ty.unwrap()));
 				match tydef.sty {
 					ty::ty_struct(def,_)=> {
-						let node_to_show=find_named_struct_field(dc.tycx, def.node, ident).get_or_default(def.node);
+						let node_to_show=find_named_struct_field(dc.tycx, def.node, ident).unwrap_or_default(def.node);
 						return Some(node_to_show);//mk_result(dc,m,node_spans,node_to_show,"(struct_field)");
 					},
 					_=>return None
@@ -880,10 +880,11 @@ pub fn rustfind_interactive(dc:&RFindCtx) {
 					let cmd=toks[0];
 					let cmd1=match cmd[0] as char { '0'..'9'=>curr_file+":"+cmd,_=>cmd.to_str() };
 					let subtoks:~[&str]=cmd1.split_iter(':').collect();
-					curr_file=find_file_name_in(dc, subtoks[0].to_str()).get_or_default(curr_file);
+					curr_file=find_file_name_in(dc, subtoks[0].to_str()).unwrap_or_default(curr_file);
 					//dump!(cmd1,subtoks,curr_file);
 					let def=lookup_def_at_text_file_pos_str(dc, cmd1,SDM_Source);
-					print(def.get_or_default(~"no def found\n"));
+					print(def.unwrap_or_default
+					(~"no def found\n"));
 					//println(def_of_symbol_to_str(dc,node_spans,node_def_node,toks[0]));
 				}
 			}

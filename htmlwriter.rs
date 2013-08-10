@@ -53,7 +53,7 @@ impl<'self> HtmlWriter {
 		self.write_tag_sub(tag_name,&[],true);
 		self
 	}
-	priv fn write_tag_sub(&'self mut self, tag_name:&str, key_values:&[(~str,~str)], closed:bool)->&'self mut HtmlWriter {
+	fn write_tag_sub(&'self mut self, tag_name:&str, key_values:&[(~str,~str)], closed:bool)->&'self mut HtmlWriter {
 		self.doc.push_str("<"+tag_name);
 		for &(ref k,ref v) in key_values.iter() {
 			self.doc.push_str(" ");
