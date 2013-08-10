@@ -889,6 +889,25 @@ pub fn rustfind_interactive(dc:&RFindCtx) {
 	}
 }
 
+pub trait MyOption<T> {
+	pub fn for_some(&self, f:&fn(t:&T));
+	pub fn do_some<R>(&self, f:&fn(t:&T)->R)->Option<R>;
+}
+impl<T> MyOption<T> for Option<T>{
+	pub fn for_some(&self, f:&fn(t:&T)) {
+		match self {
+			&None=>{},
+			&Some(ref t)=>f(t)
+		}
+	}
+	pub fn do_some<R>(&self, f:&fn(t:&T)->R)->Option<R> {
+		match self {
+			&None=>None,
+			&Some(ref t)=>Some(f(t))
+		}
+	}
+
+}
 
 
 

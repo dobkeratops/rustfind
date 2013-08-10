@@ -190,6 +190,7 @@ pub fn get_file_index(dc:&RFindCtx,fname:&str)->Option<uint> {
 	None
 }
 
+
 impl NodesPerLinePerFile {
 	fn new(dc:&RFindCtx, nim:&FNodeInfoMap)->~NodesPerLinePerFile {
 		// todo, figure this out functionally?!
@@ -206,20 +207,15 @@ impl NodesPerLinePerFile {
 		}
 		for (k,v) in nim.iter() {
 			// todo, this could be more direct, file index, line index, ...
-			match byte_pos_to_index_file_pos(dc.tycx,v.span.lo) {
-				None=>{},
-				Some(ifp)=>{
-//					dump!(ifp);
-					match byte_pos_to_index_file_pos(dc.tycx,v.span.hi) {
-						None=>{
-						},
-						Some(ifpe)=>for li in range(ifp.line,ifpe.line+1) {
-							if li < npl.m[ifp.file_index].len() {
-								npl.m[ifp.file_index][li].push(*k)
-							}
-						}
+			do byte_pos_to_index_file_pos(dc.tycx,v.span.lo).for_some|ifp|{
+				match byte_pos_to_index_file_pos(dc.tycx,v.span.hi) {
+					None=>{	},
+					Some(ifpe)=>for li in range(ifp.line,ifpe.line+1) {
+						if li < npl.m[ifp.file_index].len() {
+							npl.m[ifp.file_index][li].push(*k)
+						};
 					}
-				}
+				};
 			}
 		}
 		npl
@@ -766,12 +762,13 @@ fn write_references(doc:&mut HtmlWriter,dc:&RFindCtx, fm:&codemap::FileMap,nim:&
 	fn write_refs_header(doc:&mut HtmlWriter,dc:&RFindCtx,nim:&FNodeInfoMap, fm:&codemap::FileMap, nid:ast::NodeId) {
 
 		doc.writeln("");
-		match nim.find(&nid) {
-			None=>{},
-			Some(info)=>{
-				let oifp=byte_pos_to_index_file_pos(dc.tycx, info.span.lo);//.unwrap();
-				let oifpe=byte_pos_to_index_file_pos(dc.tycx, info.span.hi);//.unwrap();
-				if (oifp.is_some() && oifpe.is_some())==false{ return;}
+//		match nim.find(&nid) {
+//			None=>{},
+//			Some(info)=>{
+		do nim.find(&nid).for_some |info| {
+			let oifp=byte_pos_to_index_file_pos(dc.tycx, info.span.lo);//.unwrap();
+			let oifpe=byte_pos_to_index_file_pos(dc.tycx, info.span.hi);//.unwrap();
+			if (oifp.is_some() && oifpe.is_some())==true {
 				let ifp=oifp.unwrap();
 				let ifpe=oifp.unwrap();
 	//		let def_info=nim.find(&nid).unwrap();
@@ -792,6 +789,7 @@ fn write_references(doc:&mut HtmlWriter,dc:&RFindCtx, fm:&codemap::FileMap,nim:&
 				doc.end_tag();
 			}
 		}
+
 	}
 
 	fn write_file_ref(doc:&mut HtmlWriter, dc:&RFindCtx,origin_fm:&codemap::FileMap, fi:uint) {
