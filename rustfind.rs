@@ -5,6 +5,7 @@ extern mod extra;
 use rustc::{front, metadata, driver, middle};
 use rustc::middle::*;
 use rustc::middle::typeck;
+use rustc::metadata::*;
 
 use std::num;
 use std::num::*;
@@ -54,6 +55,17 @@ enum ShowDefMode {
 	SDM_GeditCmd=3
 }
 
+/*
+example of cross crate referencing
+/home/walter/gplsrc/rust/src/librustc/middle/ty.rs:4080:	
+pub fn lookup_struct_fields(cx: ctxt, did: ast::def_id) -> ~[field_ty] {
+	if did.crate == ast::LOCAL_CRATE {
+		....
+	} else {
+		return csearch::get_struct_fields(cx.sess.cstore, did);
+	}
+*/
+
 fn dump_json(dc:&RFindCtx) {
 	// TODO: full/partial options - we currently wwrite out all the nodes we find.
 	// need option to only write out nodes that map to definitons. 
@@ -92,7 +104,7 @@ pub fn build_jump_to_def_map(dc:&RFindCtx, nim:@mut FNodeInfoMap,nd:&HashMap<ast
 				match lookup_def_node_of_node(dc,&ast_node,nim,nd) {
 					None=>{},
 					Some(def_node_id)=>{
-						if *k != def_node_id {
+						if *k != def_node_id.node && def_node_id.crate==0 {
 							jdm.insert(*k,def_node_id);
 						}
 					}
@@ -155,6 +167,8 @@ fn main() {
     use extra::getopts::*;
     use std::hashmap::HashMap;
 
+	//test_default_arg(1,(2,3));
+	//test_default_arg(1);
 
     let args = os::args();
 
@@ -294,7 +308,7 @@ pub fn some_else<T,X,Y>(o:&Option<T>,f:&fn(t:&T)->Y,default_value:Y)->Y {
 
 /// todo - collect stage.
 
-fn flatten_to_str<T,U:ToStr>(xs:&[T],f:&fn(x:&T)->U, sep:&str)->~str {
+fn flatten_to_str<T,U:ToStr>(xs:&[T],f:&fn(x:&T)->U, sep:&str=" ")->~str {
 	let mut acc=~"";
 	let mut i=0; // TODO - functional way.
 	while i<xs.len() {
@@ -422,13 +436,13 @@ fn get_struct_def<'a,'b>(tc:&'a ty::ctxt_, struct_node_id:ast::NodeId)->Option<(
 	}
 }
 
-fn find_named_struct_field(tc:&ty::ctxt_, struct_node_id:ast::NodeId, field_ident:&ast::ident)->Option<ast::NodeId> {
+fn find_named_struct_field(tc:&ty::ctxt_, struct_node_id:ast::NodeId, field_ident:&ast::ident)->Option<ast::def_id> {
 	match get_struct_def(tc,struct_node_id) {
 		None=>None,
 		Some((it,sd,ge))=>{
 			for f in sd.fields.iter() {
 				match f.node.kind {
-					ast::named_field(ref ident,vis)=>if *ident==*field_ident {return Some(f.node.id);},
+					ast::named_field(ref ident,vis)=>if *ident==*field_ident {return Some(ast::def_id{crate:0,node:f.node.id});},
 					_=>return None
 				}
 			}
@@ -454,7 +468,7 @@ fn lookup_def_of_node(dc:&RFindCtx,node:&AstNode,m:ShowDefMode)->Option<~str> {
 	lookup_def_of_node_sub(dc,node,m,node_spans,node_def_node)
 }
 
-fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, node_spans:&FNodeInfoMap, node_def_node:&HashMap<ast::NodeId,ast::def_id>)->Option<ast::NodeId> {
+fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, node_spans:&FNodeInfoMap, node_def_node:&HashMap<ast::NodeId,ast::def_id>)->Option<ast::def_id> {
 	
 	match *node {
 		astnode_expr(e)=>match e.node {
@@ -469,14 +483,14 @@ fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, node_spans:&FNodeInfoMap,
 						//logi!("Method Map entry for",e.id);
 						match mme.origin {
 							typeck::method_static(def_id)=> 
-								return Some(def_id.node),
+								return Some(def_id),
 							typeck::method_trait(def_id,_,_)=>
-								return Some(def_id.node),
+								return Some(def_id),
 							typeck::method_param(mp)=>{
 								match dc.tycx.trait_method_def_ids.find(&mp.trait_id) {
 									None=>{},
 									Some(method_def_ids)=>{
-										return Some(method_def_ids[mp.method_num].node)
+										return Some(method_def_ids[mp.method_num])
 									}
 								}
 							}
@@ -491,7 +505,7 @@ fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, node_spans:&FNodeInfoMap,
 				let tydef=auto_deref_ty(ty::get(*obj_ty.unwrap()));
 				match tydef.sty {
 					ty::ty_struct(def,_)=> {
-						let node_to_show=find_named_struct_field(dc.tycx, def.node, ident).unwrap_or_default(def.node);
+						let node_to_show=find_named_struct_field(dc.tycx, def.node, ident).unwrap_or_default(def);
 						return Some(node_to_show);//mk_result(dc,m,node_spans,node_to_show,"(struct_field)");
 					},
 					_=>return None
@@ -519,30 +533,35 @@ fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, node_spans:&FNodeInfoMap,
 	return None;
 }
 
-fn lookup_def_of_node_sub(dc:&RFindCtx,node:&AstNode,m:ShowDefMode,node_spans:&FNodeInfoMap, node_def_node:&HashMap<ast::NodeId,ast::def_id>)->Option<~str> {
+fn lookup_def_of_node_sub(dc:&RFindCtx,node:&AstNode,m:ShowDefMode,nim:&FNodeInfoMap, node_def_node:&HashMap<ast::NodeId,ast::def_id>)->Option<~str> {
 	// TODO - cache outside?
 
 
-	fn mk_result(dc:&RFindCtx,  m:ShowDefMode, node_spans:&FNodeInfoMap, def_node_id:ast::NodeId, extra_str:&str)->Option<~str> {
-		match node_spans.find(&def_node_id) {
-			None=>None,
-			Some(def_info)=>{
-				let loc=get_source_loc(dc,def_info.span.lo);
-				let def_pos_str=
-					loc.file.name + ":"+loc.line.to_str()+": "+
-						match m { SDM_LineCol=>loc.col.to_str()+": ", _ =>~"" }+"\n";
-				return	match m{
-					SDM_Source=>Some(def_pos_str+get_node_source(dc.tycx,node_spans, def_node_id)+"\n"),
-					SDM_GeditCmd=>Some("+"+loc.line.to_str()+" "+loc.file.name+" "),
-					_ => Some(def_pos_str)
-				};
+	fn mk_result(dc:&RFindCtx,  m:ShowDefMode, nim:&FNodeInfoMap, def_node_id:ast::def_id, extra_str:&str)->Option<~str> {
+		if def_node_id.crate!=0 {
+			Some(~"{cross-crate-def not implemented, "+def_node_id.to_str()+"}")
+		}
+		else {
+			match nim.find(&def_node_id.node) {
+				None=>None,
+				Some(def_info)=>{
+					let loc=get_source_loc(dc,def_info.span.lo);
+					let def_pos_str=
+						loc.file.name + ":"+loc.line.to_str()+": "+
+							match m { SDM_LineCol=>loc.col.to_str()+": ", _ =>~"" }+"\n";
+					return	match m{
+						SDM_Source=>Some(def_pos_str+get_node_source(dc.tycx,nim, def_node_id)+"\n"),
+						SDM_GeditCmd=>Some("+"+loc.line.to_str()+" "+loc.file.name+" "),
+						_ => Some(def_pos_str)
+					};
 
+				}
 			}
 		}
 	}
-	match lookup_def_node_of_node(dc, node,node_spans, node_def_node) {
+	match lookup_def_node_of_node(dc, node, nim, node_def_node) {
 		None=>None,
-		Some(def_node_id)=>mk_result(dc,m,node_spans,def_node_id, "")
+		Some(def_node_id)=>mk_result(dc,m, nim,def_node_id, "")
 	}
 }
 
@@ -590,12 +609,16 @@ pub fn dump_node_source_for_single_file_only(text:&[u8], ns:&FNodeInfoMap, id:as
 }
 
 // TODO- this should return a slice?
-pub fn get_node_source(c:ty::ctxt, ns:&FNodeInfoMap, id:ast::NodeId)->~str {
-	match (ns.find(&id)){
-		None=>~"",
-		Some(info)=>{
-			get_span_str(c,&info.span)
+pub fn get_node_source(c:ty::ctxt, nim:&FNodeInfoMap, did:ast::def_id)->~str {
+	if did.crate==0{
+		match (nim.find(&did.node)){
+			None=>~"",
+			Some(info)=>{
+				get_span_str(c,&info.span)
+			}
 		}
+	} else {
+		"{out of crate def:"+did.to_str()+"}"
 	}
 }
 
@@ -612,24 +635,26 @@ pub fn get_span_str(c:ty::ctxt, sp:&codemap::span)->~str {
 pub fn dump_span(text:&[u8], sp:&codemap::span) {
 
 	let line_col=text_offset_to_line_pos(text, *sp.lo);
-	logi!(" line,ofs=",option_to_str(&line_col)," text=\"",
-		std::str::from_bytes(text_span(text,sp)),"\"");
+	logi!(" line,ofs=",option_to_str(&line_col)," text=\'",
+		std::str::from_bytes(text_span(text,sp)),"\'");
 }
 
 
-pub fn def_info_from_node_id<'a,'b>(dc:&'a RFindCtx, node_info:&'b FNodeInfoMap, id:ast::NodeId)->(int,Option<&'b FNodeInfo>) {
+pub fn def_info_from_node_id<'a,'b>(dc:&'a RFindCtx, node_info:&'b FNodeInfoMap, id:ast::NodeId)->(ast::def_id,Option<&'b FNodeInfo>) {
 	let crate_num=0;
 	match dc.tycx.def_map.find(&id) { // finds a def..
 		Some(a)=>{
 			match get_def_id(crate_num,*a){
-				Some(b)=>match b.crate {
-					0=>(b.node,node_info.find(&b.node)),
-					_ => (id as int, None)
-				},
-				None=>(id as int,None)
+				Some(b)=>
+					(b,node_info.find(&b.node)),
+//				match b.crate {
+//					0=>(b.node,node_info.find(&b.node)),
+//					_ => (id as int, None)
+//				},
+				None=>(ast::def_id{crate:0,node:id as int},None)
 			}
 		},
-		None=>(id as int,None)
+		None=>(ast::def_id{crate:0,node:id as int},None)
 	}
 }
 
@@ -667,7 +692,7 @@ pub fn text_line_pos_to_offset(text:&[u8], (line,ofs_in_line):(uint,uint))->Opti
 }
 
 /// Get from text editor's description of location to inlined-crate byte-offset
-pub fn text_file_pos_len_to_byte_pos(c:ty::ctxt,tfp:&ZTextFilePos,len:uint )->Option<(codemap::BytePos,codemap::BytePos)>
+pub fn text_file_pos_len_to_byte_pos(c:ty::ctxt,tfp:&ZTextFilePos,len:uint=0 )->Option<(codemap::BytePos,codemap::BytePos)>
 
 {
 //	for c.sess.codemap.files.rev_iter().advance |fm:&codemap::FileMap| {
@@ -787,7 +812,7 @@ fn debug_test(dc:&RFindCtx) {
 
 
 		if_some!(id in nodetloc.last().ty_node_id() then {
-			logi!("source=",get_node_source(dc.tycx, node_info_map,id));
+			logi!("source=",get_node_source(dc.tycx, node_info_map,ast::def_id{crate:0,node:id}));
 			if_some!(t in safe_node_id_to_type(dc.tycx, id) then {
 				println(fmt!("typeinfo: %?",
 					{let ntt= rustc::middle::ty::get(t); ntt}));
@@ -849,7 +874,60 @@ pub fn write_source_as_html(dc:&RFindCtx,opts:uint) {
 	let ndm = build_node_def_node_table(dc);
 	let jdm=build_jump_to_def_map(dc,nim,ndm);
 	rust2html::write_source_as_html_sub(dc,nim,ndm,jdm,opts);
+	dump_cstore_info(dc.tycx);
 }
+
+pub fn dump_cstore_info(tc:ty::ctxt) {
+//struct ctxt_ {
+//    cstore: @mut metadata::cstore::CStore,
+//    def_map: resolve::DefMap,
+//		tc.cstore.
+// home/walter/gplsrc/rust/src/librustc/metadata/cstore.rs:37:	
+//pub struct CStore {
+//    priv metas: HashMap <ast::CrateNum, @crate_metadata>,
+//    priv extern_mod_crate_map: extern_mod_crate_map,
+//    priv used_crate_files: ~[Path],
+//    priv used_libraries: ~[@str],
+//    priv used_link_args: ~[@str],
+//    intr: @ident_interner
+//}
+// home/walter/gplsrc/rust/src/librustc/metadata/cstore.rs:30:	
+//pub struct crate_metadata {
+//    name: @str,
+//    data: @~[u8],
+//    cnum_map: cnum_map,
+//    cnum: ast::CrateNum
+//}
+
+	println("crate files");
+	let ucf=cstore::get_used_crate_files(tc.cstore);
+	let num_crates=ucf.len();
+	for x in ucf.iter() {
+		dump!(x);
+	}
+/*	println("crate metadata");
+	for i in range(1,num_crates) {
+		let cd= cstore::get_crate_data(tc.cstore, i as int);
+		
+		dump!(i, cd.name, cd.data.len(), cd.cnum_map, cd.cnum);
+	}	
+*/
+	println("crate metadata");
+	cstore::iter_crate_data(tc.cstore, |i,md| {
+		dump!(i, md.name,md.data.len(),md.cnum);
+	});
+	
+}
+
+pub fn get_crate_name(tc:ty::ctxt, i:ast::CrateNum)->~str {
+	if i>0 {
+		let cd = cstore::get_crate_data(tc.cstore,i);
+		cd.name.to_owned()
+	} else {
+		~""
+	}
+}
+
 
 
 pub fn rustfind_interactive(dc:&RFindCtx) {
@@ -912,6 +990,14 @@ impl<T> MyOption<T> for Option<T>{
 
 }
 
-
-
-
+struct Foo {
+	x:int,y:int
+}
+fn test_default_arg(a:int=1,(x,y):(int,int)=(a,a)) {
+	println(fmt!("%i %i %i",a,x,y));
+}
+impl Foo {
+	fn substr(&self, a:~str, lo:int=0, hi:int=a.len())->~str {
+		~""
+	}
+}

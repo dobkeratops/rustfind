@@ -43,7 +43,7 @@ pub enum AstNode {
 }
 
 
-pub type JumpToDefMap = hashmap::HashMap<ast::NodeId,ast::NodeId> ;
+pub type JumpToDefMap = hashmap::HashMap<ast::NodeId,ast::def_id> ;
 
 pub struct FNodeInfo {
 	//name:ident, .. TODO - does it make sense to cache an ident here? not all nodes have..
@@ -912,7 +912,7 @@ pub fn get_def_id(curr_crate:ast::CrateNum,src_def:ast::def)->Option<ast::def_id
 	}
 }
 
-
+/*
 impl ToJsonStr for JumpToDefMap {
 	pub fn to_json_str(&self)->~str {
 		let mut acc=~"";
@@ -922,7 +922,7 @@ impl ToJsonStr for JumpToDefMap {
 		acc
 	}
 }
-
+*/
 
 pub fn byte_pos_from_text_file_pos_str(dc:&RFindCtx,filepos:&str)->Option<codemap::BytePos> {
 	let toks=filepos.split_iter(':').to_owned_vec();

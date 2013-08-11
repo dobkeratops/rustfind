@@ -29,8 +29,9 @@ pub static WriteReferences:uint	=0x0002;
 pub static DefaultOptions:uint 	=WriteFilePath | WriteReferences;
 // todo: options struct.
 
-pub fn make_html(dc:&RFindCtx, fm:&codemap::FileMap,nim:&FNodeInfoMap,jdm:&JumpToDefMap, jrm:&JumpToRefMap, nodes_per_line:&[~[ast::NodeId]],options:uint)->~str {
+pub fn make_html(dc:&RFindCtx, fm:&codemap::FileMap,nim:&FNodeInfoMap,jdm:&JumpToDefMap, jrm:&JumpToRefMap, fln:&FileLineNodes, options:uint)->~str {
 	// todo - Rust2HtmlCtx { fm,nim,jdm,jrm } .. cleanup common intermediates
+	
 	let mut doc= HtmlWriter::new::();
 	write_head(&mut doc);
 	write_styles(&mut doc, fm.name);
@@ -59,14 +60,21 @@ pub fn make_html(dc:&RFindCtx, fm:&codemap::FileMap,nim:&FNodeInfoMap,jdm:&JumpT
 		let line_str=fm.src.slice(*fm.lines[line]-fstart,lend);
 		//doc.writeln(line_str);
 		doc.end_tag();
+		for nl in fln.def_nodes_per_line[line].iter() {
+			doc.begin_tag_anchor("n"+nl.to_str());
+		}
+		doc.write(" "); // TODO, It should be ok to nest these surely.
+		for nl in fln.def_nodes_per_line[line].iter() {
+			doc.end_tag();
+		}
 		multiline_comment_depth=
-			write_line_with_links(&mut doc,dc,fm, nim, jdm,jrm, line_str, nodes_per_line[line],line,multiline_comment_depth);
+			write_line_with_links(&mut doc,dc,fm, nim, jdm,jrm, line_str, fln.nodes_per_line[line],line,multiline_comment_depth);
 		doc.writeln("");
 //		doc.writeln(markup_line);
 		line+=1;
 	}
 	if options & WriteReferences!=0{
-		write_references(&mut doc,dc,fm,nim,jdm,jrm, nodes_per_line);
+		write_references(&mut doc,dc,fm,nim,jdm,jrm, fln.nodes_per_line);
 	}
 	
 	doc.end_tag();
@@ -78,16 +86,20 @@ pub fn make_html(dc:&RFindCtx, fm:&codemap::FileMap,nim:&FNodeInfoMap,jdm:&JumpT
 pub fn write_source_as_html_sub(dc:&RFindCtx, nim:&FNodeInfoMap,ndn:&HashMap<ast::NodeId,ast::def_id>, jdm:&JumpToDefMap,options:uint) {
 	
 	let npl=NodesPerLinePerFile::new(dc,nim);
+
+//	let nspl=~[~[]];
 	let mut def2refs = ~MultiMap::new();
 	for (&nref,&ndef) in jdm.iter() {
-		def2refs.insert(ndef,nref);
+		if ndef.crate==0 {
+			def2refs.insert(ndef.node,nref);
+		}
 	}
 
 	// ew
 	let mut fi=0;
 	for fm in dc.sess.codemap.files.iter() {
 		println("generating "+make_html_name(fm.name)+"..");
-		let doc_str=make_html(dc, *fm, nim,jdm, def2refs, npl.m[fi],options);
+		let doc_str=make_html(dc, *fm, nim,jdm, def2refs, &npl.file[fi] ,options);
 		fileSaveStr(doc_str,make_html_name(fm.name));
 		fi+=1;
 	}
@@ -175,9 +187,12 @@ fn change_file_name_ext(file_name:&str,new_ext:&str)->~str {
 	parts[0]+"."+new_ext
 }
 
-
+struct FileLineNodes {
+	nodes_per_line:~[~[ast::NodeId]],
+	def_nodes_per_line:~[~[ast::NodeId]]
+}
 struct NodesPerLinePerFile {
-	m :~[~[~[ast::NodeId]]]
+	file :~[FileLineNodes]
 }
 //type NodesPerLine=&[~[ast::NodeId]];
 
@@ -199,32 +214,45 @@ impl NodesPerLinePerFile {
 		//				|fm:&@codemap::FileMap|{ vec::from_elem(fm.lines.len(), ~[]) }
 		//			).collect();
 
-		let mut npl=~NodesPerLinePerFile{m:~[]};
+		let mut npl=~NodesPerLinePerFile{file:~[]};
 		let mut fi=0;
-		npl.m = vec::from_elem(dc.sess.codemap.files.len(),~[]);
+//		npl.file = vec::from_elem(dc.sess.codemap.files.len(),);
 		while fi<dc.sess.codemap.files.len() {
-			npl.m[fi] = from_elem(dc.sess.codemap.files[fi].lines.len(),~[]);
+			let num_lines=dc.sess.codemap.files[fi].lines.len();
+			npl.file.push(FileLineNodes{
+				nodes_per_line:from_elem(num_lines,~[]),
+				def_nodes_per_line:from_elem(num_lines,~[])
+			});
 			fi+=1;
-		}
+		};
 		for (k,v) in nim.iter() {
+			// TODO- only want the **DEF_NODES** for 'def_nodes_per_line', not all. 
 			// todo, this could be more direct, file index, line index, ...
 			do byte_pos_to_index_file_pos(dc.tycx,v.span.lo).for_some|ifp|{
 				match byte_pos_to_index_file_pos(dc.tycx,v.span.hi) {
 					None=>{	},
-					Some(ifpe)=>for li in range(ifp.line,ifpe.line+1) {
-						if li < npl.m[ifp.file_index].len() {
-							npl.m[ifp.file_index][li].push(*k)
+					Some(ifpe)=>{
+						
+						let mut f=&mut npl.file[ifp.file_index];
+						f.def_nodes_per_line[ifp.line].push(*k);
+//						dump!(ifp, f.nodes_per_line.len());
+						for li in range(ifp.line,ifpe.line+1) {
+							if li <f.nodes_per_line.len() {
+//								dump!(li, *k)
+								f.nodes_per_line[li].push(*k)
+							};
 						};
 					}
 				};
 			}
-		}
+		};
+//		npl.dump();
 		npl
 	}
 	fn dump(&self) {
-		for f in self.m.iter() {
+		for f in self.file.iter() {
 			print("file {");
-			for l in f.iter() {
+			for l in f.nodes_per_line.iter() {
 				print("line {" + l.len().to_str());
 				for n in l.iter() {
 					print(n.to_str()+",");
@@ -358,7 +386,7 @@ fn write_line_with_links(outp:&mut HtmlWriter,dc:&RFindCtx,fm:&codemap::FileMap,
 				// link_id >0 = node def link. link_id<0 = node ref link
 				let link_id= match jdm.find(n) {
 					None=> if jrm.find(*n).len()>0 { - *n } else { no_link },
-					Some(x) =>*x
+					Some(x) =>x.node
 				};
 				
 				let os=byte_pos_to_index_file_pos(dc.tycx, ni.span.lo);
@@ -520,8 +548,9 @@ fn write_line_with_links(outp:&mut HtmlWriter,dc:&RFindCtx,fm:&codemap::FileMap,
 									outp.begin_tag_link(make_rel_html_name(dc.sess.codemap.files[ifp.file_index].name,fm.name)+link_str);
 								},
 								None=>{
-
-									outp.begin_tag_link("#node_"+curr_link.to_str());
+									// out of crate def node?
+//									def_node = ;
+									outp.begin_tag_link("#n"+curr_link.to_str());
 								}
 							}
 						}
@@ -692,7 +721,7 @@ fn write_references(doc:&mut HtmlWriter,dc:&RFindCtx, fm:&codemap::FileMap,nim:&
 			let mut curr_file=def_tfp.file_index;
 			let  mut refs2=refs.iter()
 				.filter(|&id|{nim.find(id).is_some()})
-				.transform(|&id|{
+				.map(|&id|{
 					let oni=nim.find(&id); assert!(oni.is_some());
 					let ni=oni.unwrap();
 					let oifp=byte_pos_to_index_file_pos(dc.tycx, ni.span.lo);
