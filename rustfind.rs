@@ -9,6 +9,7 @@ use rustc::metadata::*;
 
 use std::num;
 use std::num::*;
+use std::str;
 
 use syntax::parse;
 use syntax::ast;
@@ -104,7 +105,7 @@ pub fn build_jump_to_def_map(dc:&RFindCtx, nim:@mut FNodeInfoMap,nd:&HashMap<ast
 				match lookup_def_node_of_node(dc,&ast_node,nim,nd) {
 					None=>{},
 					Some(def_node_id)=>{
-						if *k != def_node_id.node && def_node_id.crate==0 {
+						if *k != def_node_id.node && def_node_id.crate==0 || (def_node_id.crate!=0) {
 							jdm.insert(*k,def_node_id);
 						}
 					}
@@ -869,12 +870,79 @@ pub fn def_of_symbol_to_str(dc:&RFindCtx, ns:&FNodeInfoMap,ds:&HashMap<ast::Node
 	~"TODO"	
 }
 
+#[deriving(Clone)]
+pub struct CrossCrateMapItem {
+	fname:~str,
+	line:uint,	
+	col:uint,
+	len:uint
+}
+
+pub type CrossCrateMap = HashMap<ast::def_id,CrossCrateMapItem>;
+
+pub fn load_cross_crate_map(dc:&RFindCtx, crate_num:int, crate_name:&str)->~CrossCrateMap {
+	let raw_bytes=ioutil::fileLoad(crate_name);
+	let rfx=str::from_bytes(raw_bytes);
+	println("loaded cratemap "+rfx.len().to_str()+"bytes");
+//	for &x in raw_bytes.iter() { rfx.push_char(x as char); }
+
+	let mut xcm=~HashMap::new();
+	for s in rfx.line_iter() {
+//		println(s.to_str());
+		let toks=s.split_iter('\t').to_owned_vec();
+		if toks.len()>=6 {
+			let node_id:int=std::int::from_str(toks[1]).unwrap_or_default(0);
+			xcm.insert(ast::def_id{crate:crate_num, node:node_id,},
+				CrossCrateMapItem{
+					fname:	toks[2].to_owned(),
+					line:	std::uint::from_str(toks[3]).unwrap_or_default(0),
+					col:	std::uint::from_str(toks[4]).unwrap_or_default(0),
+					len:	std::uint::from_str(toks[5]).unwrap_or_default(0)
+				}
+			);
+		}
+	}
+	//dump!(xcm);
+	println("from cratemap "+rfx.len().to_str()+"bytes");
+	xcm
+}
+
+
 pub fn write_source_as_html(dc:&RFindCtx,opts:uint) {
+
+	let mut xcm:~CrossCrateMap=~HashMap::new();
+	cstore::iter_crate_data(dc.tycx.cstore, |i,md| {
+//		dump!(i, md.name,md.data.len(),md.cnum);
+		println("loading cross crate data "+i.to_str()+" "+md.name);
+		let xcm_sub=load_cross_crate_map(dc, i, md.name+&".rfx");
+		for (k,v) in xcm_sub.iter() {xcm.insert(*k,(*v).clone());}
+	});
+
 	let nim=build_node_info_map(dc.crate);
 	let ndm = build_node_def_node_table(dc);
 	let jdm=build_jump_to_def_map(dc,nim,ndm);
-	rust2html::write_source_as_html_sub(dc,nim,ndm,jdm,opts);
-	dump_cstore_info(dc.tycx);
+	rust2html::write_source_as_html_sub(dc,nim,ndm,jdm,xcm,opts);
+
+	// write inter-crate node map
+	let crate_rel_path_name= dc.sess.codemap.files[0].name;
+
+	let crate_name_only=crate_rel_path_name.split_iter('/').last().unwrap_or_default("").split_iter('.').nth(0).unwrap_or_default("");
+	println("writing rustfind cross-crate link info for "+crate_name_only);
+	let mut outp=~"";
+	for (k,ni) in nim.iter() {
+		match byte_pos_to_text_file_pos(dc.tycx,ni.span.lo) {
+			Some(tfp)=>{	
+				outp.push_str(crate_name_only+"\t"+k.to_str()+"\t"+tfp.name+"\t"+tfp.line.to_str()+"\t"+tfp.col.to_str()+"\t"+(*ni.span.hi-*ni.span.lo).to_str()+"\n");
+			},
+			None=>{}
+		}
+	}
+	
+	{	let x=crate_name_only+~".rfx";
+		println("writing "+x);
+		ioutil::fileSaveStr(outp, x);
+	}
+	
 }
 
 pub fn dump_cstore_info(tc:ty::ctxt) {
@@ -916,6 +984,7 @@ pub fn dump_cstore_info(tc:ty::ctxt) {
 	cstore::iter_crate_data(tc.cstore, |i,md| {
 		dump!(i, md.name,md.data.len(),md.cnum);
 	});
+	
 	
 }
 

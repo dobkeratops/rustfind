@@ -29,7 +29,7 @@ pub static WriteReferences:uint	=0x0002;
 pub static DefaultOptions:uint 	=WriteFilePath | WriteReferences;
 // todo: options struct.
 
-pub fn make_html(dc:&RFindCtx, fm:&codemap::FileMap,nim:&FNodeInfoMap,jdm:&JumpToDefMap, jrm:&JumpToRefMap, fln:&FileLineNodes, options:uint)->~str {
+pub fn make_html(dc:&RFindCtx, fm:&codemap::FileMap,nim:&FNodeInfoMap,jdm:&JumpToDefMap, jrm:&JumpToRefMap,xcm:&::CrossCrateMap, fln:&FileLineNodes, options:uint)->~str {
 	// todo - Rust2HtmlCtx { fm,nim,jdm,jrm } .. cleanup common intermediates
 	
 	let mut doc= HtmlWriter::new::();
@@ -68,7 +68,7 @@ pub fn make_html(dc:&RFindCtx, fm:&codemap::FileMap,nim:&FNodeInfoMap,jdm:&JumpT
 			doc.end_tag();
 		}
 		multiline_comment_depth=
-			write_line_with_links(&mut doc,dc,fm, nim, jdm,jrm, line_str, fln.nodes_per_line[line],line,multiline_comment_depth);
+			write_line_with_links(&mut doc,dc,fm, nim, jdm,jrm,xcm, line_str, fln.nodes_per_line[line],line,multiline_comment_depth);
 		doc.writeln("");
 //		doc.writeln(markup_line);
 		line+=1;
@@ -83,7 +83,7 @@ pub fn make_html(dc:&RFindCtx, fm:&codemap::FileMap,nim:&FNodeInfoMap,jdm:&JumpT
 	doc.doc
 }
 
-pub fn write_source_as_html_sub(dc:&RFindCtx, nim:&FNodeInfoMap,ndn:&HashMap<ast::NodeId,ast::def_id>, jdm:&JumpToDefMap,options:uint) {
+pub fn write_source_as_html_sub(dc:&RFindCtx, nim:&FNodeInfoMap,ndn:&HashMap<ast::NodeId,ast::def_id>, jdm:&JumpToDefMap,xcm:&::CrossCrateMap,options:uint) {
 	
 	let npl=NodesPerLinePerFile::new(dc,nim);
 
@@ -99,7 +99,7 @@ pub fn write_source_as_html_sub(dc:&RFindCtx, nim:&FNodeInfoMap,ndn:&HashMap<ast
 	let mut fi=0;
 	for fm in dc.sess.codemap.files.iter() {
 		println("generating "+make_html_name(fm.name)+"..");
-		let doc_str=make_html(dc, *fm, nim,jdm, def2refs, &npl.file[fi] ,options);
+		let doc_str=make_html(dc, *fm, nim,jdm, def2refs,xcm, &npl.file[fi] , options);
 		fileSaveStr(doc_str,make_html_name(fm.name));
 		fi+=1;
 	}
@@ -204,6 +204,9 @@ pub fn get_file_index(dc:&RFindCtx,fname:&str)->Option<uint> {
 		index+=1;
 	}
 	None
+}
+pub fn get_crate_name(dc:&RFindCtx,ci:ast::CrateNum)->~str {
+	::get_crate_name(dc.tycx,ci)
 }
 
 
@@ -354,7 +357,7 @@ fn sub_match(mut line:&str,x:uint,opts:&[&str])->Option<(uint,uint)>{
 	return None;
 }
 
-fn write_line_with_links(outp:&mut HtmlWriter,dc:&RFindCtx,fm:&codemap::FileMap, nim:&FNodeInfoMap,jdm:&JumpToDefMap, jrm:&JumpToRefMap, line:&str, nodes:&[ast::NodeId],line_index:uint, mut multiline_comment_depth:int)->int {
+fn write_line_with_links(outp:&mut HtmlWriter,dc:&RFindCtx,fm:&codemap::FileMap, nim:&FNodeInfoMap,jdm:&JumpToDefMap, jrm:&JumpToRefMap,xcm:&::CrossCrateMap, line:&str, nodes:&[ast::NodeId],line_index:uint, mut multiline_comment_depth:int)->int {
 
 /*			match line[x] as char{
 			' ' =>"&nbsp;",
@@ -378,6 +381,8 @@ fn write_line_with_links(outp:&mut HtmlWriter,dc:&RFindCtx,fm:&codemap::FileMap,
 	let mut rndcolor=0;
 	let mut no_link=0 as ast::NodeId;;
 
+	let link_to_refs=false;
+	let link_debug=true;
 	for n in nodes.iter() {
 
 		match nim.find(n) {
@@ -385,9 +390,10 @@ fn write_line_with_links(outp:&mut HtmlWriter,dc:&RFindCtx,fm:&codemap::FileMap,
 			Some(ni)=>{
 				// link_id >0 = node def link. link_id<0 = node ref link
 				let link_id= match jdm.find(n) {
-					None=> if jrm.find(*n).len()>0 { - *n } else { no_link },
-					Some(x) =>x.node
+					None=> if link_to_refs{if jrm.find(*n).len()>0 { - *n } else { no_link }}else{no_link},
+					Some(x) =>if link_debug{x.node|(x.crate<<24)} else {x.node}
 				};
+				
 				
 				let os=byte_pos_to_index_file_pos(dc.tycx, ni.span.lo);
 				let oe=byte_pos_to_index_file_pos(dc.tycx, ni.span.hi);
@@ -536,29 +542,57 @@ fn write_line_with_links(outp:&mut HtmlWriter,dc:&RFindCtx,fm:&codemap::FileMap,
 			curr_col=no_color;
 			curr_link=link[x];
 
-			if curr_link!=no_link {
-				if curr_link>0 /* value is link node index*/ {
-					match nim.find(&curr_link) {
-						None=>curr_link=no_link,	// link outside the crate?
-						Some(link_node_info)=>{
-							let oifp = byte_pos_to_index_file_pos(dc.tycx, link_node_info.span.lo);
-							match oifp {
-								Some(ifp)=>{
-									let link_str="#"+(ifp.line+1).to_str();
-									outp.begin_tag_link(make_rel_html_name(dc.sess.codemap.files[ifp.file_index].name,fm.name)+link_str);
-								},
-								None=>{
-									// out of crate def node?
-//									def_node = ;
-									outp.begin_tag_link("#n"+curr_link.to_str());
+			if link_debug==false {
+				if curr_link!=no_link {
+					if curr_link>0 /* value is link node index*/ {
+						match nim.find(&curr_link) {
+							None=>curr_link=no_link,	// link outside the crate?
+							Some(link_node_info)=>{
+								let oifp = byte_pos_to_index_file_pos(dc.tycx, link_node_info.span.lo);
+								match oifp {
+									Some(ifp)=>{
+										let link_str="#"+(ifp.line+1).to_str();
+										outp.begin_tag_link(make_rel_html_name(dc.sess.codemap.files[ifp.file_index].name,fm.name)+link_str);
+									},
+									None=>{
+										// out of crate def node?
+	//									def_node = ;
+										outp.begin_tag_link("#n"+curr_link.to_str());
+									}
 								}
 							}
 						}
+					} else if curr_link<0/* link to refs block,value is -(this node index)*/{
+						let ifp= get_node_index_file_pos(dc,nim,-curr_link).unwrap();
+						
+						let ref_block_link_str="#"+(ifp.line+1).to_str()+"_"+ifp.col.to_str()+"_refs";
+						outp.begin_tag_link(ref_block_link_str);
 					}
-				} else if curr_link<0/* link to refs block,value is -(this node index)*/{
-					let ifp= get_node_index_file_pos(dc,nim,-curr_link);
-					let ref_block_link_str="#"+(ifp.line+1).to_str()+"_"+ifp.col.to_str()+"_refs";
-					outp.begin_tag_link(ref_block_link_str);
+				}
+			} else {
+				// debug - link just to node-id..
+				if curr_link!=no_link {
+					let def_crate = curr_link>>24;
+					let def_node=curr_link&((1<<24)-1);
+					let link_str=match xcm.find(&ast::def_id{crate:def_crate,node:def_node}) {
+						None=>//"#n"+def_node.to_str(), by node linnk
+						{
+							match get_node_index_file_pos(dc,nim,def_node) {
+								Some(ifp)=>make_rel_html_name(dc.sess.codemap.files[ifp.file_index].name,fm.name)+
+									"#"+(ifp.line+1).to_str(),
+								None=>{curr_link=no_link;~""}
+							}
+							
+						},
+						Some(a)=>{
+							make_rel_html_name(a.fname,fm.name)+
+//							"../gplsrc/rust/src/"+a.fname+".html"+
+							"#n"+def_node.to_str()
+						}
+					};
+					if curr_link!=no_link {
+						outp.begin_tag_link(link_str);
+					}
 				}
 			}
 		}
@@ -864,11 +898,15 @@ fn write_path_links(doc:&mut HtmlWriter, file_name:&str) {
 // things that are robust when some source changes, etc.
 // file_index:line_index:col_index:length
 
-fn get_node_index_file_pos(dc:&RFindCtx,nim:&FNodeInfoMap,nid:ast::NodeId)->ZIndexFilePos {
+fn get_node_index_file_pos(dc:&RFindCtx,nim:&FNodeInfoMap,nid:ast::NodeId)->Option<ZIndexFilePos> {
 	let oni=nim.find(&nid);
-	assert!(oni.is_some());
-	let ni=oni.unwrap();
-	byte_pos_to_index_file_pos(dc.tycx,ni.span.lo).unwrap()
+//	assert!(oni.is_some());
+	if oni.is_some() {
+		let ni=oni.unwrap();
+		byte_pos_to_index_file_pos(dc.tycx,ni.span.lo)
+	} else {
+		None
+	}
 }
 
 fn make_html_name(f:&str)->~str { f+".html"}
