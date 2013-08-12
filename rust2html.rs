@@ -29,7 +29,7 @@ pub static WriteReferences:uint	=0x0002;
 pub static DefaultOptions:uint 	=WriteFilePath | WriteReferences;
 // todo: options struct.
 
-pub fn make_html(dc:&RFindCtx, fm:&codemap::FileMap,nim:&FNodeInfoMap,jdm:&JumpToDefMap, jrm:&JumpToRefMap,xcm:&::CrossCrateMap, fln:&FileLineNodes, options:uint)->~str {
+pub fn make_html(dc:&RFindCtx, fm:&codemap::FileMap,nim:&FNodeInfoMap,jdm:&JumpToDefMap, jrm:&JumpToRefMap,xcm:&::CrossCrateMap, fln:&FileLineNodes, lib_path:&str,options:uint)->~str {
 	// todo - Rust2HtmlCtx { fm,nim,jdm,jrm } .. cleanup common intermediates
 	
 	let mut doc= HtmlWriter::new::();
@@ -68,13 +68,13 @@ pub fn make_html(dc:&RFindCtx, fm:&codemap::FileMap,nim:&FNodeInfoMap,jdm:&JumpT
 			doc.end_tag();
 		}
 		multiline_comment_depth=
-			write_line_with_links(&mut doc,dc,fm, nim, jdm,jrm,xcm, line_str, fln.nodes_per_line[line],line,multiline_comment_depth);
+			write_line_with_links(&mut doc,dc,fm,lib_path, nim, jdm,jrm,xcm, line_str, fln.nodes_per_line[line],line, multiline_comment_depth);
 		doc.writeln("");
 //		doc.writeln(markup_line);
 		line+=1;
 	}
 	if options & WriteReferences!=0{
-		write_references(&mut doc,dc,fm,nim,jdm,jrm, fln.nodes_per_line);
+		write_references(&mut doc,dc,fm,lib_path,nim,jdm,jrm, fln.nodes_per_line);
 	}
 	
 	doc.end_tag();
@@ -83,7 +83,7 @@ pub fn make_html(dc:&RFindCtx, fm:&codemap::FileMap,nim:&FNodeInfoMap,jdm:&JumpT
 	doc.doc
 }
 
-pub fn write_source_as_html_sub(dc:&RFindCtx, nim:&FNodeInfoMap,ndn:&HashMap<ast::NodeId,ast::def_id>, jdm:&JumpToDefMap,xcm:&::CrossCrateMap,options:uint) {
+pub fn write_source_as_html_sub(dc:&RFindCtx, nim:&FNodeInfoMap,ndn:&HashMap<ast::NodeId,ast::def_id>, jdm:&JumpToDefMap,xcm:&::CrossCrateMap,lib_path:&str, options:uint) {
 	
 	let npl=NodesPerLinePerFile::new(dc,nim);
 
@@ -99,7 +99,7 @@ pub fn write_source_as_html_sub(dc:&RFindCtx, nim:&FNodeInfoMap,ndn:&HashMap<ast
 	let mut fi=0;
 	for fm in dc.sess.codemap.files.iter() {
 		println("generating "+make_html_name(fm.name)+"..");
-		let doc_str=make_html(dc, *fm, nim,jdm, def2refs,xcm, &npl.file[fi] , options);
+		let doc_str=make_html(dc, *fm, nim,jdm, def2refs,xcm, &npl.file[fi] , lib_path,options);
 		fileSaveStr(doc_str,make_html_name(fm.name));
 		fi+=1;
 	}
@@ -127,17 +127,18 @@ pub fn write_styles(doc:&mut HtmlWriter,fname:&str){
 	doc.write_html("a:link:hover{ color:#f0f0f0; font-style:normal; background-color:#606060; }\n");
 	doc.write_html("pr{font-weight:bold}\n");
 	doc.write_html("ln{color:#606060; -moz-user-select:-moz-none; -khtml-user-select:none; -webkit-user-select:none; -ms-user-select:none; user-select:none;}\n");
-	doc.write_html("c24{color:#ffffff; font-style:italic; opacity:0.5}\n");
-	doc.write_html("c25{color:#ffffff; opacity:0.92}\n");
+//	doc.write_html("c25{color:#ffffff; opacity:0.92}\n");
 	doc.write_html("c26{color:#ffffff; font-weight:bold; }\n");
 	doc.write_html("c27{color:#b0ffff; font-weight:bold; }\n");
 	doc.write_html("c28{color:#b0ffb0; font-weight:bold; }\n");
 	doc.write_html("c29{color:#d0e0ff; font-weight:bold; }\n");
 	doc.write_html("c30{color:#fff0e0; font-weight:bold; }\n");
 	doc.write_html("c31{color:#d0b0ff; font-weight:bold; }\n");
-	doc.write_html("c32{color:#ffffff; font-style:italic; opacity:0.6}\n");
 	doc.write_html("c1{color:#ffffc0;   font-weight:bold; }\n");
 	doc.write_html("c33{color:#e0a0d0;  }\n");
+	doc.write_html("c40{color:#ffffff; font-style:italic; opacity:0.4}\n");
+	doc.write_html("c41{color:#ffffff; font-style:italic; opacity:0.5}\n");
+	doc.write_html("c42{color:#ffffff; font-style:italic; opacity:0.6}\n");
 	doc.write_html("c2{color:#60f0c0}\n");
 	doc.write_html("c3{color:#50e0ff; }\n");
 	doc.write_html("c4{color:#f090f0}\n");
@@ -357,7 +358,7 @@ fn sub_match(mut line:&str,x:uint,opts:&[&str])->Option<(uint,uint)>{
 	return None;
 }
 
-fn write_line_with_links(outp:&mut HtmlWriter,dc:&RFindCtx,fm:&codemap::FileMap, nim:&FNodeInfoMap,jdm:&JumpToDefMap, jrm:&JumpToRefMap,xcm:&::CrossCrateMap, line:&str, nodes:&[ast::NodeId],line_index:uint, mut multiline_comment_depth:int)->int {
+fn write_line_with_links(outp:&mut HtmlWriter,dc:&RFindCtx,fm:&codemap::FileMap,lib_path:&str, nim:&FNodeInfoMap,jdm:&JumpToDefMap, jrm:&JumpToRefMap,xcm:&::CrossCrateMap, line:&str, nodes:&[ast::NodeId],line_index:uint, mut multiline_comment_depth:int)->int {
 
 /*			match line[x] as char{
 			' ' =>"&nbsp;",
@@ -510,10 +511,11 @@ fn write_line_with_links(outp:&mut HtmlWriter,dc:&RFindCtx,fm:&codemap::FileMap,
 		while x<(line.len()) {
 			if x<line.len()-1 {
 				if line[x+0]=='/' as u8 && (line[x+1]=='/' as u8|| line[x+1]=='*' as u8) || multiline_comment_depth>0{
-					let mut comment_color=24;
-					if x<line.len()-2 { if line[x+2]as char=='/' { comment_color=32 }}// doc-comments are a bit brighter
+					let mut comment_color=40;
 					let mut slc=false;
 					if line[x]=='/' as u8 && line[x+1]=='*' as u8 {multiline_comment_depth+=1;} else {slc=true;}
+					if multiline_comment_depth>0 {comment_color=41;}
+					if x<line.len()-2 { if line[x+2]as char=='/' { comment_color=42 }}// doc-comments are a bit brightest
 					while x<line.len() && (slc || multiline_comment_depth>0){
 						color[x]=comment_color;
 						link[x]=0;
@@ -552,7 +554,7 @@ fn write_line_with_links(outp:&mut HtmlWriter,dc:&RFindCtx,fm:&codemap::FileMap,
 								match oifp {
 									Some(ifp)=>{
 										let link_str="#"+(ifp.line+1).to_str();
-										outp.begin_tag_link(make_rel_html_name(dc.sess.codemap.files[ifp.file_index].name,fm.name)+link_str);
+										outp.begin_tag_link(make_html_name_rel(dc.sess.codemap.files[ifp.file_index].name,fm.name)+link_str);
 									},
 									None=>{
 										// out of crate def node?
@@ -578,14 +580,14 @@ fn write_line_with_links(outp:&mut HtmlWriter,dc:&RFindCtx,fm:&codemap::FileMap,
 						None=>//"#n"+def_node.to_str(), by node linnk
 						{
 							match get_node_index_file_pos(dc,nim,def_node) {
-								Some(ifp)=>make_rel_html_name(dc.sess.codemap.files[ifp.file_index].name,fm.name)+
+								Some(ifp)=>make_html_name_rel(dc.sess.codemap.files[ifp.file_index].name,fm.name)+
 									"#"+(ifp.line+1).to_str(),
 								None=>{curr_link=no_link;~""}
 							}
 							
 						},
 						Some(a)=>{
-							make_rel_html_name(a.fname,fm.name)+
+							make_html_name_reloc(a.fname,fm.name,lib_path)+
 //							"../gplsrc/rust/src/"+a.fname+".html"+
 							"#n"+def_node.to_str()
 						}
@@ -717,7 +719,7 @@ fn get_source_line(fm:&codemap::FileMap, i:uint)->~str {
 //fn split_by_key<T,K>(src:&[T],f:&fn(t:&T)->K)->(K,[&T])] {
 //}
 
-fn write_references(doc:&mut HtmlWriter,dc:&RFindCtx, fm:&codemap::FileMap,nim:&FNodeInfoMap,jdm:&JumpToDefMap,jrm:&JumpToRefMap, nodes_per_line:&[~[ast::NodeId]]) {
+fn write_references(doc:&mut HtmlWriter,dc:&RFindCtx, fm:&codemap::FileMap,lib_path:&str, nim:&FNodeInfoMap,jdm:&JumpToDefMap,jrm:&JumpToRefMap, nodes_per_line:&[~[ast::NodeId]]) {
 	doc.write_tag("div");
 	let file_def_nodes = find_defs_in_file(fm,nim);
 	//let mut defs_to_refs=MultiMap::new::<ast::NodeId, ast::NodeId>();
@@ -798,7 +800,7 @@ fn write_references(doc:&mut HtmlWriter,dc:&RFindCtx, fm:&codemap::FileMap,nim:&
 							if newline==false {doc.writeln("");newline=true;}
 						}
 						let rfm=&dc.sess.codemap.files[ref_ifp.file_index];
-						doc.begin_tag_link( make_rel_html_name(rfm.name,fm.name)+"#"+(ref_ifp.line+1).to_str());
+						doc.begin_tag_link( make_html_name_rel(rfm.name,fm.name)+"#"+(ref_ifp.line+1).to_str());
 
 						if  links_written<max_links {
 							doc.begin_tag("c24"); 
@@ -856,9 +858,10 @@ fn write_references(doc:&mut HtmlWriter,dc:&RFindCtx, fm:&codemap::FileMap,nim:&
 
 	}
 
-	fn write_file_ref(doc:&mut HtmlWriter, dc:&RFindCtx,origin_fm:&codemap::FileMap, fi:uint) {
+fn write_file_ref(doc:&mut HtmlWriter, dc:&RFindCtx,origin_fm:&codemap::FileMap, fi:uint) {
+	
 		let fname = dc.tycx.sess.codemap.files[fi].name;
-		doc.begin_tag_link( make_rel_html_name(fname,origin_fm.name));
+		doc.begin_tag_link( make_html_name_rel(fname,origin_fm.name));
 		doc.begin_tag("c24");
 		doc.writeln(""+fname + ":");
 		doc.end_tag();
@@ -917,7 +920,7 @@ fn count_chars_in(f:&str, x:char)->uint{
 	n
 }
 
-fn make_rel_html_name(f:&str, origin:&str)->~str {
+fn make_html_name_reloc(f:&str, origin:&str, reloc:&str)->~str {
 	let mut acc=~"";
 	let mut i=0;
 	let depth_change=count_chars_in(origin,'/');//-count_chars_in(origin,'/')
@@ -925,8 +928,12 @@ fn make_rel_html_name(f:&str, origin:&str)->~str {
 		acc.push_str("../");
 		i+=1;
 	}
+	if reloc.len()>0 { acc=reloc.to_owned(); if acc.iter().last().unwrap_or_default(' ')!='/' {acc.push_char('/')} }// replace that..
 	acc.push_str(f);
 	make_html_name(acc)
+}
+fn make_html_name_rel(f:&str, origin:&str)->~str {
+	make_html_name_reloc(f,origin,"")
 }
 
 

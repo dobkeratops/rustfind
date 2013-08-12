@@ -174,7 +174,7 @@ fn main() {
     let args = os::args();
 
     let opts = ~[
-        optmulti("L"),optflag("d"),optflag("j"),optflag("h"),optflag("i"),optflag("g"),optflag("w"),optflag("f")
+        optmulti("L"),optflag("d"),optflag("j"),optflag("h"),optflag("i"),optflag("g"),optflag("w"),optflag("f"),optopt("x")
     ];
 
 	let matches = getopts(args.tail(), opts).unwrap();
@@ -183,7 +183,7 @@ fn main() {
 		match (os::getenv(&"RUST_LIBS")) {
 			Some(x)=>~[Path(x)],
 			None=>~[]
-		}		
+		}
 	};
 
 	if opt_present(&matches,"h") {
@@ -197,6 +197,7 @@ fn main() {
 		println(" -i filename.rs [-L<lib path>] : interactive mode");
 		println(" -d filename.rs [-L<lib path>] : debug for this tool");
 		println(" -g format output as gedit filepos +line filename");
+		println(" -x where to look for html of external crates -  :eg rustfind filename mysource.rs -x ~/rust/src\n");
 		println(" set RUST_LIBS for a default library search path");
 	};
 	if matches.free.len()>0 {
@@ -212,6 +213,7 @@ fn main() {
 			dump_json(dc);
 		}
 		let mut i=0;
+		let lib_html_path=if opt_present(&matches,"x"){ opt_str(&matches,"x")} else {~""};
 		if (opt_present(&matches,"f")) {
 			while i<matches.free.len() {
 				let mode=if opt_present(&matches,"g"){SDM_GeditCmd} else {SDM_Source};
@@ -228,10 +230,9 @@ fn main() {
 		// Dump as html..
 		if opt_present(&matches,"w") || !(done) {
 			println("Creating HTML pages from source:-");
-			write_source_as_html(dc,rust2html::DefaultOptions);
+			write_source_as_html(dc,lib_html_path, rust2html::DefaultOptions);
 			println("Creating HTML pages from source.. done");
 		}
-
 	}
 }
 
@@ -692,6 +693,8 @@ pub fn text_line_pos_to_offset(text:&[u8], (line,ofs_in_line):(uint,uint))->Opti
 	return None;
 }
 
+/* Get from text editor's description of location to inlined-crate byte-offset */
+//   Get from text editor's description of location to inlined-crate byte-offset
 /// Get from text editor's description of location to inlined-crate byte-offset
 pub fn text_file_pos_len_to_byte_pos(c:ty::ctxt,tfp:&ZTextFilePos,len:uint=0 )->Option<(codemap::BytePos,codemap::BytePos)>
 
@@ -908,7 +911,7 @@ pub fn load_cross_crate_map(dc:&RFindCtx, crate_num:int, crate_name:&str)->~Cros
 }
 
 
-pub fn write_source_as_html(dc:&RFindCtx,opts:uint) {
+pub fn write_source_as_html(dc:&RFindCtx,lib_html_path:~str,opts:uint) {
 
 	let mut xcm:~CrossCrateMap=~HashMap::new();
 	cstore::iter_crate_data(dc.tycx.cstore, |i,md| {
@@ -921,7 +924,7 @@ pub fn write_source_as_html(dc:&RFindCtx,opts:uint) {
 	let nim=build_node_info_map(dc.crate);
 	let ndm = build_node_def_node_table(dc);
 	let jdm=build_jump_to_def_map(dc,nim,ndm);
-	rust2html::write_source_as_html_sub(dc,nim,ndm,jdm,xcm,opts);
+	rust2html::write_source_as_html_sub(dc,nim,ndm,jdm,xcm,lib_html_path,opts);
 
 	// write inter-crate node map
 	let crate_rel_path_name= dc.sess.codemap.files[0].name;

@@ -1,7 +1,7 @@
 RF_LIBS= -L $(RUST)/x86_64-unknown-linux-gnu/stage2/lib
 OPTS= test_input.rs $(RF_LIBS)
 html: rustfind
-	./rustfind rustfind.rs $(RF_LIBS)
+	./rustfind rustfind.rs $(RF_LIBS) -x $(RUST_SRC)
 	firefox rustfind.rs.html &
 
 test1 : rustfind
