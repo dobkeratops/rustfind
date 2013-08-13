@@ -48,36 +48,35 @@ pub fn make_html(dc:&RFindCtx, fm:&codemap::FileMap,nmaps:&NodeMaps,xcm:&::Cross
 	// write the doc lines..
 	doc.begin_tag_ext("body",&[(~"style",~"background-color:#"+bg+";")]);
 	doc.begin_tag("maintext");
-	let mut line=0;
 	let fstart = *fm.start_pos;
 	let max_digits=num_digits(fm.lines.len());
 	
 	if options & WriteFilePath!=0 {
 		doc.write_path_links(fm.name);
 	}
-
-	let mut multiline_comment_depth=0;	//todo: general purpose state object.
-	while line<fm.lines.len() {
-		// todo: line numbers want to go in a seperate column so they're unselectable..
-		doc.write_tagged("ln",pad_to_length((line+1).to_str(),max_digits," "));
-		doc.begin_tag_anchor((line+1).to_str());
-		let lend=if line<(fm.lines.len()-1){*fm.lines[line+1]-fstart}else{fm.src.len()};
-		doc.write(" ");
-		let line_str=fm.src.slice(*fm.lines[line]-fstart,lend);
-		//doc.writeln(line_str);
-		doc.end_tag();
-		for nl in fln.def_nodes_per_line[line].iter() {
-			doc.begin_tag_anchor("n"+nl.to_str());
+	{
+		let mut scw=SourceCodeWriter::new::<htmlwriter::HtmlWriter>(&mut doc);
+		for line in range(0, fm.lines.len()) {
+			scw.line_index=line;
+			// todo: line numbers want to go in a seperate column so they're unselectable..
+			scw.doc.write_tagged("ln",pad_to_length((line+1).to_str(),max_digits," "));
+			scw.doc.begin_tag_anchor((line+1).to_str());
+			let lend=if line<(fm.lines.len()-1){*fm.lines[line+1]-fstart}else{fm.src.len()};
+			scw.doc.write(" ");
+			let line_str=fm.src.slice(*fm.lines[line]-fstart,lend);
+			//doc.writeln(line_str);
+			scw.doc.end_tag();
+			for nl in fln.def_nodes_per_line[line].iter() {
+				scw.doc.begin_tag_anchor("n"+nl.to_str());
+			}
+			scw.doc.write(" "); // TODO, It should be ok to nest these surely.
+			for nl in fln.def_nodes_per_line[line].iter() {
+				scw.doc.end_tag();
+			}
+			write_line_with_links(&mut scw,dc,fm,lib_path, nmaps,xcm, line_str, fln.nodes_per_line[line]);
+			scw.doc.writeln("");
+	//		doc.writeln(markup_line);
 		}
-		doc.write(" "); // TODO, It should be ok to nest these surely.
-		for nl in fln.def_nodes_per_line[line].iter() {
-			doc.end_tag();
-		}
-		multiline_comment_depth=
-			write_line_with_links(&mut doc,dc,fm,lib_path, nmaps,xcm, line_str, fln.nodes_per_line[line],line, multiline_comment_depth);
-		doc.writeln("");
-//		doc.writeln(markup_line);
-		line+=1;
 	}
 	if options & WriteReferences!=0{
 		write_references(&mut doc,dc,fm,lib_path,nmaps, fln.nodes_per_line);
@@ -381,8 +380,32 @@ struct NodeMaps<'self>  {
 	jrm:&'self JumpToRefMap
 }
 
-fn write_line_with_links(outp:&mut htmlwriter::HtmlWriter,dc:&RFindCtx,fm:&codemap::FileMap,lib_path:&str, nmaps:&NodeMaps,xcm:&::CrossCrateMap, line:&str, nodes:&[ast::NodeId],line_index:uint, mut multiline_comment_depth:int)->int {
+/// interface for emitting source code serially
+/// carries state between emitting lines
+struct SourceCodeWriter<'self, T> {
+	doc: &'self mut T,
+	multiline_comment_depth:int,
+	brace_depth:int,
+	bracket_depth:int,
+	angle_bracket_depth:int,
+	in_string:int,
+	line_index:uint
+}
 
+impl<'self, T> SourceCodeWriter<'self,T> {
+	fn new(d:&'self mut T)->SourceCodeWriter<'self, T> {
+		SourceCodeWriter{
+			doc:d, multiline_comment_depth:0, brace_depth:0,bracket_depth:0, angle_bracket_depth:0, in_string:0, line_index:0
+		}
+	}
+}
+
+static no_link:ast::NodeId	=0 ;
+static link_to_refs:bool	=false;
+static link_debug:bool		=true;
+
+
+fn write_line_with_links(dst:&mut SourceCodeWriter<htmlwriter::HtmlWriter>,dc:&RFindCtx,fm:&codemap::FileMap,lib_path:&str, nmaps:&NodeMaps,xcm:&::CrossCrateMap, line:&str, nodes:&[ast::NodeId]) {
 	// todo ... BREAK THIS FUNCTION UP!!!!
 	// and there is a load of messy cut paste too.
 
@@ -395,10 +418,7 @@ fn write_line_with_links(outp:&mut htmlwriter::HtmlWriter,dc:&RFindCtx,fm:&codem
 	let mut color:~[int] = vec::from_elem(line.len(),0 as int);
 	let mut depth:~[uint]= vec::from_elem(line.len(),0x7fffffff as uint);
 	let mut rndcolor=0;
-	let mut no_link=0 as ast::NodeId;;
-	
-	let link_to_refs=false;
-	let link_debug=true;
+
 	for n in nodes.iter() {
 
 		match nmaps.nim.find(n) {
@@ -415,14 +435,14 @@ fn write_line_with_links(outp:&mut htmlwriter::HtmlWriter,dc:&RFindCtx,fm:&codem
 				if os.is_some() && oe.is_some() {
 					let e=oe.unwrap(); let s=os.unwrap();
 					let d=*ni.span.hi-*ni.span.lo;	// todo - get the actual hrc node depth in here!
-					let xs=if line_index<=s.line {s.col}else{0};
+					let xs=if dst.line_index<=s.line {s.col}else{0};
 					// TODO: instead of this brute force 'painters-algorithm',
 					// clip spans, or at least have a seperate "buffer" for the line-coherent infill
 					// for multi-line spans
 
 					// 'paint' the nodes we have here.
 					//if (s.line==e.line) 
-					let xe = if e.line>line_index{line.len()}else{e.col};
+					let xe = if e.line>dst.line_index{line.len()}else{e.col};
 					let ci = node_color_index(ni);
 					for x in range(xs, xe.min(&line.len())) {
 						if d < depth[x] {
@@ -523,114 +543,116 @@ fn write_line_with_links(outp:&mut htmlwriter::HtmlWriter,dc:&RFindCtx,fm:&codem
 		x=0; 
 		while x<(line.len()) {
 			if x<line.len()-1 {
-				if line[x+0]=='/' as u8 && (line[x+1]=='/' as u8|| line[x+1]=='*' as u8) || multiline_comment_depth>0{
+				if line[x+0]=='/' as u8 && (line[x+1]=='/' as u8|| line[x+1]=='*' as u8) || dst.multiline_comment_depth>0{
 					let mut comment_color=40;
 					let mut slc=false;
-					if line[x]=='/' as u8 && line[x+1]=='*' as u8 {multiline_comment_depth+=1;} else {slc=true;}
-					if multiline_comment_depth>0 {comment_color=41;}
+					if line[x]=='/' as u8 && line[x+1]=='*' as u8 {dst.multiline_comment_depth+=1;} else {slc=true;}
+					if dst.multiline_comment_depth>0 {comment_color=41;}
 					if x<line.len()-2 { if line[x+2]as char=='/' { comment_color=42 }}// doc-comments are a bit brightest
-					while x<line.len() && (slc || multiline_comment_depth>0){
+					while x<line.len() && (slc || dst.multiline_comment_depth>0){
 						color[x]=comment_color;
 						link[x]=0;
 						
 						x+=1;
-						if line[if x>=2{x-2}else{0}]=='*' as u8 && line[x-1]=='/' as u8 {multiline_comment_depth-=1;}
+						if line[if x>=2{x-2}else{0}]=='*' as u8 && line[x-1]=='/' as u8 {dst.multiline_comment_depth-=1;}
 					}
 				}
 			}
 			x+=1;
 		}
 	}
+	let resolver=|x|resolve_link(x,dc,fm,lib_path, nmaps,xcm);
+	write_line_attr_links(dst,line,color,link, resolver );
+}
 
-	// emit a span..
+fn resolve_link(link:int, dc:&RFindCtx,fm:&codemap::FileMap,lib_path:&str, nmaps:&NodeMaps,xcm:&::CrossCrateMap)->~str {
 	let nim=nmaps.nim;
-	let mut x=0;
+/*
+	if link_debug==false {
+		if link!=no_link {
+			if link>0 // value is link node index {
+				match nmaps.nim.find(&link) {
+					None=>~"",	// link outside the crate?
+					Some(link_node_info)=>{
+						let oifp = link_node_info.span.lo.to_index_file_pos(dc.tycx);
+						match oifp {
+							Some(ifp)=>{
+								let link_str:~str="#"+(ifp.line+1).to_str();
+								make_html_name_rel(dc.sess.codemap.files[ifp.file_index].name,fm.name)+link_str
+							},
+							None=>{
+								// out of crate def node?
+//									def_node = ;
+								~"#n"+link.to_str()
+							}
+						}
+					}
+				}
+			} else if link<0{// link to refs block,value is -(this node index)
+				let ifp= (nmaps.nim,-link).to_index_file_pos(dc.tycx).unwrap();
+				
+				"#"+(ifp.line+1).to_str()+"_"+ifp.col.to_str()+"_refs"
+			}
+		} else {
+			~""
+		}
+	} else 
+	*/
+	if link !=no_link {
+		let def_crate = link>>24;
+		let def_node=link&((1<<24)-1);
+		match xcm.find(&ast::def_id{crate:def_crate,node:def_node}) {
+			None=>//"#n"+def_node.to_str(), by node linnk
+			{
+				match (nmaps.nim,def_node).to_index_file_pos(dc.tycx) {
+					Some(ifp)=>make_html_name_rel(dc.sess.codemap.files[ifp.file_index].name,fm.name)+
+						"#"+(ifp.line+1).to_str(),
+					None=>~""
+				}
+				
+			},
+			Some(a)=>{
+//							"../gplsrc/rust/src/"+a.fname+".html"+
+				make_html_name_reloc(a.fname,fm.name,lib_path)+
+					"#n"+def_node.to_str()
+			}
+		}
+	} else {
+		~""
+	}
+
+}
+
+
+fn write_line_attr_links(dst:&mut SourceCodeWriter<htmlwriter::HtmlWriter>,text_line:&str,color:&[int],links:&[int], resolve_link:&fn(int)->~str) {
+	// emit a span..
 	let no_color=-1;
 	let mut curr_col=no_color;
 	let mut curr_link=0;
 	//let mut outp=HtmlWriter::new();
-	let tag_depth=outp.tag_stack.len();
-	while x<line.len() {
-		// link overrides color..
-		if curr_link!=link[x] {
-			if curr_link!=no_link {outp.end_tag();}
-			if curr_col!=no_color {outp.end_tag();}
-			curr_col=no_color;
-			curr_link=link[x];
+	let tag_depth=dst.doc.tag_stack.len();
+	assert!(text_line.len()==color.len() && text_line.len()==links.len());
 
-			if link_debug==false {
-				if curr_link!=no_link {
-					if curr_link>0 /* value is link node index*/ {
-						match nim.find(&curr_link) {
-							None=>curr_link=no_link,	// link outside the crate?
-							Some(link_node_info)=>{
-								let oifp = link_node_info.span.lo.to_index_file_pos(dc.tycx);
-								match oifp {
-									Some(ifp)=>{
-										let link_str="#"+(ifp.line+1).to_str();
-										outp.begin_tag_link(make_html_name_rel(dc.sess.codemap.files[ifp.file_index].name,fm.name)+link_str);
-									},
-									None=>{
-										// out of crate def node?
-	//									def_node = ;
-										outp.begin_tag_link("#n"+curr_link.to_str());
-									}
-								}
-							}
-						}
-					} else if curr_link<0/* link to refs block,value is -(this node index)*/{
-						let ifp= (nim,-curr_link).to_index_file_pos(dc.tycx).unwrap();
-						
-						let ref_block_link_str="#"+(ifp.line+1).to_str()+"_"+ifp.col.to_str()+"_refs";
-						outp.begin_tag_link(ref_block_link_str);
-					}
-				}
-			} else {
-				// debug - link just to node-id..
-				if curr_link!=no_link {
-					let def_crate = curr_link>>24;
-					let def_node=curr_link&((1<<24)-1);
-					let link_str=match xcm.find(&ast::def_id{crate:def_crate,node:def_node}) {
-						None=>//"#n"+def_node.to_str(), by node linnk
-						{
-							match (nim,def_node).to_index_file_pos(dc.tycx) {
-								Some(ifp)=>make_html_name_rel(dc.sess.codemap.files[ifp.file_index].name,fm.name)+
-									"#"+(ifp.line+1).to_str(),
-								None=>{curr_link=no_link;~""}
-							}
-							
-						},
-						Some(a)=>{
-							make_html_name_reloc(a.fname,fm.name,lib_path)+
-//							"../gplsrc/rust/src/"+a.fname+".html"+
-							"#n"+def_node.to_str()
-						}
-					};
-					if curr_link!=no_link {
-						outp.begin_tag_link(link_str);
-					}
-				}
+	for x in range(0,text_line.len()) {
+		// if state changed...
+		if (curr_link,curr_col)!=(links[x],color[x]) {
+			if curr_link!=no_link {dst.doc.end_tag();}
+			if curr_col!=no_color {dst.doc.end_tag();}
+			
+			curr_col = color[x];
+			curr_link=links[x];
+			if curr_col!=no_color {
+				dst.doc.begin_tag(color_index_to_tag(curr_col));
+			}
+			if curr_link!=no_link {
+				dst.doc.begin_tag_link( resolve_link(links[x]) );
 			}
 		}
-		if curr_col!=color[x] {
-			if curr_col!=no_color {
-				outp.end_tag();
-			}
-			curr_col=color[x];
-			if curr_col!=no_color {
-				outp.begin_tag(color_index_to_tag(curr_col));
-			}
-		}
-
-
-		outp.write_u8_(line[x]);
-		x+=1;
+		dst.doc.write_u8_(text_line[x]);
 	}
-	if curr_col!=no_color {outp.end_tag();}
-	if curr_link!=no_link {outp.end_tag();}
-	assert!(tag_depth==outp.tag_stack.len());
-
-	multiline_comment_depth
+	if curr_col!=no_color {dst.doc.end_tag();}
+	if curr_link!=no_link {dst.doc.end_tag();}
+	assert!(tag_depth==dst.doc.tag_stack.len());
 }
 
 fn find_defs_in_file(fm:&codemap::FileMap, nim:&FNodeInfoMap)->~[ast::NodeId] {

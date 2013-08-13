@@ -295,7 +295,7 @@ pub fn some_else<T,X,Y>(o:&Option<T>,f:&fn(t:&T)->Y,default_value:Y)->Y {
 
 /// todo - collect stage.
 
-fn flatten_to_str<T,U:ToStr>(xs:&[T],f:&fn(x:&T)->U, sep:&str=" ")->~str {
+fn flatten_to_str<T,U:ToStr>(xs:&[T],f:&fn(x:&T)->U, sep:&str)->~str {
 	let mut acc=~"";
 	let mut i=0; // TODO - functional way.
 	while i<xs.len() {
@@ -1012,7 +1012,8 @@ impl<T> MyOption<T> for Option<T>{
 	}
 
 }
-
+/*
+test for default args compiler hack
 struct Foo {
 	x:int,y:int
 }
@@ -1024,3 +1025,4 @@ impl Foo {
 		~""
 	}
 }
+*/
