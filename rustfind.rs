@@ -267,11 +267,6 @@ fn get_ast_and_resolve(cpath: &std::path::PosixPath, libs: ~[std::path::PosixPat
     let mut sess = driver::driver::build_session_(sessopts, parsesess.cm,
                                                   if quiet{no_emit}else{syntax::diagnostic::emit},
                                                   span_diagnostic_handler);
-
-/*    let (crate, tycx) = driver::driver::compile_upto(sess, sessopts.cfg.clone(),
-                                                     &driver::driver::file_input(cpath.clone()),
-                                                     driver::driver::cu_no_trans, None);
-*/
 	let input=driver::driver::file_input(cpath.clone());
 	let cfg= driver::driver::build_configuration(sess, @"", &input);
 
@@ -279,22 +274,12 @@ fn get_ast_and_resolve(cpath: &std::path::PosixPath, libs: ~[std::path::PosixPat
 	let crate2=driver::driver::phase_2_configure_and_expand(sess,cfg,crate1);
 	
 	let ca=driver::driver::phase_3_run_analysis_passes(sess,crate2);  
-//	let c=crate.unwrap();
-//	let t=tycx.unwrap();
     RFindCtx { crate: crate2, tycx: ca.ty_cx, sess: sess, ca:ca }
 }
 fn get_filename_only(fnm:&str)->~str {
 	let toks:~[&str]=fnm.split_iter(':').collect();
 	return toks[0].to_str();
 }
-fn option_to_str<T:ToStr>(opt:&Option<T>)->~str {
-	match *opt { Some(ref s)=>~"("+s.to_str()+~")",None=>~"(None)" }
-}
-trait MyToStr {  fn my_to_str(&self)->~str; }
-impl MyToStr for codemap::span {
-	fn my_to_str(&self)->~str { ~"("+self.lo.to_str()+~".."+self.hi.to_str() }
-}
-/// Todo , couldn't quite see how to declare this as a generic method of Option<T>
 pub fn some<T>(o:&Option<T>,f:&fn(t:&T)) {
 	match *o {
 		Some(ref x)=>f(x),
@@ -338,7 +323,7 @@ fn lookup_def_at_file_line_pos_old(dc:&RFindCtx,filepos:&str, show_all:ShowDefMo
 		if_some!(col in FromStr::from_str::<uint>(toks[2]) then {
 			//todo - if no column specified, just lookup everything on that line!
 
-			match text_file_pos_to_byte_pos(dc.tycx,&ZTextFilePos::new(toks[0],line-1,col-1)) {
+			match ZTextFilePos::new(toks[0],line-1,col-1).to_byte_pos(dc.tycx) {
 				None=>{},
 				Some(bp)=>{
 					return lookup_def_at_byte_pos(dc,bp,show_all)
@@ -351,7 +336,7 @@ fn lookup_def_at_file_line_pos_old(dc:&RFindCtx,filepos:&str, show_all:ShowDefMo
 
 
 pub fn lookup_def_at_text_file_pos(dc:&RFindCtx, tfp:&ZTextFilePos, show_mode:ShowDefMode)->Option<~str> {
-	match text_file_pos_to_byte_pos(dc.tycx, tfp) {
+	match tfp.to_byte_pos(dc.tycx) {
 		None=>None,
 		Some(bp)=>lookup_def_at_byte_pos(dc,bp,show_mode)
 	}
@@ -567,15 +552,6 @@ fn lookup_def_of_node_sub(dc:&RFindCtx,node:&AstNode,m:ShowDefMode,nim:&FNodeInf
 	}
 }
 
-fn get_str_at_text_file_pos_len(cx:ty::ctxt, tfp:&ZTextFilePos,len:uint)->~str {
-	let a=text_file_pos_len_to_byte_pos(cx, tfp,len);
-	match  a  {
-		Some((bp_lo,bp_hi))=>get_span_str(cx,
-			&codemap::span{lo:bp_lo,hi:bp_hi,expn_info:None}
-		),
-		None=>~""
-	}
-}
 fn zget_file_line_str(cx:ty::ctxt, filename:&str, src_line:uint)->~str {
 //	for c.sess.codemap.files.rev_iter().advance |fm:&codemap::FileMap| {
 	let mut i=cx.sess.codemap.files.len();
@@ -625,19 +601,10 @@ pub fn get_node_source(c:ty::ctxt, nim:&FNodeInfoMap, did:ast::def_id)->~str {
 }
 
 
-pub fn get_span_str(c:ty::ctxt, sp:&codemap::span)->~str {
-	let loc_lo=c.sess.codemap.lookup_char_pos(sp.lo);
-	let loc_hi=c.sess.codemap.lookup_char_pos(sp.hi);
-	// TODO-assert both in same file!
-	let file_org=*loc_lo.file.start_pos;
-	let slice=loc_lo.file.src.slice(*sp.lo-file_org, *sp.hi-file_org );
-	slice.to_str()
-}
-
 pub fn dump_span(text:&[u8], sp:&codemap::span) {
 
 	let line_col=text_offset_to_line_pos(text, *sp.lo);
-	logi!(" line,ofs=",option_to_str(&line_col)," text=\'",
+	logi!(" line,ofs=",line_col.to_str()," text=\'",
 		std::str::from_bytes(text_span(text,sp)),"\'");
 }
 
@@ -693,27 +660,6 @@ pub fn text_line_pos_to_offset(text:&[u8], (line,ofs_in_line):(uint,uint))->Opti
 	return None;
 }
 
-/* Get from text editor's description of location to inlined-crate byte-offset */
-//   Get from text editor's description of location to inlined-crate byte-offset
-/// Get from text editor's description of location to inlined-crate byte-offset
-pub fn text_file_pos_len_to_byte_pos(c:ty::ctxt,tfp:&ZTextFilePos,len:uint=0 )->Option<(codemap::BytePos,codemap::BytePos)>
-
-{
-//	for c.sess.codemap.files.rev_iter().advance |fm:&codemap::FileMap| {
-	let mut i=c.sess.codemap.files.len();
-	while i>0 {	// caution, need loop because we return, wait for new foreach ..in..
-		i-=1;
-		let fm=&c.sess.codemap.files[i];
-		let filemap_filename:&str=fm.name;	
-		if filemap_filename==tfp.name {
-			let line_pos=*fm.lines[tfp.line];
-			let bp_start=*fm.lines[tfp.line]+tfp.col;
-			let bp_end=(bp_start+len).min(&(*fm.start_pos+fm.src.len()));
-			return Some((BytePos(bp_start), BytePos(bp_end)))
-		}
-	}
-	return None;
-}
 
 
 
@@ -812,7 +758,7 @@ fn debug_test(dc:&RFindCtx) {
 		let nodetloc = find_node_tree_loc_at_byte_pos(dc.crate,BytePos(test_cursor));
 		let node_info =  get_node_info_str(dc,&nodetloc);
 		dump!(node_info);
-		println("node ast loc:"+(do nodetloc.map |x| { option_to_str(&x.get_id()) }).to_str());
+		println("node ast loc:"+(do nodetloc.map |x| { x.get_id().to_str() }).to_str());
 
 
 		if_some!(id in nodetloc.last().ty_node_id() then {
@@ -825,7 +771,7 @@ fn debug_test(dc:&RFindCtx) {
 			let (def_id,opt_info)= def_info_from_node_id(dc,node_info_map,id); 
 			if_some!(info in opt_info then{
 				logi!("src node=",id," def node=",def_id,
-					" span=",info.span.my_to_str());
+					" span=",fmt!("%?",info.span));
 				logi!("def source=", get_node_source(dc.tycx, node_info_map, def_id));
 			})
 		})
@@ -835,11 +781,11 @@ fn debug_test(dc:&RFindCtx) {
 
 	// test byte pos from file...
 	logi!("====test file:pos source lookup====");
-	dump!(get_str_at_text_file_pos_len(dc.tycx,&ZTextFilePos::new("test_input.rs",3-1,0),10));
-	dump!(get_str_at_text_file_pos_len(dc.tycx,&ZTextFilePos::new("test_input.rs",9-1,0),10));
-	dump!(get_str_at_text_file_pos_len(dc.tycx,&ZTextFilePos::new("test_input2.rs",4-1,0),10));
-	dump!(get_str_at_text_file_pos_len(dc.tycx,&ZTextFilePos::new("test_input2.rs",11-1,0),10));
-	let ospan=text_file_pos_len_to_byte_pos(dc.tycx, &ZTextFilePos::new("test_input2.rs", 10-1,0),32);
+	dump!(ZTextFilePosLen::new("test_input.rs",3-1,0,10).get_str(dc.tycx));
+	dump!(ZTextFilePosLen::new("test_input.rs",9-1,0,10).get_str(dc.tycx));
+	dump!(ZTextFilePosLen::new("test_input2.rs",4-1,0,10).get_str(dc.tycx));
+	dump!(ZTextFilePosLen::new("test_input2.rs",11-1,0,10).get_str(dc.tycx));
+	let ospan=ZTextFilePosLen::new("test_input2.rs", 10-1,0,32).to_byte_pos(dc.tycx);
 	if_some!(x in ospan then {
 		let (lo,hi)=x;
 		logi!(get_span_str(dc.tycx, &codemap::span{lo:lo,hi:hi,expn_info:None} ));
@@ -872,11 +818,16 @@ fn find_file_name_in(dc:&RFindCtx,fname:&str)->Option<~str> {
 pub fn def_of_symbol_to_str(dc:&RFindCtx, ns:&FNodeInfoMap,ds:&HashMap<ast::NodeId, ast::def_id>,s:&str)->~str {
 	~"TODO"	
 }
+type ZeroBasedIndex=uint;
 
+/// cross crate map, extra info written out when compiling links of a crate
+/// allows sunsequent crates to jump to definitions in that crate
+/// TODO - check if this already exists in the 'cstore/create metadata'
+/// specificially we need node->span info
 #[deriving(Clone)]
 pub struct CrossCrateMapItem {
 	fname:~str,
-	line:uint,	
+	line:ZeroBasedIndex,	
 	col:uint,
 	len:uint
 }
@@ -924,7 +875,7 @@ pub fn write_source_as_html(dc:&RFindCtx,lib_html_path:~str,opts:uint) {
 	let nim=build_node_info_map(dc.crate);
 	let ndm = build_node_def_node_table(dc);
 	let jdm=build_jump_to_def_map(dc,nim,ndm);
-	rust2html::write_source_as_html_sub(dc,nim,ndm,jdm,xcm,lib_html_path,opts);
+	rust2html::write_source_as_html_sub(dc,nim,jdm,xcm,lib_html_path,opts);
 
 	// write inter-crate node map
 	let crate_rel_path_name= dc.sess.codemap.files[0].name;
@@ -933,7 +884,7 @@ pub fn write_source_as_html(dc:&RFindCtx,lib_html_path:~str,opts:uint) {
 	println("writing rustfind cross-crate link info for "+crate_name_only);
 	let mut outp=~"";
 	for (k,ni) in nim.iter() {
-		match byte_pos_to_text_file_pos(dc.tycx,ni.span.lo) {
+		match ni.span.lo.to_text_file_pos(dc.tycx) {
 			Some(tfp)=>{	
 				outp.push_str(crate_name_only+"\t"+k.to_str()+"\t"+tfp.name+"\t"+tfp.line.to_str()+"\t"+tfp.col.to_str()+"\t"+(*ni.span.hi-*ni.span.lo).to_str()+"\n");
 			},

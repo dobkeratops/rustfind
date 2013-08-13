@@ -177,8 +177,8 @@ pub fn node_spans_table_to_json_sub(dc:&RFindCtx,ns:&FNodeInfoMap)->~str {
 	for (k,v) in ns.iter() {
 		//let (_,line,_)=byte_pos_to_file_line_col(c,*v.span.lo);
 
-		let oifps=byte_pos_to_index_file_pos(dc.tycx,v.span.lo);
-		let oifpe=byte_pos_to_index_file_pos(dc.tycx,v.span.hi);
+		let oifps=v.span.lo.to_index_file_pos(dc.tycx);
+		let oifpe=v.span.hi.to_index_file_pos(dc.tycx);
 		if oifps.is_some() && oifpe.is_some() {
 			let ifps=oifps.unwrap();
 			let ifpe=oifpe.unwrap();
@@ -938,7 +938,7 @@ pub fn byte_pos_from_text_file_pos_str(dc:&RFindCtx,filepos:&str)->Option<codema
 		//todo - if no column specified, just lookup everything on that line!
 		let l0 = line.unwrap()-1;
 		let c0= col.unwrap()-1;
-		let foo= text_file_pos_to_byte_pos(dc.tycx,&ZTextFilePos::new(toks[0],l0,c0));
+		let foo= ZTextFilePos::new(toks[0],l0,c0).to_byte_pos(dc.tycx);
 		foo;
 	}
 	return None;

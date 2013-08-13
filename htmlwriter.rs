@@ -42,12 +42,10 @@ impl<'self> HtmlWriter {
 		self
 	}
 	pub fn begin_tag(&'self mut self, tag_name:&str)->&'self mut HtmlWriter {
-		self.begin_tag_ext(tag_name,&[]);
-		self
+		self.begin_tag_ext(tag_name,&[])
 	}
 	pub fn write_tag_ext(&'self mut self, tag_name:&str, key_values:&[(~str,~str)])->&'self mut HtmlWriter {
-		self.write_tag_sub(tag_name,key_values,true);
-		self
+		self.write_tag_sub(tag_name,key_values,true)
 	}
 	pub fn write_tag(&'self mut self, tag_name:&str)->&'self mut HtmlWriter {
 		self.write_tag_sub(tag_name,&[],true);
@@ -90,19 +88,17 @@ impl<'self> HtmlWriter {
 		self
 	}
 	pub fn write_tagged(&'self mut self, tagname:&str, text:&str)->&'self mut HtmlWriter {
-		self.begin_tag(tagname);
-		self.write(text);
-		self.end_tag();
-		self
+		self.begin_tag(tagname).write(text).end_tag()
+	}
+	pub fn writeln_tagged(&'self mut self, tagname:&str, text:&str)->&'self mut HtmlWriter {
+		self.begin_tag(tagname).write(text).end_tag().write_tag("br")
 	}
 	pub fn writeln(&'self mut self, text:&str)->&'self mut HtmlWriter {
-		self.write(text);
-		self.write_tag("br");
-		self
+		self.write(text).write_tag("br")
 	}
 	pub fn write_u8_(&'self mut self, x:u8)->&'self mut HtmlWriter {
-			self.doc.push_str(self.xlat[x]);
-			self
+		self.doc.push_str(self.xlat[x]);
+		self
 	}
 	pub fn begin_tag_anchor(&'self mut self, anchor:&str)->&'self mut HtmlWriter {
 		self.begin_tag_ext("a",[(~"id",anchor.to_owned())])

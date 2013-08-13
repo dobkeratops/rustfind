@@ -1,7 +1,7 @@
 use syntax::codemap;
 use syntax::ast;
 use ioutil::*;
-use htmlwriter::*;
+//use htmlwriter::*;
 use std::hashmap::*;
 use std::vec;
 use std::str;
@@ -10,6 +10,10 @@ use codemaput::*;
 use find_ast_node::*;
 use rfindctx::*;
 use syntax::*;
+use rustc::middle::ty;
+//use self::htmlwriter::HtmlWriter;
+mod htmlwriter;
+
 
 // TODO: See how far we can decouple this from the link generation
 // could we have an abstract linked-AST format , and an html renderer for that..
@@ -29,10 +33,12 @@ pub static WriteReferences:uint	=0x0002;
 pub static DefaultOptions:uint 	=WriteFilePath | WriteReferences;
 // todo: options struct.
 
-pub fn make_html(dc:&RFindCtx, fm:&codemap::FileMap,nim:&FNodeInfoMap,jdm:&JumpToDefMap, jrm:&JumpToRefMap,xcm:&::CrossCrateMap, fln:&FileLineNodes, lib_path:&str,options:uint)->~str {
+
+//nim:&FNodeInfoMap,jdm:&JumpToDefMap, jrm:&JumpToRefMap
+pub fn make_html(dc:&RFindCtx, fm:&codemap::FileMap,nmaps:&NodeMaps,xcm:&::CrossCrateMap, fln:&FileLineNodes, lib_path:&str,options:uint)->~str {
 	// todo - Rust2HtmlCtx { fm,nim,jdm,jrm } .. cleanup common intermediates
 	
-	let mut doc= HtmlWriter::new::();
+	let mut doc= htmlwriter::HtmlWriter::new();
 	write_head(&mut doc);
 	write_styles(&mut doc, fm.name);
 
@@ -47,7 +53,7 @@ pub fn make_html(dc:&RFindCtx, fm:&codemap::FileMap,nim:&FNodeInfoMap,jdm:&JumpT
 	let max_digits=num_digits(fm.lines.len());
 	
 	if options & WriteFilePath!=0 {
-		write_path_links(&mut doc,fm.name);
+		doc.write_path_links(fm.name);
 	}
 
 	let mut multiline_comment_depth=0;	//todo: general purpose state object.
@@ -68,13 +74,13 @@ pub fn make_html(dc:&RFindCtx, fm:&codemap::FileMap,nim:&FNodeInfoMap,jdm:&JumpT
 			doc.end_tag();
 		}
 		multiline_comment_depth=
-			write_line_with_links(&mut doc,dc,fm,lib_path, nim, jdm,jrm,xcm, line_str, fln.nodes_per_line[line],line, multiline_comment_depth);
+			write_line_with_links(&mut doc,dc,fm,lib_path, nmaps,xcm, line_str, fln.nodes_per_line[line],line, multiline_comment_depth);
 		doc.writeln("");
 //		doc.writeln(markup_line);
 		line+=1;
 	}
 	if options & WriteReferences!=0{
-		write_references(&mut doc,dc,fm,lib_path,nim,jdm,jrm, fln.nodes_per_line);
+		write_references(&mut doc,dc,fm,lib_path,nmaps, fln.nodes_per_line);
 	}
 	
 	doc.end_tag();
@@ -83,7 +89,7 @@ pub fn make_html(dc:&RFindCtx, fm:&codemap::FileMap,nim:&FNodeInfoMap,jdm:&JumpT
 	doc.doc
 }
 
-pub fn write_source_as_html_sub(dc:&RFindCtx, nim:&FNodeInfoMap,ndn:&HashMap<ast::NodeId,ast::def_id>, jdm:&JumpToDefMap,xcm:&::CrossCrateMap,lib_path:&str, options:uint) {
+pub fn write_source_as_html_sub(dc:&RFindCtx, nim:&FNodeInfoMap, jdm:&JumpToDefMap,xcm:&::CrossCrateMap,lib_path:&str, options:uint) {
 	
 	let npl=NodesPerLinePerFile::new(dc,nim);
 
@@ -93,19 +99,30 @@ pub fn write_source_as_html_sub(dc:&RFindCtx, nim:&FNodeInfoMap,ndn:&HashMap<ast
 		if ndef.crate==0 {
 			def2refs.insert(ndef.node,nref);
 		}
-	}
+	};
 
-	// ew
-	let mut fi=0;
-	for fm in dc.sess.codemap.files.iter() {
-		println("generating "+make_html_name(fm.name)+"..");
-		let doc_str=make_html(dc, *fm, nim,jdm, def2refs,xcm, &npl.file[fi] , lib_path,options);
-		fileSaveStr(doc_str,make_html_name(fm.name));
-		fi+=1;
+	let nmaps=NodeMaps { nim:nim, jdm:jdm, jrm:def2refs};
+	let files=&dc.sess.codemap.files;
+	for (fi,fm) in files.iter().enumerate() {
+		if is_valid_filename(fm.name) {
+			println("generating "+fi.to_str()+ ": "+make_html_name(fm.name)+"..");
+			let doc_str=make_html(dc, *fm, &nmaps,xcm, &npl.file[fi] , lib_path,options);
+			fileSaveStr(doc_str,make_html_name(fm.name));
+		}
 	}
 }
 
-fn write_head(doc:&mut HtmlWriter) {
+fn is_valid_filename(f:&str) ->bool{
+	match f.iter().nth(0) {
+		Some(c)=> match c{
+			'<' => false,
+			_=>true
+		},
+		None => false
+	}
+}
+
+fn write_head(doc:&mut htmlwriter::HtmlWriter) {
 	
 	doc.begin_tag("head");
 	doc.write_tag_ext("link",&[(~"href",~"css/shCore.css"),(~"rel",~"stylesheet"),(~"type",~"text/css")]);
@@ -118,7 +135,7 @@ fn get_str_hash(s:&str)->uint{
 	for x in s.iter() { acc=((acc<<5)-acc)^(acc>>12); acc+=x as uint;}
 	acc 
 }
-pub fn write_styles(doc:&mut HtmlWriter,fname:&str){
+pub fn write_styles(doc:&mut htmlwriter::HtmlWriter,fname:&str){
 	// write the styles..
 	doc.begin_tag_ext("style",&[(~"type",~"text/css")]);
 	doc.write_html("maintext {color:#f0f0f0; font-size:12px; font-family:\"Courier New\"}\n");
@@ -232,8 +249,8 @@ impl NodesPerLinePerFile {
 		for (k,v) in nim.iter() {
 			// TODO- only want the **DEF_NODES** for 'def_nodes_per_line', not all. 
 			// todo, this could be more direct, file index, line index, ...
-			do byte_pos_to_index_file_pos(dc.tycx,v.span.lo).for_some|ifp|{
-				match byte_pos_to_index_file_pos(dc.tycx,v.span.hi) {
+			do v.span.lo.to_index_file_pos(dc.tycx).for_some|ifp|{
+				match v.span.hi.to_index_file_pos(dc.tycx) {
 					None=>{	},
 					Some(ifpe)=>{
 						
@@ -358,20 +375,18 @@ fn sub_match(mut line:&str,x:uint,opts:&[&str])->Option<(uint,uint)>{
 	return None;
 }
 
-fn write_line_with_links(outp:&mut HtmlWriter,dc:&RFindCtx,fm:&codemap::FileMap,lib_path:&str, nim:&FNodeInfoMap,jdm:&JumpToDefMap, jrm:&JumpToRefMap,xcm:&::CrossCrateMap, line:&str, nodes:&[ast::NodeId],line_index:uint, mut multiline_comment_depth:int)->int {
+struct NodeMaps<'self>  {
+	nim:&'self FNodeInfoMap,
+	jdm:&'self JumpToDefMap, 
+	jrm:&'self JumpToRefMap
+}
 
-/*			match line[x] as char{
-			' ' =>"&nbsp;",
-			'<' =>"&lt;",
-			'>' =>"&gt;",
-			'&' =>"&amp;",
-			'\t' =>"&nbsp;&nbsp;&nbsp;&nbsp;",
-			c=>str::from_char(c as char)
-			}
-*/
+fn write_line_with_links(outp:&mut htmlwriter::HtmlWriter,dc:&RFindCtx,fm:&codemap::FileMap,lib_path:&str, nmaps:&NodeMaps,xcm:&::CrossCrateMap, line:&str, nodes:&[ast::NodeId],line_index:uint, mut multiline_comment_depth:int)->int {
 
+	// todo ... BREAK THIS FUNCTION UP!!!!
+	// and there is a load of messy cut paste too.
 
-	let node_infos=nodes.map(|id|{nim.find(id)});
+	let node_infos=nodes.map(|id|{nmaps.nim.find(id)});
 //	for x in node_infos.iter() { println(fmt!("%?", x));}
 //	dump!(node_infos);
 // todo - sorting node spans, not this "painters-algorithm" approach..
@@ -381,27 +396,26 @@ fn write_line_with_links(outp:&mut HtmlWriter,dc:&RFindCtx,fm:&codemap::FileMap,
 	let mut depth:~[uint]= vec::from_elem(line.len(),0x7fffffff as uint);
 	let mut rndcolor=0;
 	let mut no_link=0 as ast::NodeId;;
-
+	
 	let link_to_refs=false;
 	let link_debug=true;
 	for n in nodes.iter() {
 
-		match nim.find(n) {
+		match nmaps.nim.find(n) {
 			None=>{},
 			Some(ni)=>{
 				// link_id >0 = node def link. link_id<0 = node ref link
-				let link_id= match jdm.find(n) {
-					None=> if link_to_refs{if jrm.find(*n).len()>0 { - *n } else { no_link }}else{no_link},
+				let link_id= match nmaps.jdm.find(n) {
+					None=> if link_to_refs{if nmaps.jrm.find(*n).len()>0 { - *n } else { no_link }}else{no_link},
 					Some(x) =>if link_debug{x.node|(x.crate<<24)} else {x.node}
 				};
 				
-				
-				let os=byte_pos_to_index_file_pos(dc.tycx, ni.span.lo);
-				let oe=byte_pos_to_index_file_pos(dc.tycx, ni.span.hi);
+				let os=ni.span.lo.to_index_file_pos(dc.tycx);
+				let oe=ni.span.hi.to_index_file_pos(dc.tycx);
 				if os.is_some() && oe.is_some() {
 					let e=oe.unwrap(); let s=os.unwrap();
 					let d=*ni.span.hi-*ni.span.lo;	// todo - get the actual hrc node depth in here!
-					let mut x=if line_index<=s.line {s.col}else{0};
+					let xs=if line_index<=s.line {s.col}else{0};
 					// TODO: instead of this brute force 'painters-algorithm',
 					// clip spans, or at least have a seperate "buffer" for the line-coherent infill
 					// for multi-line spans
@@ -410,7 +424,7 @@ fn write_line_with_links(outp:&mut HtmlWriter,dc:&RFindCtx,fm:&codemap::FileMap,
 					//if (s.line==e.line) 
 					let xe = if e.line>line_index{line.len()}else{e.col};
 					let ci = node_color_index(ni);
-					while x<xe && x<line.len() {
+					for x in range(xs, xe.min(&line.len())) {
 						if d < depth[x] {
 							color[x]=ci;
 							depth[x]=d;
@@ -419,7 +433,6 @@ fn write_line_with_links(outp:&mut HtmlWriter,dc:&RFindCtx,fm:&codemap::FileMap,
 							}
 						}
 						if link[x]==0 { link[x]=link_id;}
-						x+=1;
 					}
 					rndcolor+=1;
 				}
@@ -442,7 +455,7 @@ fn write_line_with_links(outp:&mut HtmlWriter,dc:&RFindCtx,fm:&codemap::FileMap,
 		}
 		// delimiters/whitespace/special chars characters - disable links & override some coloring
 		x=0; wb=false;
-		while x<(line.len()) {
+		while x < line.len() {
 			let c0=line[x] as char;
 
 			match c0 {
@@ -530,6 +543,7 @@ fn write_line_with_links(outp:&mut HtmlWriter,dc:&RFindCtx,fm:&codemap::FileMap,
 	}
 
 	// emit a span..
+	let nim=nmaps.nim;
 	let mut x=0;
 	let no_color=-1;
 	let mut curr_col=no_color;
@@ -550,7 +564,7 @@ fn write_line_with_links(outp:&mut HtmlWriter,dc:&RFindCtx,fm:&codemap::FileMap,
 						match nim.find(&curr_link) {
 							None=>curr_link=no_link,	// link outside the crate?
 							Some(link_node_info)=>{
-								let oifp = byte_pos_to_index_file_pos(dc.tycx, link_node_info.span.lo);
+								let oifp = link_node_info.span.lo.to_index_file_pos(dc.tycx);
 								match oifp {
 									Some(ifp)=>{
 										let link_str="#"+(ifp.line+1).to_str();
@@ -565,7 +579,7 @@ fn write_line_with_links(outp:&mut HtmlWriter,dc:&RFindCtx,fm:&codemap::FileMap,
 							}
 						}
 					} else if curr_link<0/* link to refs block,value is -(this node index)*/{
-						let ifp= get_node_index_file_pos(dc,nim,-curr_link).unwrap();
+						let ifp= (nim,-curr_link).to_index_file_pos(dc.tycx).unwrap();
 						
 						let ref_block_link_str="#"+(ifp.line+1).to_str()+"_"+ifp.col.to_str()+"_refs";
 						outp.begin_tag_link(ref_block_link_str);
@@ -579,7 +593,7 @@ fn write_line_with_links(outp:&mut HtmlWriter,dc:&RFindCtx,fm:&codemap::FileMap,
 					let link_str=match xcm.find(&ast::def_id{crate:def_crate,node:def_node}) {
 						None=>//"#n"+def_node.to_str(), by node linnk
 						{
-							match get_node_index_file_pos(dc,nim,def_node) {
+							match (nim,def_node).to_index_file_pos(dc.tycx) {
 								Some(ifp)=>make_html_name_rel(dc.sess.codemap.files[ifp.file_index].name,fm.name)+
 									"#"+(ifp.line+1).to_str(),
 								None=>{curr_link=no_link;~""}
@@ -609,54 +623,13 @@ fn write_line_with_links(outp:&mut HtmlWriter,dc:&RFindCtx,fm:&codemap::FileMap,
 		}
 
 
-//		let cstr=str::from_char(line[x] as char);
-//		outp.write(cstr);
-
 		outp.write_u8_(line[x]);
-
-/*			match line[x] as char{
-			' ' =>"&nbsp;",
-			'<' =>"&lt;",
-			'>' =>"&gt;",
-			'&' =>"&amp;",
-			'\t' =>"&nbsp;&nbsp;&nbsp;&nbsp;",
-			c=>str::from_char(c as char)
-			}
-		);
-*/
-
-/*
-		outp.write(
-			match line[x] as char {
-			' '=>"&nbsp;",
-			'<'=>"&lt;",
-			'>'=>"&gt;",
-			'&'=>"&amp;",
-			'\t'=>"&nbsp;&nbsp;&nbsp;&nbsp;",
-			c=>cstr.slice(0,1)//line.slice(x,x+1)
-			}
-		);
-*/
-		/*
-		let chstr=line.slice(x,x+1);
-		if chstr==" " {
-			outp.write("&nbsp;");
-		} else if (chstr=="\t") {
-			outp.write("&nbsp;&nbsp;&nbsp;&nbsp;");
-		}
-		else {
-			outp.write(chstr);
-		}
-		*/
 		x+=1;
 	}
 	if curr_col!=no_color {outp.end_tag();}
 	if curr_link!=no_link {outp.end_tag();}
 	assert!(tag_depth==outp.tag_stack.len());
-	//todo - we prefered this functional, "build a line, assemble lines"..
-	// but we hacked it this way because of plain text->translated text issue. < > &lt; &gt; etc
-	// need to split doc writerinterface into functions that take plain text and html fragments
-	//outp.doc
+
 	multiline_comment_depth
 }
 
@@ -718,26 +691,66 @@ fn get_source_line(fm:&codemap::FileMap, i:uint)->~str {
 
 //fn split_by_key<T,K>(src:&[T],f:&fn(t:&T)->K)->(K,[&T])] {
 //}
+#[deriving(Clone)]
+pub struct Extents<T> {
+	lo:T, hi:T
+}
 
-fn write_references(doc:&mut HtmlWriter,dc:&RFindCtx, fm:&codemap::FileMap,lib_path:&str, nim:&FNodeInfoMap,jdm:&JumpToDefMap,jrm:&JumpToRefMap, nodes_per_line:&[~[ast::NodeId]]) {
+impl<T:Orderable+Clone> Extents<T> {
+	pub fn new(lo:&T,hi:&T)->Extents<T> { Extents{lo:lo.clone(),hi:hi.clone()} }
+	pub fn new_from_value(v:&T)->Extents<T>{ Extents {lo:v.clone(),hi:v.clone()} }
+	pub fn contains(&self, other:&Extents<T>)->bool {
+		other.lo >= self.lo && other.hi <=self.hi
+	}
+	pub fn intersection(&self,other:&Extents<T>)->Option<Extents<T>> {
+		if self.overlaps(other) {
+			Some(Extents{lo:self.lo.max(&other.lo), hi:self.hi.min(&other.hi)})
+		} else {
+			None
+		}
+	}
+	pub fn include(&self,other:&Extents<T>)->Extents<T> {
+		Extents{lo:self.lo.min(&other.lo),hi:self.hi.max(&other.hi)}
+	}
+	pub fn overlaps(&self, other:&Extents<T>)->bool {
+		!(other.lo >= self.hi || other.hi <= self.lo) 
+	}
+	pub fn contains_val(&self, value:&T)->bool {
+		*value >= self.lo && *value <= self.hi
+	}
+	pub fn include_val(&self, value:&T)->Extents<T> {
+		Extents { lo: self.lo.min(value), hi: self.hi.max(value) }
+	}
+}
+
+/*
+fn get_decl_span(dc:&RFindCtx, fm:&codemap::FileMap, n:ast::NodeId)->Extents<ZIndexFilePos>
+{
+	
+}
+*/
+
+
+fn write_references(doc:&mut htmlwriter::HtmlWriter,dc:&RFindCtx, fm:&codemap::FileMap,lib_path:&str,  nmaps:&NodeMaps, nodes_per_line:&[~[ast::NodeId]]) {
+//	let (nim,jdm,jrm)=(nmaps.nim, nmaps.jdm, nmaps.jrm);
 	doc.write_tag("div");
-	let file_def_nodes = find_defs_in_file(fm,nim);
+	let file_def_nodes = find_defs_in_file(fm,nmaps.nim);
 	//let mut defs_to_refs=MultiMap::new::<ast::NodeId, ast::NodeId>();
 
 	for &dn in file_def_nodes.iter() {
-		let opt_def_info = nim.find(&dn);
+		let opt_def_info = nmaps.nim.find(&dn);
 		if !opt_def_info.is_some() {loop;}
 		let def_info = opt_def_info.unwrap();
 		if !(def_info.kind==~"fn" || def_info.kind==~"struct" || def_info.kind==~"trait" || def_info.kind==~"enum" || def_info.kind==~"ty") {loop}
 
-		let refs = jrm.find(dn);
+		let refs = nmaps.jrm.find(dn);
 		let max_links=30;	// todo - sort..
 		let max_short_links=60;	// todo - sort..
 
 		
 		if refs.len()>0 {
 			let mut header_written=false;
-			let opt_def_tfp = byte_pos_to_index_file_pos(dc.tycx,def_info.span.lo);
+			let opt_def_tfp = def_info.span.lo.to_index_file_pos(dc.tycx);
 			if !opt_def_tfp.is_some() { loop;}
 			let def_tfp=opt_def_tfp.unwrap();
 			let mut links_written=0 as uint;
@@ -756,11 +769,11 @@ fn write_references(doc:&mut HtmlWriter,dc:&RFindCtx, fm:&codemap::FileMap,lib_p
 
 			let mut curr_file=def_tfp.file_index;
 			let  mut refs2=refs.iter()
-				.filter(|&id|{nim.find(id).is_some()})
+				.filter(|&id|{nmaps.nim.find(id).is_some()})
 				.map(|&id|{
-					let oni=nim.find(&id); assert!(oni.is_some());
+					let oni=nmaps.nim.find(&id); assert!(oni.is_some());
 					let ni=oni.unwrap();
-					let oifp=byte_pos_to_index_file_pos(dc.tycx, ni.span.lo);
+					let oifp=ni.span.lo.to_index_file_pos(dc.tycx);
 					assert!(oifp.is_some()); let ifp=oifp.unwrap();
 					(ni,ifp,id)})
 				.to_owned_vec();
@@ -782,16 +795,14 @@ fn write_references(doc:&mut HtmlWriter,dc:&RFindCtx, fm:&codemap::FileMap,lib_p
 					if header_written==false {					
 						if newline==false {doc.writeln("");}
 						header_written=true;
-						write_refs_header(doc,dc,nim,fm,dn);
-						doc.begin_tag("c24"); 
-						doc.writeln("references:-");
-						doc.end_tag();
+						doc.write_refs_header(dc,nmaps.nim,fm,dn);
+						doc.writeln_tagged("c40","references:-");
 						newline=true;
 					};
 					if curr_file!=ref_ifp.file_index {
 						if newline==false {doc.writeln("");}
 						curr_file=ref_ifp.file_index;
-						write_file_ref(doc,dc,fm,curr_file);
+						doc.write_file_ref(dc,fm,curr_file);
 						newline=true;
 					}
 
@@ -803,16 +814,12 @@ fn write_references(doc:&mut HtmlWriter,dc:&RFindCtx, fm:&codemap::FileMap,lib_p
 						doc.begin_tag_link( make_html_name_rel(rfm.name,fm.name)+"#"+(ref_ifp.line+1).to_str());
 
 						if  links_written<max_links {
-							doc.begin_tag("c24"); 
-							doc.write((ref_ifp.line+1).to_str()+&": ");
-							doc.end_tag();
+							doc.write_tagged("c40",(ref_ifp.line+1).to_str()+&": ");
 							doc.writeln(get_source_line(dc.sess.codemap.files[ref_ifp.file_index],ref_ifp.line));
 							newline=true;
 							links_written+=1;
 						} else {
-							doc.begin_tag("c24"); 
-							doc.write("("+(ref_ifp.line+1).to_str()+")");
-							doc.end_tag();
+							doc.write_tagged("c40","("+(ref_ifp.line+1).to_str()+")");
 							newline=false;
 							links_written+=1;
 						}
@@ -821,79 +828,76 @@ fn write_references(doc:&mut HtmlWriter,dc:&RFindCtx, fm:&codemap::FileMap,lib_p
 				}
 			}
 			if links_written < refs2.len() { 
-				doc.begin_tag("c24").writeln(".."+(refs2.len()-links_written).to_str()+"more..").end_tag();
+				doc.begin_tag("c40").writeln(".."+(refs2.len()-links_written).to_str()+"more..").end_tag();
 			}
 			if header_written {doc.writeln("");}
 	//		info=nim.find(dn);
 		}
 	}
+}
 
-	fn write_refs_header(doc:&mut HtmlWriter,dc:&RFindCtx,nim:&FNodeInfoMap, fm:&codemap::FileMap, nid:ast::NodeId) {
-
-		doc.writeln("");
+impl htmlwriter::HtmlWriter{
+	fn write_refs_header(&mut self,dc:&RFindCtx,nim:&FNodeInfoMap, fm:&codemap::FileMap, nid:ast::NodeId) {
+		self.writeln("");
 		do nim.find(&nid).for_some |info| {
-			let oifp=byte_pos_to_index_file_pos(dc.tycx, info.span.lo);//.unwrap();
-			let oifpe=byte_pos_to_index_file_pos(dc.tycx, info.span.hi);//.unwrap();
+			let oifp=info.span.lo.to_index_file_pos(dc.tycx);//.unwrap();
+			let oifpe=info.span.hi.to_index_file_pos(dc.tycx);//.unwrap();
 			if (oifp.is_some() && oifpe.is_some())==true {
 				let ifp=oifp.unwrap();
 				let ifpe=oifp.unwrap();
 	//		let def_info=nim.find(&nid).unwrap();
 	//		let ifpe=get_node_index_file_pos(dc,nim,nid).unwrap();
 
-				doc.begin_tag_anchor((ifp.line+1).to_str()+"_"+ifp.col.to_str() + "_refs" );
-				doc.begin_tag_link( "#"+(ifp.line+1).to_str());
-				doc.begin_tag("c24");
-				doc.writeln(dc.sess.codemap.files[ifp.file_index].name+":"+(ifp.line+1).to_str()+":"+ifp.col.to_str()
+				self.begin_tag_anchor((ifp.line+1).to_str()+"_"+ifp.col.to_str() + "_refs" );
+				self.begin_tag_link( "#"+(ifp.line+1).to_str());
+				self.begin_tag("c40");
+				self.writeln(dc.sess.codemap.files[ifp.file_index].name+":"+(ifp.line+1).to_str()+":"+ifp.col.to_str()
 							+"-"+(ifpe.line+1).to_str()+":"+ifpe.col.to_str() +" -" +info.kind + "- definition:");
-				doc.end_tag();
-				doc.begin_tag("pr");
+				self.end_tag();
+				self.begin_tag("pr");
 		//			dump!(def_tfp);
-				doc.writeln(get_source_line(fm,ifp.line) );
-				doc.writeln(get_source_line(fm,ifp.line+1) );
-				doc.end_tag();
-				doc.end_tag();
-				doc.end_tag();
+				self.writeln(get_source_line(fm,ifp.line) );
+				self.writeln(get_source_line(fm,ifp.line+1) );
+				self.end_tag();
+				self.end_tag();
+				self.end_tag();
 			}
 		}
-
 	}
+	fn write_file_ref(&mut self, dc:&RFindCtx,origin_fm:&codemap::FileMap, fi:uint) {
 
-fn write_file_ref(doc:&mut HtmlWriter, dc:&RFindCtx,origin_fm:&codemap::FileMap, fi:uint) {
-	
 		let fname = dc.tycx.sess.codemap.files[fi].name;
-		doc.begin_tag_link( make_html_name_rel(fname,origin_fm.name));
-		doc.begin_tag("c24");
-		doc.writeln(""+fname + ":");
-		doc.end_tag();
+		self.begin_tag_link( make_html_name_rel(fname,origin_fm.name));
+		self.begin_tag("c40").writeln(""+fname + ":").end_tag();
+		self.end_tag();
 	}
-}
-
-fn write_path_links(doc:&mut HtmlWriter, file_name:&str) {
-	doc.writeln("");
-	let file_path_col=&"c0";
-	let file_delim_col=&"c1";
-	let name_parts = file_name.split_iter('/').to_owned_vec();
-	let num_dirs=name_parts.len()-1;
-	let mut link_target=~"./";
+	pub fn write_path_links(&mut self/*doc:&mut HtmlWriter*/, file_name:&str) {
+		self.writeln("");
+		let file_path_col=&"c0";
+		let file_delim_col=&"c1";
+		let name_parts = file_name.split_iter('/').to_owned_vec();
+		let num_dirs=name_parts.len()-1;
+		let mut link_target=~"./";
 	
 
-	for x in range(0,num_dirs) {link_target.push_str("../");}
-	doc.write("    ");
-	doc.begin_tag_link(link_target+"index.html").write("(index<- )").end_tag().write("    ");
-	doc.begin_tag_link(link_target).write("    ./").end_tag();
+		for x in range(0,num_dirs) {link_target.push_str("../");}
+		self.write("    ");
+		self.begin_tag_link(link_target+"index.html").write("(index<- )").end_tag().write("    ");
+		self.begin_tag_link(link_target).write("    ./").end_tag();
 
-	for (i,x) in name_parts.iter().enumerate() {
-		let is_dir = i < num_dirs;
-		link_target.push_str(*x);
-		if is_dir {link_target.push_str("/");}
-		else { link_target.push_str(".html");}
-		doc.begin_tag(file_path_col);
-		doc.begin_tag_link(link_target); doc.write(*x);
-		doc.end_tag();
-		if is_dir {doc.write_tagged(file_delim_col,"/");}
+		for (i,x) in name_parts.iter().enumerate() {
+			let is_dir = i < num_dirs;
+			link_target.push_str(*x);
+			if is_dir {link_target.push_str("/");}
+			else { link_target.push_str(".html");}
+			self.begin_tag(file_path_col);
+			self.begin_tag_link(link_target).write(*x).end_tag();
+//			self.end_tag();
+			if is_dir {self.write_tagged(file_delim_col,"/");}
+		}
+		self.writeln("");
+		self.writeln("");
 	}
-	doc.writeln("");
-	doc.writeln("");
 }
 
 // TODO: a span index should uniquely identify the node.
@@ -901,14 +905,16 @@ fn write_path_links(doc:&mut HtmlWriter, file_name:&str) {
 // things that are robust when some source changes, etc.
 // file_index:line_index:col_index:length
 
-fn get_node_index_file_pos(dc:&RFindCtx,nim:&FNodeInfoMap,nid:ast::NodeId)->Option<ZIndexFilePos> {
-	let oni=nim.find(&nid);
-//	assert!(oni.is_some());
-	if oni.is_some() {
-		let ni=oni.unwrap();
-		byte_pos_to_index_file_pos(dc.tycx,ni.span.lo)
-	} else {
-		None
+impl<'self> ToZIndexFilePos for (&'self FNodeInfoMap,ast::NodeId) {
+	pub fn to_index_file_pos(&self,tc:ty::ctxt)->Option<ZIndexFilePos> {
+		let (ref nim,nid)=*self;
+		let oni=nim.find(&nid);
+		if oni.is_some() {
+			let ni=oni.unwrap();
+			ni.span.lo.to_index_file_pos(tc)
+		} else {
+			None
+		}
 	}
 }
 
@@ -920,15 +926,17 @@ fn count_chars_in(f:&str, x:char)->uint{
 	n
 }
 
+
 fn make_html_name_reloc(f:&str, origin:&str, reloc:&str)->~str {
 	let mut acc=~"";
-	let mut i=0;
-	let depth_change=count_chars_in(origin,'/');//-count_chars_in(origin,'/')
-	while i<depth_change {
-		acc.push_str("../");
-		i+=1;
+	if reloc.len()>0 {
+		acc=reloc.to_owned(); 
+		if acc.iter().last().unwrap()!='/' { acc.push_char('/');}
+	}else {
+		for x in range(0,count_chars_in(origin,'/')) {
+			acc.push_str("../");
+		}
 	}
-	if reloc.len()>0 { acc=reloc.to_owned(); if acc.iter().last().unwrap_or_default(' ')!='/' {acc.push_char('/')} }// replace that..
 	acc.push_str(f);
 	make_html_name(acc)
 }
