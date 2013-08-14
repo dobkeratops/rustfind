@@ -31,7 +31,7 @@ pub struct ZTextFilePos {
 	col:uint
 }
 pub trait ToZTextFilePos {
-	pub fn to_text_file_pos(self,cx:ty::ctxt)->Option<ZTextFilePos>;
+	fn to_text_file_pos(self,cx:ty::ctxt)->Option<ZTextFilePos>;
 }
 impl ZIndexFilePos {
 	pub fn to_scalar(&self)->u64 { 
@@ -42,14 +42,14 @@ impl ZIndexFilePos {
 
 impl Ord for ZIndexFilePos {
 	// todo: as fixed width bignum? or int64 from int32 components?
-	pub fn lt(&self, other:&ZIndexFilePos)->bool { self.to_scalar()<other.to_scalar()}
-	pub fn gt(&self, other:&ZIndexFilePos)->bool { self.to_scalar()>other.to_scalar()}
-	pub fn le(&self, other:&ZIndexFilePos)->bool { self.to_scalar()<=other.to_scalar()}
-	pub fn ge(&self, other:&ZIndexFilePos)->bool { self.to_scalar()>=other.to_scalar()}
+	fn lt(&self, other:&ZIndexFilePos)->bool { self.to_scalar()<other.to_scalar()}
+	fn gt(&self, other:&ZIndexFilePos)->bool { self.to_scalar()>other.to_scalar()}
+	fn le(&self, other:&ZIndexFilePos)->bool { self.to_scalar()<=other.to_scalar()}
+	fn ge(&self, other:&ZIndexFilePos)->bool { self.to_scalar()>=other.to_scalar()}
 }
 
 impl ToZTextFilePos for codemap::BytePos {
-	pub fn to_text_file_pos(self, cx:ty::ctxt)->Option<ZTextFilePos> {
+	fn to_text_file_pos(self, cx:ty::ctxt)->Option<ZTextFilePos> {
 		let mut i=cx.sess.codemap.files.len();
 		while i>0 {
 			i-=1;
@@ -70,7 +70,7 @@ impl ToZTextFilePos for codemap::BytePos {
 }
 
 impl FromStr for ZTextFilePos {
-	pub fn from_str(file_pos_str:&str)->Option<ZTextFilePos> {
+	fn from_str(file_pos_str:&str)->Option<ZTextFilePos> {
 		let toks:~[&str]=file_pos_str.split_iter(':').collect();
 		if toks.len()<=0 {
 			None 
@@ -219,11 +219,11 @@ pub struct ZIndexFilePos {
 	col:uint
 }
 pub trait ToZIndexFilePos {
-	pub fn to_index_file_pos(&self,c:ty::ctxt)->Option<ZIndexFilePos>;
+	fn to_index_file_pos(&self,c:ty::ctxt)->Option<ZIndexFilePos>;
 }
 
 impl ToZIndexFilePos for codemap::BytePos {
-	pub fn to_index_file_pos(&self, c:ty::ctxt)->Option<ZIndexFilePos> {
+	fn to_index_file_pos(&self, c:ty::ctxt)->Option<ZIndexFilePos> {
 		// TODO: cleanup with byte_pos_to_text_file_pos, one in terms of the other.
 		// TODO - functional, and with binary search or something ..
 		let mut i=c.sess.codemap.files.len();

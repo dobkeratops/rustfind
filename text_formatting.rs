@@ -5,7 +5,7 @@ pub trait Indent {
 }
 
 impl Indent for ~str {
-	pub fn indent(&self,tabsize:int, linesize:int)->~str {
+	fn indent(&self,tabsize:int, linesize:int)->~str {
 		// todo-write as iterators.
 		fn change_indent(c:u8)->int{
 			match c as char {

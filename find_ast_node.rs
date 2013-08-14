@@ -56,7 +56,7 @@ pub type FNodeInfoMap= hashmap::HashMap<ast::NodeId,FNodeInfo>;
 pub type NodeTreeLoc = ~[AstNode];
 
 pub trait AstNodeAccessors {
-	pub fn get_id(&self)->Option<ast::NodeId>;
+	fn get_id(&self)->Option<ast::NodeId>;
 }
 pub trait KindToStr {
 	fn kind_to_str(&self)->&'static str;
@@ -195,13 +195,13 @@ pub fn node_spans_table_to_json_sub(dc:&RFindCtx,ns:&FNodeInfoMap)->~str {
 }
 
 impl ToJsonStrFc for FNodeInfoMap {
-	pub fn to_json_str(&self,dc:&RFindCtx)->~str {
+	fn to_json_str(&self,dc:&RFindCtx)->~str {
 		~"[\n"+node_spans_table_to_json_sub(dc,self)+~"]\n"
 	}
 }
 
 impl ToJsonStr for hashmap::HashMap<ast::NodeId,ast::def_id> {
-	pub fn to_json_str(&self)->~str {
+	fn to_json_str(&self)->~str {
 		let mut r=~"[\n";
 //		for self.iter().advance|(&key,&value)| {
 		for (&key,&value) in self.iter() {
@@ -351,7 +351,7 @@ impl AstNode {
 	}
 }
 impl KindToStr for AstNode {
-	pub fn kind_to_str(&self)->&'static str {
+	fn kind_to_str(&self)->&'static str {
 		//TODO subsets of view_item?
 		match *self {
 			astnode_mod(_)=>"mod",
@@ -379,7 +379,7 @@ impl KindToStr for AstNode {
 }
 
 impl AstNodeAccessors for ast::item_ {
-	pub fn get_id(&self)->Option<ast::NodeId> {
+	fn get_id(&self)->Option<ast::NodeId> {
 		match *self {
 		ast::item_static(_,_,ref e) => Some(e.id),
 		ast::item_fn(ref decl,_,_,_,ref b)=>Some(b.id),
@@ -396,18 +396,18 @@ impl AstNodeAccessors for ast::item_ {
 }
 
 impl AstNodeAccessors for ast::item {
-	pub fn get_id(&self)->Option<ast::NodeId> {
+	fn get_id(&self)->Option<ast::NodeId> {
 		Some(self.id)
 	}
 }
 impl AstNodeAccessors for ast::Local {
-	pub fn get_id(&self)->Option<ast::NodeId> {
+	fn get_id(&self)->Option<ast::NodeId> {
 		Some(self.id)
 	}
 }
 
 impl AstNodeAccessors for ast::decl_ {
-	pub fn get_id(&self)->Option<ast::NodeId> {
+	fn get_id(&self)->Option<ast::NodeId> {
 		match *self{
 			ast::decl_local(ref x)=>Some(x.id),
 			ast::decl_item(ref x)=>Some(x.id)
@@ -416,7 +416,7 @@ impl AstNodeAccessors for ast::decl_ {
 }
 
 impl<T:AstNodeAccessors> AstNodeAccessors for codemap::spanned<T> {
-	pub fn get_id(&self)->Option<ast::NodeId> {
+	fn get_id(&self)->Option<ast::NodeId> {
 		self.node.get_id()
 	}
 }
@@ -426,12 +426,12 @@ impl<T:AstNodeAccessors> AstNodeAccessors for codemap::spanned<T> {
 //	}
 //}
 impl AstNodeAccessors for ast::Block {
-	pub fn get_id(&self)->Option<ast::NodeId> {
+	fn get_id(&self)->Option<ast::NodeId> {
 		Some(self.id)
 	}
 }
 impl AstNodeAccessors for ast::stmt_ {
-	pub fn get_id(&self)->Option<ast::NodeId> {
+	fn get_id(&self)->Option<ast::NodeId> {
 		match *self {
 			ast::stmt_decl(_,x)=>Some(x),
 			ast::stmt_expr(_,x)=>Some(x),
@@ -442,7 +442,7 @@ impl AstNodeAccessors for ast::stmt_ {
 }
 
 impl AstNodeAccessors for ast::view_item_ {
-	pub fn get_id(&self)->Option<ast::NodeId> {
+	fn get_id(&self)->Option<ast::NodeId> {
 		match *self {
 			ast::view_item_extern_mod(_,_,_,node_id)=>Some(node_id),
 			ast::view_item_use(_)=>None
@@ -450,13 +450,13 @@ impl AstNodeAccessors for ast::view_item_ {
 	}
 }
 impl AstNodeAccessors for ast::struct_field_ {
-	pub fn get_id(&self)->Option<ast::NodeId> {
+	fn get_id(&self)->Option<ast::NodeId> {
 		Some(self.id)
 	}
 }
 
 impl AstNodeAccessors for ast::trait_method {
-	pub fn get_id(&self)->Option<ast::NodeId> {
+	fn get_id(&self)->Option<ast::NodeId> {
 		match(*self) {
 			ast::required(ref m)=>Some(m.id),
 			ast::provided(ref m)=>None
@@ -465,7 +465,7 @@ impl AstNodeAccessors for ast::trait_method {
 }
 
 impl AstNodeAccessors for AstNode {
-	pub fn get_id(&self)->Option<ast::NodeId> {
+	fn get_id(&self)->Option<ast::NodeId> {
 		// todo - should be option<node_id> really..
 		match *self {
 			astnode_mod(ref x) => None,

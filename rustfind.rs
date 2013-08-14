@@ -95,10 +95,30 @@ fn dump_json(dc:&RFindCtx) {
 	println("}");
 }
 
+
+
 pub fn build_jump_to_def_map(dc:&RFindCtx, nim:@mut FNodeInfoMap,nd:&HashMap<ast::NodeId,ast::def_id>)->~JumpToDefMap{
 // todo: NodeId->AStNode  .. lookup_def_ inner functionality extracted
 	let mut jdm=~HashMap::new();
-	for (k,_) in nim.iter() {
+	for (k,node_info) in nim.iter() {
+		match lookup_def_node_of_node(dc,&node_info.node,nim,nd) {
+			None=>{},
+			Some(def_node_id)=>{
+//				if *k != def_node_id.node && def_node_id.crate==0 || (def_node_id.crate!=0) 
+				{
+					jdm.insert(*k,def_node_id);
+				}
+			}
+		}
+	}
+	jdm
+}
+
+/*
+pub fn build_jump_to_def_map(dc:&RFindCtx, nim:@mut FNodeInfoMap,nd:&HashMap<ast::NodeId,ast::def_id>)->~JumpToDefMap{
+// todo: NodeId->AStNode  .. lookup_def_ inner functionality extracted
+	let mut jdm=~HashMap::new();
+	for (k,nim) in nim.iter() {
 		match get_ast_node_of_node_id(nim,*k) {
 			None=>{},
 			Some(ast_node)=>{
@@ -113,9 +133,9 @@ pub fn build_jump_to_def_map(dc:&RFindCtx, nim:@mut FNodeInfoMap,nd:&HashMap<ast
 			}
 		}
 	}
-
 	jdm
 }
+*/
 
 
 pub static ctxtkey: local_data::Key<@RFindCtx> = &local_data::Key;
@@ -167,6 +187,7 @@ fn main() {
 
     use extra::getopts::*;
     use std::hashmap::HashMap;
+
 
 	//test_default_arg(1,(2,3));
 	//test_default_arg(1);
@@ -243,9 +264,10 @@ struct HrcNode<NODE> {
 
 /// tags: crate,ast,parse resolve
 /// Parses, resolves the given crate
-fn get_ast_and_resolve(cpath: &std::path::PosixPath, libs: ~[std::path::PosixPath]) -> RFindCtx {
-	
-
+fn get_ast_and_resolve(
+	cpath: &std::path::PosixPath, 
+	libs: ~[std::path::PosixPath]) 
+	-> RFindCtx {
 
     let parsesess = parse::new_parse_sess(None);
     let sessopts = @driver::session::options {
@@ -471,7 +493,7 @@ fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, node_spans:&FNodeInfoMap,
 						match mme.origin {
 							typeck::method_static(def_id)=> 
 								return Some(def_id),
-							typeck::method_trait(def_id,_,_)=>
+							typeck::method_trait(def_id,_)=>
 								return Some(def_id),
 							typeck::method_param(mp)=>{
 								match dc.tycx.trait_method_def_ids.find(&mp.trait_id) {
@@ -845,15 +867,23 @@ pub fn load_cross_crate_map(dc:&RFindCtx, crate_num:int, crate_name:&str)->~Cros
 //		println(s.to_str());
 		let toks=s.split_iter('\t').to_owned_vec();
 		if toks.len()>=6 {
-			let node_id:int=std::int::from_str(toks[1]).unwrap_or_default(0);
-			xcm.insert(ast::def_id{crate:crate_num, node:node_id,},
-				CrossCrateMapItem{
-					fname:	toks[2].to_owned(),
-					line:	std::uint::from_str(toks[3]).unwrap_or_default(0),
-					col:	std::uint::from_str(toks[4]).unwrap_or_default(0),
-					len:	std::uint::from_str(toks[5]).unwrap_or_default(0)
+			match toks[0] {
+				"jdef"=> {
+					// special entries
 				}
-			);
+				_=>{	// everything else is a node instance
+
+					let node_id:int=std::int::from_str(toks[1]).unwrap_or_default(0);
+					xcm.insert(ast::def_id{crate:crate_num, node:node_id,},
+						CrossCrateMapItem{
+							fname:	toks[2].to_owned(),
+							line:	std::uint::from_str(toks[3]).unwrap_or_default(0),
+							col:	std::uint::from_str(toks[4]).unwrap_or_default(0),
+							len:	std::uint::from_str(toks[5]).unwrap_or_default(0)
+						}
+					);
+				}
+			}
 		}
 	}
 	//dump!(xcm);
@@ -880,19 +910,34 @@ pub fn write_source_as_html(dc:&RFindCtx,lib_html_path:~str,opts:uint) {
 	// write inter-crate node map
 	let crate_rel_path_name= dc.sess.codemap.files[0].name;
 
-	let crate_name_only=crate_rel_path_name.split_iter('/').last().unwrap_or_default("").split_iter('.').nth(0).unwrap_or_default("");
-	println("writing rustfind cross-crate link info for "+crate_name_only);
+	let curr_crate_name_only=crate_rel_path_name.split_iter('/').last().unwrap_or_default("").split_iter('.').nth(0).unwrap_or_default("");
+	println("writing rustfind cross-crate link info for "+curr_crate_name_only);
 	let mut outp=~"";
 	for (k,ni) in nim.iter() {
 		match ni.span.lo.to_text_file_pos(dc.tycx) {
 			Some(tfp)=>{	
-				outp.push_str(crate_name_only+"\t"+k.to_str()+"\t"+tfp.name+"\t"+tfp.line.to_str()+"\t"+tfp.col.to_str()+"\t"+(*ni.span.hi-*ni.span.lo).to_str()+"\n");
+				outp.push_str(curr_crate_name_only+"\t"+k.to_str()+"\t"+tfp.name+"\t"+tfp.line.to_str()+"\t"+tfp.col.to_str()+"\t"+(*ni.span.hi-*ni.span.lo).to_str()+"\n");
 			},
 			None=>{}
 		}
 	}
 	
-	{	let x=crate_name_only+~".rfx";
+	for (k,v) in jdm.iter()  {
+		let cname:~str= if v.crate>0 {
+			cstore::get_crate_data(dc.tycx.cstore,v.crate).name.to_str()
+		} else {
+			curr_crate_name_only.to_str()
+		};
+		//println(cdata.name);
+		outp.push_str("jdef\t"+k.to_str()+"\t"+cname+"\t" +v.node.to_str()+"\n");
+	}	
+
+//	for (k,v) in ndm.iter()  {
+//		outp.push_str("def\t"+k.to_str()+"\t"+dc.tycx.cstore.crate() +v.node.to_str()+"\n");
+//	}	
+
+	
+	{	let x=curr_crate_name_only+~".rfx";
 		println("writing "+x);
 		ioutil::fileSaveStr(outp, x);
 	}
@@ -994,17 +1039,17 @@ pub fn rustfind_interactive(dc:&RFindCtx) {
 }
 
 pub trait MyOption<T> {
-	pub fn for_some(&self, f:&fn(t:&T));
-	pub fn do_some<R>(&self, f:&fn(t:&T)->R)->Option<R>;
+	fn for_some(&self, f:&fn(t:&T));
+	fn do_some<R>(&self, f:&fn(t:&T)->R)->Option<R>;
 }
 impl<T> MyOption<T> for Option<T>{
-	pub fn for_some(&self, f:&fn(t:&T)) {
+	fn for_some(&self, f:&fn(t:&T)) {
 		match self {
 			&None=>{},
 			&Some(ref t)=>f(t)
 		}
 	}
-	pub fn do_some<R>(&self, f:&fn(t:&T)->R)->Option<R> {
+	fn do_some<R>(&self, f:&fn(t:&T)->R)->Option<R> {
 		match self {
 			&None=>None,
 			&Some(ref t)=>Some(f(t))

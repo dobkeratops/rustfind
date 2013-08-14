@@ -400,7 +400,7 @@ impl<'self, T> SourceCodeWriter<'self,T> {
 	}
 }
 
-static no_link:ast::NodeId	=0 ;
+static no_link:i64	=0 ;
 static link_to_refs:bool	=false;
 static link_debug:bool		=true;
 
@@ -414,7 +414,7 @@ fn write_line_with_links(dst:&mut SourceCodeWriter<htmlwriter::HtmlWriter>,dc:&R
 //	dump!(node_infos);
 // todo - sorting node spans, not this "painters-algorithm" approach..
 
-	let mut link:~[ast::NodeId] = vec::from_elem(line.len(),0 as ast::NodeId);
+	let mut link:~[i64] = vec::from_elem(line.len(),0 as ast::NodeId as i64);
 	let mut color:~[int] = vec::from_elem(line.len(),0 as int);
 	let mut depth:~[uint]= vec::from_elem(line.len(),0x7fffffff as uint);
 	let mut rndcolor=0;
@@ -425,10 +425,25 @@ fn write_line_with_links(dst:&mut SourceCodeWriter<htmlwriter::HtmlWriter>,dc:&R
 			None=>{},
 			Some(ni)=>{
 				// link_id >0 = node def link. link_id<0 = node ref link
+				
 				let link_id= match nmaps.jdm.find(n) {
-					None=> if link_to_refs{if nmaps.jrm.find(*n).len()>0 { - *n } else { no_link }}else{no_link},
-					Some(x) =>if link_debug{x.node|(x.crate<<24)} else {x.node}
+					None=>
+						if link_to_refs{
+							if nmaps.jrm.find(*n  ).len()>0 {
+								- *n as i64
+							} else {
+								no_link
+							}
+						}else{
+							no_link
+						},
+					Some(x) => if link_debug{(x.node as i64)|(x.crate as i64<<48)} else {x.node as i64}
 				};
+				
+//				let null_def=ast::def_id{crate:0,node:0};
+//				let x=nmaps.jdm.find(n).unwrap_or_default(&null_def);
+//				let link_id=(x.node as i64)|(x.crate as i64<<48);
+//				let link_id=*n as i64 &15;
 				
 				let os=ni.span.lo.to_index_file_pos(dc.tycx);
 				let oe=ni.span.hi.to_index_file_pos(dc.tycx);
@@ -445,7 +460,7 @@ fn write_line_with_links(dst:&mut SourceCodeWriter<htmlwriter::HtmlWriter>,dc:&R
 					let xe = if e.line>dst.line_index{line.len()}else{e.col};
 					let ci = node_color_index(ni);
 					for x in range(xs, xe.min(&line.len())) {
-						if d < depth[x] {
+						if d <= depth[x] {
 							color[x]=ci;
 							depth[x]=d;
 							if link_id!=0 {
@@ -565,7 +580,7 @@ fn write_line_with_links(dst:&mut SourceCodeWriter<htmlwriter::HtmlWriter>,dc:&R
 	write_line_attr_links(dst,line,color,link, resolver );
 }
 
-fn resolve_link(link:int, dc:&RFindCtx,fm:&codemap::FileMap,lib_path:&str, nmaps:&NodeMaps,xcm:&::CrossCrateMap)->~str {
+fn resolve_link(link:i64, dc:&RFindCtx,fm:&codemap::FileMap,lib_path:&str, nmaps:&NodeMaps,xcm:&::CrossCrateMap)->~str {
 	let nim=nmaps.nim;
 /*
 	if link_debug==false {
@@ -599,15 +614,15 @@ fn resolve_link(link:int, dc:&RFindCtx,fm:&codemap::FileMap,lib_path:&str, nmaps
 	} else 
 	*/
 	if link !=no_link {
-		let def_crate = link>>24;
-		let def_node=link&((1<<24)-1);
+		let def_crate = (link>>48) as int;
+		let def_node=(link&((1<<48)-1)) as int;
 		match xcm.find(&ast::def_id{crate:def_crate,node:def_node}) {
 			None=>//"#n"+def_node.to_str(), by node linnk
 			{
 				match (nmaps.nim,def_node).to_index_file_pos(dc.tycx) {
 					Some(ifp)=>make_html_name_rel(dc.sess.codemap.files[ifp.file_index].name,fm.name)+
 						"#"+(ifp.line+1).to_str(),
-					None=>~""
+					None=>~"c="+def_crate.to_str()+" n="+def_node.to_str()
 				}
 				
 			},
@@ -618,13 +633,13 @@ fn resolve_link(link:int, dc:&RFindCtx,fm:&codemap::FileMap,lib_path:&str, nmaps
 			}
 		}
 	} else {
-		~""
+		~"no link"
 	}
 
 }
 
 
-fn write_line_attr_links(dst:&mut SourceCodeWriter<htmlwriter::HtmlWriter>,text_line:&str,color:&[int],links:&[int], resolve_link:&fn(int)->~str) {
+fn write_line_attr_links(dst:&mut SourceCodeWriter<htmlwriter::HtmlWriter>,text_line:&str,color:&[int],links:&[i64], resolve_link:&fn(i64)->~str) {
 	// emit a span..
 	let no_color=-1;
 	let mut curr_col=no_color;
@@ -752,12 +767,39 @@ fn get_decl_span(dc:&RFindCtx, fm:&codemap::FileMap, n:ast::NodeId)->Extents<ZIn
 }
 */
 
+enum CwOpts {
+	Rect(int,int,int,int), Pos(int,int), SplitHoriz(int),SplitVert(int),full
+}
+enum TitleStyle {
+
+}
+struct Window {
+	name:~str,x:int,y:int,w:int,h:int,child:~[Window],
+}
+
+fn CreateWindow(parent:&Window,mname:&str, opt:CwOpts) {
+}
+struct Foo {
+	i:int
+}
+trait Draw {
+	fn draw(self);
+}
+impl<'self> Draw for  (&'self Window,&'self str) {
+	fn draw(self) {
+	}
+}
+
 
 fn write_references(doc:&mut htmlwriter::HtmlWriter,dc:&RFindCtx, fm:&codemap::FileMap,lib_path:&str,  nmaps:&NodeMaps, nodes_per_line:&[~[ast::NodeId]]) {
+
+	
+
 //	let (nim,jdm,jrm)=(nmaps.nim, nmaps.jdm, nmaps.jrm);
 	doc.write_tag("div");
 	let file_def_nodes = find_defs_in_file(fm,nmaps.nim);
 	//let mut defs_to_refs=MultiMap::new::<ast::NodeId, ast::NodeId>();
+
 
 	for &dn in file_def_nodes.iter() {
 		let opt_def_info = nmaps.nim.find(&dn);
@@ -928,7 +970,7 @@ impl htmlwriter::HtmlWriter{
 // file_index:line_index:col_index:length
 
 impl<'self> ToZIndexFilePos for (&'self FNodeInfoMap,ast::NodeId) {
-	pub fn to_index_file_pos(&self,tc:ty::ctxt)->Option<ZIndexFilePos> {
+	fn to_index_file_pos(&self,tc:ty::ctxt)->Option<ZIndexFilePos> {
 		let (ref nim,nid)=*self;
 		let oni=nim.find(&nid);
 		if oni.is_some() {
