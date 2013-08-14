@@ -40,19 +40,24 @@ pub fn make_html(dc:&RFindCtx, fm:&codemap::FileMap,nmaps:&NodeMaps,xcm:&::Cross
 	
 	let mut doc= htmlwriter::HtmlWriter::new();
 	write_head(&mut doc);
-	write_styles(&mut doc, fm.name);
 
 	let hash=get_str_hash(fm.name);
 	let bg=(~[~"383838",~"34383c",~"3c3834",~"383c34",~"343c38",~"38343c",~"3a343a",
 			~"3a343a",~"36363a",~"363a36",~"3a3636",~"3a3a34",~"3a333a",~"343a3a",~"343a3c",~"343838"])[hash&15];
 	// write the doc lines..
-	doc.begin_tag_ext("body",&[(~"style",~"background-color:#"+bg+";")]);
+	doc.begin_tag("body");//,&[(~"style",~"background-color:#"+bg+";")]);
+	doc.begin_tag("div");//,&[(~"style",~"background-color:#"+bg+";")]);
+	doc.begin_tag("bg"+(hash&15).to_str()); 
 	doc.begin_tag("maintext");
 	let fstart = *fm.start_pos;
 	let max_digits=num_digits(fm.lines.len());
 	
 	if options & WriteFilePath!=0 {
+		doc.begin_tag("div");//,&[(~"style",~"background-color:#"+bg+";")]);
+		doc.begin_tag("fileblock");
 		doc.write_path_links(fm.name);
+		doc.end_tag();
+		doc.end_tag();
 	}
 	{
 		let mut scw=SourceCodeWriter::new::<htmlwriter::HtmlWriter>(&mut doc);
@@ -82,6 +87,8 @@ pub fn make_html(dc:&RFindCtx, fm:&codemap::FileMap,nmaps:&NodeMaps,xcm:&::Cross
 		write_references(&mut doc,dc,fm,lib_path,nmaps, fln.nodes_per_line);
 	}
 	
+	doc.end_tag();
+	doc.end_tag();
 	doc.end_tag();
 	doc.end_tag();
 
@@ -135,54 +142,7 @@ fn get_str_hash(s:&str)->uint{
 	for x in s.iter() { acc=((acc<<5)-acc)^(acc>>12); acc+=x as uint;}
 	acc 
 }
-pub fn write_styles(doc:&mut htmlwriter::HtmlWriter,fname:&str){
-	// write the styles..
-/*	doc.begin_tag_ext("style",&[(~"type",~"text/css")]);
-	doc.write_html("maintext {color:#f0f0f0; font-size:12px; font-family:\"Courier New\"}\n");
-	doc.write_html("a:link{ color:#f0f0f0; font-style:normal;   text-decoration:none;}\n");
-	doc.write_html("a:visited{ color:#f0f0f0; font-style:normal;   text-decoration:none;}\n");
-	doc.write_html("a:link:hover{ color:#f0f0f0; font-style:normal; background-color:#606060; }\n");
-	doc.write_html("pr{font-weight:bold}\n");
-	doc.write_html("ln{color:#606060; -moz-user-select:-moz-none; -khtml-user-select:none; -webkit-user-select:none; -ms-user-select:none; user-select:none;}\n");
-//	doc.write_html("c25{color:#ffffff; opacity:0.92}\n");
-	doc.write_html("c26{color:#ffffff; font-weight:bold; }\n");
-	doc.write_html("c27{color:#b0ffff; font-weight:bold; }\n");
-	doc.write_html("c28{color:#b0ffb0; font-weight:bold; }\n");
-	doc.write_html("c29{color:#d0e0ff; font-weight:bold; }\n");
-	doc.write_html("c30{color:#fff0e0; font-weight:bold; }\n");
-	doc.write_html("c31{color:#d0b0ff; font-weight:bold; }\n");
-	doc.write_html("c1{color:#ffffc0;   font-weight:bold; }\n");
-	doc.write_html("c33{color:#e0a0d0;  }\n");
-	doc.write_html("c40{color:#ffffff; font-style:italic; opacity:0.4}\n");
-	doc.write_html("c41{color:#ffffff; font-style:italic; opacity:0.5}\n");
-	doc.write_html("c42{color:#ffffff; font-style:italic; opacity:0.6}\n");
-	doc.write_html("c2{color:#60f0c0}\n");
-	doc.write_html("c3{color:#50e0ff; }\n");
-	doc.write_html("c4{color:#f090f0}\n");
-	doc.write_html("c5{color:#50ff80; }\n");
-	doc.write_html("c6{color:#f0f0e0}\n");
-	doc.write_html("c7{color:#fff0d0}\n");
-	doc.write_html("c8{color:#e0d0f0}\n");
-	doc.write_html("c9{color:#70f0f0}\n");
-	doc.write_html("c10{color:#f0f070}\n");
-	doc.write_html("c11{color:#c0f070}\n");
-	doc.write_html("c12{color:#70c0f0}\n");
-	doc.write_html("c13{color:#c0f070}\n");
-	doc.write_html("c14{color:#f0ffc0}\n");
-	doc.write_html("c15{color:#f0f0e0}\n");
-	doc.write_html("c16{color:#c0ffe0}\n");
-	doc.write_html("c17{color:#90d0f0}\n");
-	doc.write_html("c18{color:#f0a0d0}\n");
-	doc.write_html("c19{color:#d0f0a0}\n");
-	doc.write_html("c20{color:#0f0ff}\n");
-	doc.write_html("c21{color:#d0d0d0; font-weight:bold}\n");
-	doc.write_html("c22{color:#c0ffd0; }\n");
-	doc.write_html("c23{color:#d0f0ff; }\n");
 
-
-	doc.end_tag();
-	*/
-}
 
 
 fn num_digits(a:uint)->uint{
@@ -517,13 +477,15 @@ fn write_line_with_links(dst:&mut SourceCodeWriter<htmlwriter::HtmlWriter>,dc:&R
 			// override color for top level decls
 			if wb && is_alphanumeric(line[x] as char){
 				let (decl_color,len)=
-										is_text_here(line,x,"type",35)
-					.unwrap_or_default(	is_text_here(line,x,"fn",30)
+										is_text_here(line,x,"fn",30)
 					.unwrap_or_default(	is_text_here(line,x,"struct",31)
 					.unwrap_or_default(	is_text_here(line,x,"trait",32)
 					.unwrap_or_default(	is_text_here(line,x,"impl",33)
 					.unwrap_or_default(	is_text_here(line,x,"enum",34)
-					.unwrap_or_default((0,0)))))));
+					.unwrap_or_default(	is_text_here(line,x,"type",35)
+					.unwrap_or_default(	is_text_here(line,x,"static",36)
+					.unwrap_or_default(	is_text_here(line,x,"macro_rules!",37)
+					.unwrap_or_default((0,0)))))))));
 				if decl_color>0{
 					for x in range(x,x+len) { link[x]=0;/* clear link on the keyword part..*/}
 					let mut in_typaram=0;
@@ -797,9 +759,10 @@ impl<'self> Draw for  (&'self Window,&'self str) {
 fn write_references(doc:&mut htmlwriter::HtmlWriter,dc:&RFindCtx, fm:&codemap::FileMap,lib_path:&str,  nmaps:&NodeMaps, nodes_per_line:&[~[ast::NodeId]]) {
 
 	
+	doc.write_tag("div");
+	doc.begin_tag("refblock");
 
 //	let (nim,jdm,jrm)=(nmaps.nim, nmaps.jdm, nmaps.jrm);
-	doc.write_tag("div");
 	let file_def_nodes = find_defs_in_file(fm,nmaps.nim);
 	//let mut defs_to_refs=MultiMap::new::<ast::NodeId, ast::NodeId>();
 
@@ -901,6 +864,7 @@ fn write_references(doc:&mut htmlwriter::HtmlWriter,dc:&RFindCtx, fm:&codemap::F
 	//		info=nim.find(dn);
 		}
 	}
+	doc.end_tag();
 }
 
 impl htmlwriter::HtmlWriter{

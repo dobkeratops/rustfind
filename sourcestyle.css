@@ -14,7 +14,7 @@ c2{color:#ffffff; opacity:0.92}
 /* delimeters*/
 c3{color:#f090f0; opacity:0.92}
 /* special delmeters*/
-c4{color:#fff0d0; }
+c4{color:#fff080; }
 /* operators */
 c5{color:#50ff80; } 
 /* Special operators */
@@ -39,7 +39,7 @@ c16{color:#c0ffe0}
 c17{color:#90d0f0}
 c18{color:#f0a0d0}
 c19{color:#d0f0a0}
-c20{color:#f00f0ff}
+c20{color:#f0f0ff}
 c21{color:#d0d0d0; font-weight:bold}  /* structural keywords */
 c22{color:#c0ffd0; }
 c23{color:#d0f0ff; }
@@ -51,12 +51,22 @@ c27{color:#70f0f0}
 
 
 /* declarative keywords*/
+/* fn */
 c30{color:#ffffff; font-weight:bold; }
-c31{color:#b0ffff; font-weight:bold; }
-c32{color:#b0ffb0; font-weight:bold; }
-c33{color:#d0e0ff; font-weight:bold; }
-c34{color:#fff0e0; font-weight:bold; }
-c35{color:#d0b0ff; font-weight:bold; }
+/* struct */
+c31{color:##d0ffc0; font-weight:bold; }
+/* trait */
+c32{color:#c0f0ff; font-weight:bold; }
+/* impl */
+c33{color:#ffc0f0; font-weight:bold; }
+/* enum */
+c34{color:#c0ffff; font-weight:bold; }
+/* type */
+c35{color:##80c0ff; font-weight:bold; }
+/* static */
+c36{color:#f0c0ff; font-weight:bold; }
+/* macro */
+c37{color:#ffc0a0; font-weight:bold; }
 
 /* comment levels*/
 c40{color:#ffffff; font-style:italic; opacity:0.4}
@@ -65,5 +75,33 @@ c42{color:#ffffff; font-style:italic; opacity:0.6}
 
 /* preprocessor/attributes*/
 c50{color:#e0a0d0;  }
+
+/* backgrounds*/
+/* todo, how to select body from these */
+
+bg0{background-color:#383838;}
+bg1{background-color:#34383c;}
+bg2{background-color:#3c3834;}
+bg3{background-color:#383c34;}
+bg4{background-color:#343c38;}
+bg5{background-color:#38343c;}
+bg6{background-color:#3a343a;}
+bg7{background-color:#3a343a;}
+bg8{background-color:#36363a;}
+bg9{background-color:#363a36;}
+bg10{background-color:#3a3636;}
+bg11{background-color:#3a3a34;}
+bg12{background-color:#3a333a;}
+bg13{background-color:#343a3a;}
+bg14{background-color:#343a3c;}
+bg15{background-color:#343838;}
+
+body {background-color:#303030;} 
+
+/* non-source */
+fileblock {background-color:#303030;} 
+refblock {background-color:#303030;} 
+
+
 
 
