@@ -126,6 +126,7 @@ fn write_head(doc:&mut htmlwriter::HtmlWriter) {
 	doc.begin_tag("head");
 	doc.write_tag_ext("link",&[(~"href",~"css/shCore.css"),(~"rel",~"stylesheet"),(~"type",~"text/css")]);
 	doc.write_tag_ext("link",&[(~"href",~"css/shThemeDefault.css"),(~"rel",~"stylesheet"),(~"type",~"text/css")]);
+	doc.write_tag_ext("link",&[(~"rel",~"stylesheet"),(~"type",~"text/css"),(~"href",~"sourcestyle.css")]);
 	doc.end_tag();
 }
 
@@ -136,7 +137,7 @@ fn get_str_hash(s:&str)->uint{
 }
 pub fn write_styles(doc:&mut htmlwriter::HtmlWriter,fname:&str){
 	// write the styles..
-	doc.begin_tag_ext("style",&[(~"type",~"text/css")]);
+/*	doc.begin_tag_ext("style",&[(~"type",~"text/css")]);
 	doc.write_html("maintext {color:#f0f0f0; font-size:12px; font-family:\"Courier New\"}\n");
 	doc.write_html("a:link{ color:#f0f0f0; font-style:normal;   text-decoration:none;}\n");
 	doc.write_html("a:visited{ color:#f0f0f0; font-style:normal;   text-decoration:none;}\n");
@@ -178,7 +179,9 @@ pub fn write_styles(doc:&mut htmlwriter::HtmlWriter,fname:&str){
 	doc.write_html("c22{color:#c0ffd0; }\n");
 	doc.write_html("c23{color:#d0f0ff; }\n");
 
+
 	doc.end_tag();
+	*/
 }
 
 
@@ -290,23 +293,18 @@ pub fn node_color_index(ni:&FNodeInfo)->int {
 		~"fn"=>1,
 		~"add"|~"sub"|~"mul"|~"div"|~"assign"|~"eq"|~"le"|~"gt"|~"ge"|~"ne"|~"binop"|~"assign_op"
 		|~"bitand"|~"bitxor"|~"bitor"|~"shl"|~"shr"|~"not"|~"neg"|~"box"|~"uniq"|~"deref"|~"addr_of"
-			=>2,
-		~"ty"=>3,
-		~"de"=>4,
-		~"type_param"=>5,
-		~"struct_field"|~"field"=>6,
-		~"keyword"|~"while"|~"match"|~"loop"|~"do"|~"cast"|~"if"|~"return"|~"unsafe"|~"extern"|~"as"|~"in"|~"for"=>7,
-		~"path"=>8,
-		~"call"=>9,
+			=>4,
+		~"de"=>3,
+		~"type_param"=>7,
+		~"ty"=>8,
+		~"struct_field"|~"field"=>24,
+		~"path"=>26,
+		~"call"=>27,
 		~"method_call"=>10,
-		~"enum"=>11,
 		~"lit"=>12,
 		~"stmt"=>13,
 		~"mod"=>14,
-		~"struct"=>23,
 		~"local"=>16,
-		~"impl"=>17,
-		~"trait"=>28,
 		~"pat"=>20,
 		~"block"|~"blk"|~"fn_block"=>22,
 		~"method"|~"type_method"=>18,
@@ -315,6 +313,11 @@ pub fn node_color_index(ni:&FNodeInfo)->int {
 		~"index"=>13,
 		~"vstore"=>16,
 		~"mac"=>10,
+		~"struct"=>31,
+		~"trait"=>32,
+		~"impl"=>33,
+		~"enum"=>33,
+		~"keyword"|~"while"|~"match"|~"loop"|~"do"|~"cast"|~"if"|~"return"|~"unsafe"|~"extern"|~"as"|~"in"|~"for"=>21,
 
 		_ =>0
 	}	
@@ -486,7 +489,7 @@ fn write_line_with_links(dst:&mut SourceCodeWriter<htmlwriter::HtmlWriter>,dc:&R
 		//attributes/"preprocessor"
 		x=0;
 		if line[0]as char =='#' {
-			for x in range(0,line.len()) { color[x]=33 }
+			for x in range(0,line.len()) { color[x]=50 }
 		}
 		// delimiters/whitespace/special chars characters - disable links & override some coloring
 		x=0; wb=false;
@@ -495,8 +498,8 @@ fn write_line_with_links(dst:&mut SourceCodeWriter<htmlwriter::HtmlWriter>,dc:&R
 
 			match c0 {
 				' '|'\t'|'+'|'-'|'|'|':'|'*'|'&'|'\''|'/'|'@'|'~'|'^'|'%'|'$'|'!'|'>'|'<'|'.'|'#'=> {link[x]=0;}
-				'{'|'}'|'['|']'|';'|',' => {color[x]=4;	link[x]=0; },
-				'('|')'=> {color[x]=25;link[x]=0;},
+				'{'|'}'|'['|']'|';'|',' => {color[x]=3;	link[x]=0; },
+				'('|')'=> {color[x]=4;link[x]=0;},
 				_=>{}
 			}
 			if x<(line.len()-1) {
@@ -514,12 +517,12 @@ fn write_line_with_links(dst:&mut SourceCodeWriter<htmlwriter::HtmlWriter>,dc:&R
 			// override color for top level decls
 			if wb && is_alphanumeric(line[x] as char){
 				let (decl_color,len)=
-					is_text_here(line,x,"type",31)
-					.unwrap_or_default(is_text_here(line,x,"struct",27)
-					.unwrap_or_default(is_text_here(line,x,"trait",28)
-					.unwrap_or_default(is_text_here(line,x,"impl",30)
-					.unwrap_or_default(is_text_here(line,x,"enum",29)
-					.unwrap_or_default(is_text_here(line,x,"fn",26)
+										is_text_here(line,x,"type",35)
+					.unwrap_or_default(	is_text_here(line,x,"fn",30)
+					.unwrap_or_default(	is_text_here(line,x,"struct",31)
+					.unwrap_or_default(	is_text_here(line,x,"trait",32)
+					.unwrap_or_default(	is_text_here(line,x,"impl",33)
+					.unwrap_or_default(	is_text_here(line,x,"enum",34)
 					.unwrap_or_default((0,0)))))));
 				if decl_color>0{
 					for x in range(x,x+len) { link[x]=0;/* clear link on the keyword part..*/}
