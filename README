@@ -1,7 +1,7 @@
 Uses rust libsyntax to find symbol definitions
 and generates  HTML view of source with links
 finds struct-defs, functions, methods, fields
-
+writes ast node def info into '.rfx' files in plaintext.
 
 "make" to compile and run test program
 ./rustfind -h to display options
@@ -52,4 +52,7 @@ can ctags actually deal with overloaded symbols?
 could we write out an intermediate that editors can read for fast jump-to-def, with some dynamic context .. 
 
 
-
+.rfx format:
+------------
+libname node_id source-file-name line col length  kind [identifier]
+jdef nodeid libname def_node_id
