@@ -530,11 +530,12 @@ fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, nodeinfomap:&FNodeInfoMap
 	match node.ty_node_id() {
 		Some(id) =>{
 			let (def_id,opt_info)= def_info_from_node_id(dc,nodeinfomap,id); 
-			match opt_info {
+			return if def_id != ast::def_id{crate:0,node:id} {Some(def_id)} else {None}
+/*			match opt_info {
 				Some(info)=> {
 					return Some(def_id);
 				},
-				_=>{ //println("can't find def for"+node.get_id().to_str()+".ty_node_id="+id.to_str()); //return None;
+				_=>{ println("can't find def for"+node.get_id().to_str()+".ty_node_id="+id.to_str()); //return None;
 					//let (def_id,opt_info)= def_info_from_node_id(dc,nodeinfomap,node.get_id().unwrap()); 
 					//match opt_info {
 					//	Some(info)=> {return Some(def_id);}
@@ -542,7 +543,8 @@ fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, nodeinfomap:&FNodeInfoMap
 					//}
 				}
 			}
-		}
+*/
+		},
 		None=> {}
 	};
 	return None;

@@ -367,7 +367,7 @@ impl<'self, T> SourceCodeWriter<'self,T> {
 }
 
 static no_link:i64	=0 ;
-static link_to_refs:bool	=false;
+static link_to_refs:bool	=true;
 static link_debug:bool		=true;
 
 
@@ -584,22 +584,28 @@ fn resolve_link(link:i64, dc:&RFindCtx,fm:&codemap::FileMap,lib_path:&str, nmaps
 	} else 
 	*/
 	if link !=no_link {
-		let def_crate = (link>>48) as int;
-		let def_node=(link&((1<<48)-1)) as int;
-		match xcm.find(&ast::def_id{crate:def_crate,node:def_node}) {
-			None=>//"#n"+def_node.to_str(), by node linnk
-			{
-				match (nmaps.nim,def_node).to_index_file_pos(dc.tycx) {
-					Some(ifp)=>make_html_name_rel(dc.sess.codemap.files[ifp.file_index].name,fm.name)+
-						"#"+(ifp.line+1).to_str(),
-					None=>~"c="+def_crate.to_str()+" n="+def_node.to_str()
-				}
+		if (link as i32)<0{// link to refs block,value is -(this node index)
+			let ifp= (nmaps.nim,-((link as i32) as int)).to_index_file_pos(dc.tycx).unwrap();
+			"#"+(ifp.line+1).to_str()+"_"+ifp.col.to_str()+"_refs"
+		} else 
+		{
+			let def_crate = (link>>48) as int;
+			let def_node=(link&((1<<48)-1)) as int;
+			match xcm.find(&ast::def_id{crate:def_crate,node:def_node}) {
+				None=>//"#n"+def_node.to_str(), by node linnk
+				{
+					match (nmaps.nim,def_node).to_index_file_pos(dc.tycx) {
+						Some(ifp)=>make_html_name_rel(dc.sess.codemap.files[ifp.file_index].name,fm.name)+
+							"#"+(ifp.line+1).to_str(),
+						None=>~"c="+def_crate.to_str()+" n="+def_node.to_str()
+					}
 				
-			},
-			Some(a)=>{
-//							"../gplsrc/rust/src/"+a.fname+".html"+
-				make_html_name_reloc(a.fname,fm.name,lib_path)+
-					"#n"+def_node.to_str()
+				},
+				Some(a)=>{
+	//							"../gplsrc/rust/src/"+a.fname+".html"+
+					make_html_name_reloc(a.fname,fm.name,lib_path)+
+						"#n"+def_node.to_str()
+				}
 			}
 		}
 	} else {
