@@ -15,12 +15,19 @@ test2: rustfind
 int: rustfind
 	./rustfind -i $(OPTS)
 
-test : rustfind
+test1 : rustfind
 	@if [ ! $(RUST) ] ; then echo "set RUST to point to root of rust sourcetree" ; fi
 	echo $(RUST)
 	./rustfind test_input.rs -j $(RF_LIBS)
 	./rustfind test_input.rs -w $(RF_LIBS)
 	firefox test_input.rs.html
+
+test0 : rustfind
+	@if [ ! $(RUST) ] ; then echo "set RUST to point to root of rust sourcetree" ; fi
+	echo $(RUST)
+	./rustfind test_input0.rs -j -x $(RUST_SRC) $RF_LIBS
+	./rustfind test_input0.rs -w -x $(RUST_SRC) $RF_LIBS
+	firefox test_input0.rs.html
 
 SRC=$(wildcard *.rs)
 

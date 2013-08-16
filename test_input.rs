@@ -57,6 +57,7 @@ impl DoZ for Foo {
 
 trait SuperTraitTest:Testable+DoZ {
 }
+struct Pair<A,B> { a:A,b:B }
 
 fn gfunc<X:Testable+DoZ>(x:&X) {
 	let a1=a_anteater(1);
@@ -77,6 +78,9 @@ fn some2(a:Animal) {
 
 }
 
+fn foobarbaz()->Pair<Result<int,~str>,Animal> {
+	Pair{a:Ok(0),b:a_cat(0)}
+}
 
 
 

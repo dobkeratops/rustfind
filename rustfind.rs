@@ -477,7 +477,7 @@ fn lookup_def_of_node(dc:&RFindCtx,node:&AstNode,m:ShowDefMode)->Option<~str> {
 	lookup_def_of_node_sub(dc,node,m,node_spans,node_def_node)
 }
 
-fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, node_spans:&FNodeInfoMap, node_def_node:&HashMap<ast::NodeId,ast::def_id>)->Option<ast::def_id> {
+fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, nodeinfomap:&FNodeInfoMap, node_def_node:&HashMap<ast::NodeId,ast::def_id>)->Option<ast::def_id> {
 	
 	match *node {
 		astnode_expr(e)=>match e.node {
@@ -529,12 +529,18 @@ fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, node_spans:&FNodeInfoMap,
 	// handle everything else
 	match node.ty_node_id() {
 		Some(id) =>{
-			let (def_id,opt_info)= def_info_from_node_id(dc,node_spans,id); 
+			let (def_id,opt_info)= def_info_from_node_id(dc,nodeinfomap,id); 
 			match opt_info {
 				Some(info)=> {
 					return Some(def_id);
 				},
-				_=>{}
+				_=>{ //println("can't find def for"+node.get_id().to_str()+".ty_node_id="+id.to_str()); //return None;
+					//let (def_id,opt_info)= def_info_from_node_id(dc,nodeinfomap,node.get_id().unwrap()); 
+					//match opt_info {
+					//	Some(info)=> {return Some(def_id);}
+					//	None=>{}
+					//}
+				}
 			}
 		}
 		None=> {}
@@ -856,10 +862,14 @@ pub struct CrossCrateMapItem {
 
 pub type CrossCrateMap = HashMap<ast::def_id,CrossCrateMapItem>;
 
-pub fn load_cross_crate_map(dc:&RFindCtx, crate_num:int, crate_name:&str)->~CrossCrateMap {
-	let raw_bytes=ioutil::fileLoad(crate_name);
+pub fn read_cross_crate_map(dc:&RFindCtx, crate_num:int, crate_name:&str,lib_path:&str)->~CrossCrateMap {
+	let mut raw_bytes=ioutil::fileLoad(crate_name);
+	if (raw_bytes.len()==0) {
+		println("loading lib crosscratemap "+lib_path+"/"+crate_name);
+		raw_bytes=ioutil::fileLoad(lib_path+"/"+crate_name);
+	}
 	let rfx=str::from_bytes(raw_bytes);
-	println("loaded cratemap "+rfx.len().to_str()+"bytes");
+	println("loaded cratemap "+rfx.len().to_str()+"bytes"+" as crate "+crate_num.to_str());
 //	for &x in raw_bytes.iter() { rfx.push_char(x as char); }
 
 	let mut xcm=~HashMap::new();
@@ -877,7 +887,7 @@ pub fn load_cross_crate_map(dc:&RFindCtx, crate_num:int, crate_name:&str)->~Cros
 					xcm.insert(ast::def_id{crate:crate_num, node:node_id,},
 						CrossCrateMapItem{
 							fname:	toks[2].to_owned(),
-							line:	std::uint::from_str(toks[3]).unwrap_or_default(0),
+							line:	std::uint::from_str(toks[3]).unwrap_or_default(0)-1,
 							col:	std::uint::from_str(toks[4]).unwrap_or_default(0),
 							len:	std::uint::from_str(toks[5]).unwrap_or_default(0)
 						}
@@ -898,7 +908,7 @@ pub fn write_source_as_html(dc:&RFindCtx,lib_html_path:~str,opts:uint) {
 	cstore::iter_crate_data(dc.tycx.cstore, |i,md| {
 //		dump!(i, md.name,md.data.len(),md.cnum);
 		println("loading cross crate data "+i.to_str()+" "+md.name);
-		let xcm_sub=load_cross_crate_map(dc, i, md.name+&".rfx");
+		let xcm_sub=read_cross_crate_map(dc, i, md.name+&".rfx",lib_html_path);
 		for (k,v) in xcm_sub.iter() {xcm.insert(*k,(*v).clone());}
 	});
 
@@ -925,7 +935,7 @@ pub fn write_cross_crate_map(dc:&RFindCtx,lib_html_path:~str,nim:&FNodeInfoMap, 
 	for (k,ni) in nim.iter() {
 		match ni.span.lo.to_text_file_pos(dc.tycx) {
 			Some(tfp)=>{	
-				outp.push_str(curr_crate_name_only+"\t"+k.to_str()+"\t"+tfp.name+"\t"+tfp.line.to_str()+"\t"+tfp.col.to_str()+"\t"+(*ni.span.hi-*ni.span.lo).to_str() + "\t"+ni.kind+ "\t"+str_of_opt_ident(dc,ni.ident)+"\n");
+				outp.push_str(curr_crate_name_only+"\t"+k.to_str()+"\t"+tfp.name+"\t"+(tfp.line+1).to_str()+"\t"+tfp.col.to_str()+"\t"+(*ni.span.hi-*ni.span.lo).to_str() + "\t"+ni.kind+ "\t"+str_of_opt_ident(dc,ni.ident)+"\n");
 			},
 			None=>{}
 		}
