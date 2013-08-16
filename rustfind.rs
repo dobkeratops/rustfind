@@ -906,17 +906,26 @@ pub fn write_source_as_html(dc:&RFindCtx,lib_html_path:~str,opts:uint) {
 	let ndm = build_node_def_node_table(dc);
 	let jdm=build_jump_to_def_map(dc,nim,ndm);
 	rust2html::write_source_as_html_sub(dc,nim,jdm,xcm,lib_html_path,opts);
-
+	write_cross_crate_map(dc,lib_html_path,nim,ndm,jdm);
+}
+fn str_of_opt_ident(dc:&RFindCtx, ident:Option<ast::ident>)->~str{
+	match ident {
+		Some(i)=>dc.sess.str_of(i).to_owned(), None=>~""
+	}
+}
+pub fn write_cross_crate_map(dc:&RFindCtx,lib_html_path:~str,nim:&FNodeInfoMap, ndm:&HashMap<ast::NodeId, ast::def_id>, jdm:&JumpToDefMap) {
 	// write inter-crate node map
 	let crate_rel_path_name= dc.sess.codemap.files[0].name;
+	
 
 	let curr_crate_name_only=crate_rel_path_name.split_iter('/').last().unwrap_or_default("").split_iter('.').nth(0).unwrap_or_default("");
 	println("writing rustfind cross-crate link info for "+curr_crate_name_only);
 	let mut outp=~"";
+	// todo - idents to a seperate block, they're rare.
 	for (k,ni) in nim.iter() {
 		match ni.span.lo.to_text_file_pos(dc.tycx) {
 			Some(tfp)=>{	
-				outp.push_str(curr_crate_name_only+"\t"+k.to_str()+"\t"+tfp.name+"\t"+tfp.line.to_str()+"\t"+tfp.col.to_str()+"\t"+(*ni.span.hi-*ni.span.lo).to_str()+"\n");
+				outp.push_str(curr_crate_name_only+"\t"+k.to_str()+"\t"+tfp.name+"\t"+tfp.line.to_str()+"\t"+tfp.col.to_str()+"\t"+(*ni.span.hi-*ni.span.lo).to_str() + "\t"+ni.kind+ "\t"+str_of_opt_ident(dc,ni.ident)+"\n");
 			},
 			None=>{}
 		}

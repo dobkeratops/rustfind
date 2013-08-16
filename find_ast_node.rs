@@ -46,7 +46,7 @@ pub enum AstNode {
 pub type JumpToDefMap = hashmap::HashMap<ast::NodeId,ast::def_id> ;
 
 pub struct FNodeInfo {
-	//name:ident, .. TODO - does it make sense to cache an ident here? not all nodes have..
+	ident:Option<ast::ident>, 		//.. TODO - does it make sense to cache an ident here? not all nodes have..
 	kind:~str,
 	span:codemap::span,
 	node:AstNode,
@@ -57,6 +57,7 @@ pub type NodeTreeLoc = ~[AstNode];
 
 pub trait AstNodeAccessors {
 	fn get_id(&self)->Option<ast::NodeId>;
+	fn get_ident(&self)->Option<ast::ident>;
 }
 pub trait KindToStr {
 	fn kind_to_str(&self)->&'static str;
@@ -393,17 +394,45 @@ impl AstNodeAccessors for ast::item_ {
 		ast::item_mac(_)=>None,
 		}
 	}
+	fn get_ident(&self)->Option<ast::ident> {
+		match *self {
+		_=>None
+		}
+	}
 }
 
 impl AstNodeAccessors for ast::item {
-	fn get_id(&self)->Option<ast::NodeId> {
-		Some(self.id)
-	}
+	fn get_id(&self)->Option<ast::NodeId> {	Some(self.id)}
+	fn get_ident(&self)->Option<ast::ident> {	Some(self.ident) }
 }
-impl AstNodeAccessors for ast::Local {
-	fn get_id(&self)->Option<ast::NodeId> {
-		Some(self.id)
+
+impl AstNodeAccessors for ast::expr {
+	fn get_id(&self)->Option<ast::NodeId> {	Some(self.id)}
+	fn get_ident(&self)->Option<ast::ident> {	None }
+}
+
+
+impl AstNodeAccessors for ast::pat {
+	fn get_id(&self)->Option<ast::NodeId> {	Some(self.id)}
+	fn get_ident(&self)->Option<ast::ident> { None
+/*		match *self {
+		pat_ident=>None,
+		pat_enum(_,_)=>None,
+		pat_tup(_)=>None,
+		pat_box(x)=>None,
+		pat_uniq(x)=>None,
+		pat_region(x)=>None,
+		pat_lit(e)=>N
+		_=>None,
+		}
+*/
 	}
+
+}
+
+impl AstNodeAccessors for ast::Local {
+	fn get_id(&self)->Option<ast::NodeId> {	Some(self.id)}
+	fn get_ident(&self)->Option<ast::ident> {	None }
 }
 
 impl AstNodeAccessors for ast::decl_ {
@@ -413,12 +442,19 @@ impl AstNodeAccessors for ast::decl_ {
 			ast::decl_item(ref x)=>Some(x.id)
 		}
 	}
+	fn get_ident(&self)->Option<ast::ident> {
+		match *self {
+			ast::decl_local(l)=>l.get_ident(),
+			ast::decl_item(l)=>l.get_ident()
+		}
+	}
 }
 
 impl<T:AstNodeAccessors> AstNodeAccessors for codemap::spanned<T> {
 	fn get_id(&self)->Option<ast::NodeId> {
 		self.node.get_id()
 	}
+	fn get_ident(&self)->Option<ast::ident> { self.node.get_ident() }
 }
 //impl AstNodeAccessors for ty_method {
 //	pub fn get_id(&self)->Option<NodeId> {
@@ -429,6 +465,7 @@ impl AstNodeAccessors for ast::Block {
 	fn get_id(&self)->Option<ast::NodeId> {
 		Some(self.id)
 	}
+	fn get_ident(&self)->Option<ast::ident> { None }
 }
 impl AstNodeAccessors for ast::stmt_ {
 	fn get_id(&self)->Option<ast::NodeId> {
@@ -439,6 +476,20 @@ impl AstNodeAccessors for ast::stmt_ {
 			ast::stmt_mac(_,_)=>None
 		}
 	}
+	fn get_ident(&self)->Option<ast::ident> { None }
+}
+
+impl AstNodeAccessors for ast::view_item {
+	fn get_id(&self)->Option<ast::NodeId> { self.node.get_id() }
+	fn get_ident(&self)->Option<ast::ident> { self.node.get_ident() }
+}
+impl AstNodeAccessors for ast::ty_ {
+	fn get_id(&self)->Option<ast::NodeId> { None }
+	fn get_ident(&self)->Option<ast::ident> { None }
+}
+impl AstNodeAccessors for ast::Ty {
+	fn get_id(&self)->Option<ast::NodeId> { Some(self.id) }
+	fn get_ident(&self)->Option<ast::ident> { self.node.get_ident() }
 }
 
 impl AstNodeAccessors for ast::view_item_ {
@@ -448,10 +499,45 @@ impl AstNodeAccessors for ast::view_item_ {
 			ast::view_item_use(_)=>None
 		}
 	}
+	fn get_ident(&self)->Option<ast::ident> {
+		match *self {
+			ast::view_item_extern_mod(ident,_,_,_)=>Some(ident),
+			ast::view_item_use(_)=>None
+		}
+	}
 }
+impl AstNodeAccessors for ast::variant_ {
+	fn get_id(&self)->Option<ast::NodeId> { Some(self.id) }
+	fn get_ident(&self)->Option<ast::ident> { Some(self.name) }
+}
+impl AstNodeAccessors for ast::TypeMethod {
+	fn get_id(&self)->Option<ast::NodeId> { Some(self.id) }
+	fn get_ident(&self)->Option<ast::ident> { Some(self.ident) }
+}
+
+impl AstNodeAccessors for ast::method {
+	fn get_id(&self)->Option<ast::NodeId> { Some(self.id) }
+	fn get_ident(&self)->Option<ast::ident> { Some(self.ident) }
+}
+impl AstNodeAccessors for ast::struct_def {
+	fn get_id(&self)->Option<ast::NodeId> { None }
+	fn get_ident(&self)->Option<ast::ident> { None }
+}
+impl AstNodeAccessors for ast::trait_ref {
+	fn get_id(&self)->Option<ast::NodeId> { None }
+	fn get_ident(&self)->Option<ast::ident> { None }
+}
+
+
 impl AstNodeAccessors for ast::struct_field_ {
 	fn get_id(&self)->Option<ast::NodeId> {
 		Some(self.id)
+	}
+	fn get_ident(&self)->Option<ast::ident> { 
+		match self.kind{
+			ast::named_field(ident,_)=>Some(ident),
+			ast::unnamed_field => None
+		}
 	}
 }
 
@@ -462,6 +548,16 @@ impl AstNodeAccessors for ast::trait_method {
 			ast::provided(ref m)=>None
 		}
 	}
+	fn get_ident(&self)->Option<ast::ident> {
+		match *self {
+		ast::required(ref tym)=> tym.get_ident(),
+		ast::provided(ref m)=>m.get_ident()
+		}
+	}
+}
+impl AstNodeAccessors for ast::_mod  {
+	fn get_id(&self)->Option<ast::NodeId>{ None }
+	fn get_ident(&self)->Option<ast::ident>{ None }
 }
 
 impl AstNodeAccessors for AstNode {
@@ -488,7 +584,31 @@ impl AstNodeAccessors for AstNode {
 			astnode_trait_ref(ref x)=>Some(x.ref_id),
 			astnode_variant(ref x)=>Some(x.node.id),
 			astnode_none|astnode_root=>None,
-			
+		}
+	}
+	fn get_ident(&self)->Option<ast::ident> {
+		// todo - should be option<node_id> really..
+		match *self {
+			astnode_mod(ref x) => x.get_ident(),
+			astnode_view_item(ref x) =>x.get_ident(),
+			astnode_item(ref x) =>x.get_ident(),
+			astnode_local(ref x) =>x.get_ident(),
+			astnode_block(ref x)=>None,
+			astnode_stmt(ref x)=>None,
+			astnode_arm(ref x)=>None,
+			astnode_pat(ref x)=>x.get_ident(),
+			astnode_decl(ref x)=>x.get_ident(),
+			astnode_expr(ref x)=>x.get_ident(),
+//			astnode_expr_post(ref x)=>Some(x.id),
+			astnode_ty(ref x)=>x.get_ident(),
+			astnode_ty_method(ref x)=>x.get_ident(),
+			astnode_trait_method(ref x)=>x.get_ident(),
+			astnode_method(ref m)=>m.get_ident(),
+			astnode_struct_def(ref x)=>x.get_ident(),
+			astnode_struct_field(ref x)=>x.get_ident(),
+			astnode_trait_ref(ref x)=>x.get_ident(),
+			astnode_variant(ref x)=>x.get_ident(),
+			astnode_none|astnode_root=>None,
 		}
 	}
 }
@@ -520,12 +640,12 @@ pub fn get_ast_node_of_node_id(info:&FNodeInfoMap,id:ast::NodeId)->Option<AstNod
 }
 
 pub fn push_span(spt:&mut FNodeInfoMap,n:ast::NodeId,idt:Option<ast::ident>,k:&str, s:codemap::span,nd:AstNode) {
-	spt.insert(n,FNodeInfo{kind:k.to_str(),span:s,node:nd});
+	spt.insert(n,FNodeInfo{ident:nd.get_ident(), kind:k.to_str(),span:s,node:nd});
 }
 
 pub fn push_spanned<T:AstNodeAccessors>(spt:&mut FNodeInfoMap,k:&str,s:&codemap::spanned<T>,nd:AstNode) {
 	match s.node.get_id() {
-		Some(id)=>{spt.insert(id,FNodeInfo{kind:k.to_str(),span:s.span,node:nd});}
+		Some(id)=>{spt.insert(id,FNodeInfo{ident:nd.get_ident(), kind:k.to_str(),span:s.span,node:nd});}
 		None=>{}
 	}
 }
@@ -615,8 +735,8 @@ fn fcns_decl(a:@ast::decl, (s,v):FNodeInfoMapSV) {
 	push_spanned(s,"decl",a,astnode_decl(a));
 	visit_decl(a,(s,v))
 }
-fn fcns_struct_def(sd:@ast::struct_def, ide:ast::ident, g:&ast::Generics, id:ast::NodeId, (s,b):FNodeInfoMapSV) {
-	visit_struct_def(sd,ide,g,id,(s,b))
+fn fcns_struct_def(sd:@ast::struct_def, ide:ast::ident, g:&ast::Generics, id:ast::NodeId, sv:FNodeInfoMapSV) {
+	visit_struct_def(sd,ide,g,id,sv)
 }
 
 // struct Visitor<E>.visit_expr: @fn(@expr, (E, vt<E>)),

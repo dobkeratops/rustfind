@@ -52,7 +52,7 @@ pub fn make_html(dc:&RFindCtx, fm:&codemap::FileMap,nmaps:&NodeMaps,xcm:&::Cross
 	let fstart = *fm.start_pos;
 	let max_digits=num_digits(fm.lines.len());
 	
-	if options & WriteFilePath!=0 {
+	if options & WriteFilePath !=0 {
 		doc.begin_tag("div");//,&[(~"style",~"background-color:#"+bg+";")]);
 		doc.begin_tag("fileblock");
 		doc.write_path_links(fm.name);
@@ -83,7 +83,7 @@ pub fn make_html(dc:&RFindCtx, fm:&codemap::FileMap,nmaps:&NodeMaps,xcm:&::Cross
 	//		doc.writeln(markup_line);
 		}
 	}
-	if options & WriteReferences!=0{
+	if options & WriteReferences != 0{
 		write_references(&mut doc,dc,fm,lib_path,nmaps, fln.nodes_per_line);
 	}
 	
@@ -198,15 +198,17 @@ impl NodesPerLinePerFile {
 		//			).collect();
 
 		let mut npl=~NodesPerLinePerFile{file:~[]};
-		let mut fi=0;
+//		let mut fi=0;
 //		npl.file = vec::from_elem(dc.sess.codemap.files.len(),);
-		while fi<dc.sess.codemap.files.len() {
-			let num_lines=dc.sess.codemap.files[fi].lines.len();
+		for cmfile in dc.sess.codemap.files.iter() {
+//		while fi<dc.sess.codemap.files.len() {
+//			let num_lines=dc.sess.codemap.files[fi].lines.len();
+			let num_lines=cmfile.lines.len();
 			npl.file.push(FileLineNodes{
 				nodes_per_line:from_elem(num_lines,~[]),
 				def_nodes_per_line:from_elem(num_lines,~[])
 			});
-			fi+=1;
+//			fi+=1;
 		};
 		for (k,v) in nim.iter() {
 			// TODO- only want the **DEF_NODES** for 'def_nodes_per_line', not all. 
@@ -253,22 +255,23 @@ pub fn node_color_index(ni:&FNodeInfo)->int {
 		~"fn"=>1,
 		~"add"|~"sub"|~"mul"|~"div"|~"assign"|~"eq"|~"le"|~"gt"|~"ge"|~"ne"|~"binop"|~"assign_op"
 		|~"bitand"|~"bitxor"|~"bitor"|~"shl"|~"shr"|~"not"|~"neg"|~"box"|~"uniq"|~"deref"|~"addr_of"
-			=>4,
+			=>5,
 		~"de"=>3,
 		~"type_param"=>7,
 		~"ty"=>8,
 		~"struct_field"|~"field"=>24,
 		~"path"=>26,
 		~"call"=>27,
+		~"variant"=>28,
 		~"method_call"=>10,
 		~"lit"=>12,
 		~"stmt"=>13,
-		~"mod"=>14,
+		~"mod"=>38,
 		~"local"=>16,
 		~"pat"=>20,
 		~"block"|~"blk"|~"fn_block"=>22,
 		~"method"|~"type_method"=>18,
-		~"tup"=>4,
+		~"tup"=>14,
 		~"arm"=>11,
 		~"index"=>13,
 		~"vstore"=>16,
@@ -276,10 +279,10 @@ pub fn node_color_index(ni:&FNodeInfo)->int {
 		~"struct"=>31,
 		~"trait"=>32,
 		~"impl"=>33,
-		~"enum"=>33,
+		~"enum"=>34,
 		~"keyword"|~"while"|~"match"|~"loop"|~"do"|~"cast"|~"if"|~"return"|~"unsafe"|~"extern"|~"as"|~"in"|~"for"=>21,
 
-		_ =>0
+		_ =>1
 	}	
 }
 pub fn color_index_to_tag(i:int)->~str {
@@ -457,7 +460,7 @@ fn write_line_with_links(dst:&mut SourceCodeWriter<htmlwriter::HtmlWriter>,dc:&R
 			let c0=line[x] as char;
 
 			match c0 {
-				' '|'\t'|'+'|'-'|'|'|':'|'*'|'&'|'\''|'/'|'@'|'~'|'^'|'%'|'$'|'!'|'>'|'<'|'.'|'#'=> {link[x]=0;}
+//				' '|'\t'|'+'|'-'|'|'|':'|'*'|'&'|'\''|'/'|'@'|'~'|'^'|'%'|'$'|'!'|'>'|'<'|'.'|'#'=> {link[x]=0;}
 				'{'|'}'|'['|']'|';'|',' => {color[x]=3;	link[x]=0; },
 				'('|')'=> {color[x]=4;link[x]=0;},
 				_=>{}
@@ -485,7 +488,9 @@ fn write_line_with_links(dst:&mut SourceCodeWriter<htmlwriter::HtmlWriter>,dc:&R
 					.unwrap_or_default(	is_text_here(line,x,"type",35)
 					.unwrap_or_default(	is_text_here(line,x,"static",36)
 					.unwrap_or_default(	is_text_here(line,x,"macro_rules!",37)
-					.unwrap_or_default((0,0)))))))));
+					.unwrap_or_default(	is_text_here(line,x,"mod",38)
+					.unwrap_or_default(	is_text_here(line,x,"class",39)
+					.unwrap_or_default((0,0)))))))))));
 				if decl_color>0{
 					for x in range(x,x+len) { link[x]=0;/* clear link on the keyword part..*/}
 					let mut in_typaram=0;
@@ -616,22 +621,22 @@ fn write_line_attr_links(dst:&mut SourceCodeWriter<htmlwriter::HtmlWriter>,text_
 	for x in range(0,text_line.len()) {
 		// if state changed...
 		if (curr_link,curr_col)!=(links[x],color[x]) {
-			if curr_link!=no_link {dst.doc.end_tag();}
-			if curr_col!=no_color {dst.doc.end_tag();}
+			if curr_link !=no_link {dst.doc.end_tag();}
+			if curr_col !=no_color {dst.doc.end_tag();}
 			
 			curr_col = color[x];
 			curr_link=links[x];
-			if curr_col!=no_color {
+			if curr_col !=no_color {
 				dst.doc.begin_tag(color_index_to_tag(curr_col));
 			}
-			if curr_link!=no_link {
+			if curr_link !=no_link {
 				dst.doc.begin_tag_link( resolve_link(links[x]) );
 			}
 		}
 		dst.doc.write_u8_(text_line[x]);
 	}
-	if curr_col!=no_color {dst.doc.end_tag();}
-	if curr_link!=no_link {dst.doc.end_tag();}
+	if curr_col !=no_color {dst.doc.end_tag();}
+	if curr_link !=no_link {dst.doc.end_tag();}
 	assert!(tag_depth==dst.doc.tag_stack.len());
 }
 
@@ -759,8 +764,7 @@ impl<'self> Draw for  (&'self Window,&'self str) {
 fn write_references(doc:&mut htmlwriter::HtmlWriter,dc:&RFindCtx, fm:&codemap::FileMap,lib_path:&str,  nmaps:&NodeMaps, nodes_per_line:&[~[ast::NodeId]]) {
 
 	
-	doc.write_tag("div");
-	doc.begin_tag("refblock");
+	doc.begin_tag_ext("div",~[(~"class",~"refblock")]);
 
 //	let (nim,jdm,jrm)=(nmaps.nim, nmaps.jdm, nmaps.jrm);
 	let file_def_nodes = find_defs_in_file(fm,nmaps.nim);
