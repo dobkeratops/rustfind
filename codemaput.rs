@@ -315,6 +315,17 @@ pub fn flatten_to_str<T,U:ToStr>(xs:&[T],f:&fn(x:&T)->U, sep:&str)->~str {
 	acc
 }
 
+pub fn dump_methods_of_t(tycx:&ty::ctxt_, t:*ty::t_opaque) {
+	for (&k,&method) in tycx.methods.iter() {
+		dump!(method.transformed_self_ty, t);
+		if method.transformed_self_ty==Some(t) {
+			dump!(method);
+		}
+	}
+
+}
+
+
 
 
 

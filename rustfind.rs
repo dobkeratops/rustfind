@@ -48,6 +48,7 @@ pub mod rsfind;
 pub mod crosscratemap;
 pub mod rfserver;
 pub mod util;
+pub mod rf_ast_ut;
 
 /*
   test multiline
@@ -396,15 +397,6 @@ pub fn dump_methods_of_type(tycx:&ty::ctxt_, type_node_id:ast::NodeId) {
 		}
 	}
 }
-fn dump_methods_of_t(tycx:&ty::ctxt_, t:*ty::t_opaque) {
-	for (&k,&method) in tycx.methods.iter() {
-		dump!(method.transformed_self_ty, t);
-		if method.transformed_self_ty==Some(t) {
-			dump!(method);
-		}
-	}
-
-}
 
 fn auto_deref_ty<'a>(t:&'a ty::t_box_)->&'a ty::t_box_ {
 	match t.sty {
@@ -415,35 +407,7 @@ fn auto_deref_ty<'a>(t:&'a ty::t_box_)->&'a ty::t_box_ {
 	}
 }
  
-fn get_struct_def<'a,'b>(tc:&'a ty::ctxt_, struct_node_id:ast::NodeId)->Option<(@ast::item,@ast::struct_def,ast::Generics)> {
-	match tc.items.find(&struct_node_id) {
-		None=>{None},
-		Some(node)=>match *node {
-			syntax::ast_map::node_item(item,ref path)=>{
-				match item.node {
-					ast::item_struct(sd, ref generics)=>Some((item, sd, generics.clone())),
-					_=>None
-				}
-			}
-			_=> None
-		},
-	}
-}
 
-fn find_named_struct_field(tc:&ty::ctxt_, struct_node_id:ast::NodeId, field_ident:&ast::ident)->Option<ast::def_id> {
-	match get_struct_def(tc,struct_node_id) {
-		None=>None,
-		Some((it,sd,ge))=>{
-			for f in sd.fields.iter() {
-				match f.node.kind {
-					ast::named_field(ref ident,vis)=>if *ident==*field_ident {return Some(ast::def_id{crate:0,node:f.node.id});},
-					_=>return None
-				}
-			}
-			None
-		}
-	}
-}
 fn some_or_else<T:Clone>(opt:&Option<T>,fallback_value:&T)->T {
 	match *opt {
 		Some(ref value)=>value.clone(),
@@ -499,7 +463,7 @@ fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, nodeinfomap:&FNodeInfoMap
 				let tydef=auto_deref_ty(ty::get(*obj_ty.unwrap()));
 				match tydef.sty {
 					ty::ty_struct(def,_)=> {
-						let node_to_show=find_named_struct_field(dc.tycx, def.node, ident).unwrap_or_default(def);
+						let node_to_show=rf_ast_ut::find_named_struct_field(dc.tycx, def.node, ident).unwrap_or_default(def);
 						return Some(node_to_show);//mk_result(dc,m,node_spans,node_to_show,"(struct_field)");
 					},
 					_=>return None
