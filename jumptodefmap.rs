@@ -1,9 +1,11 @@
 use syntax::ast;
 use rustc::middle::{ty,typeck};
+use syntax::codemap::BytePos;
+use rsfind::ShowDefMode;
 
 use std::hashmap::HashMap;
 use find_ast_node::*;
-use rfindctx::*;
+use rfindctx::{RFindCtx,ZTextFilePos,get_source_loc};
 use rf_ast_ut::*;
 use util::flatten_to_str; //todo - why is qualifying manually not working?!
 //use super::rf_use_ast;
@@ -11,6 +13,16 @@ use util::flatten_to_str; //todo - why is qualifying manually not working?!
 
 //todo - simple declartions of types shouldn't mean bringing in associated code modules ?
 // a user that needs the type JumpToDefMap needn't necaserily need all its functions...
+
+
+pub macro_rules! if_some {
+	($b:ident in $a:expr then $c:expr)=>(
+		match $a {
+			Some($b)=>$c,
+			None=>{}
+		}
+	);
+}
 
 pub type JumpToDefMap = HashMap<ast::NodeId,ast::def_id> ;
 
@@ -151,4 +163,106 @@ pub fn dump_json(dc:&RFindCtx) {
 	println("\tdef_ids:");
 	println(node_def_node.to_json_str());
 	println("}");
+}
+
+
+fn lookup_def_at_file_line_pos_old(dc:&RFindCtx,filepos:&str, show_all:ShowDefMode)->Option<~str> {
+
+	let toks:~[&str]=filepos.split_iter(':').collect();
+	if toks.len()<3 { return None }
+
+//	let line:Option<uint> = FromStr::from_str(toks[1]);
+	if_some!(line in FromStr::from_str::<uint>(toks[1]) then {
+		if_some!(col in FromStr::from_str::<uint>(toks[2]) then {
+			//todo - if no column specified, just lookup everything on that line!
+
+			match ZTextFilePos::new(toks[0],line-1,col-1).to_byte_pos(dc.tycx) {
+				None=>{},
+				Some(bp)=>{
+					return lookup_def_at_byte_pos(dc,bp,show_all)
+				}
+			}
+		})
+	})
+	return None;
+}
+
+
+pub fn lookup_def_at_text_file_pos(dc:&RFindCtx, tfp:&ZTextFilePos, show_mode:ShowDefMode)->Option<~str> {
+	match tfp.to_byte_pos(dc.tycx) {
+		None=>None,
+		Some(bp)=>lookup_def_at_byte_pos(dc,bp,show_mode)
+	}
+}
+
+pub fn lookup_def_at_text_file_pos_str(dc:&RFindCtx,file_pos_str:&str, show_mode:ShowDefMode)->Option<~str> {
+	match byte_pos_from_text_file_pos_str(dc,file_pos_str) {
+		None=>None,
+		Some(bp)=>lookup_def_at_byte_pos(dc,bp,show_mode),
+	}
+}
+
+pub fn node_id_from_text_file_pos_str(dc:&RFindCtx, file_pos_str:&str)->Option<ast::NodeId> {
+	match node_from_text_file_pos_str(dc, file_pos_str) {
+		None=>None,
+		Some(an)=>an.get_id()
+	}
+}
+pub fn node_from_text_file_pos_str(dc:&RFindCtx, file_pos_str:&str)->Option<AstNode> {
+	match byte_pos_from_text_file_pos_str(dc,file_pos_str) {
+		Some(bp)=>{let ndt=find_node_tree_loc_at_byte_pos(dc.crate,bp);Some(ndt.last().clone())},
+		None=>None
+	}
+}
+
+
+
+
+pub fn lookup_def_at_byte_pos(dc:&RFindCtx, bp:BytePos, m:ShowDefMode)->Option<~str> {
+	let ndt=find_node_tree_loc_at_byte_pos(dc.crate,bp);
+	lookup_def_of_node_tree_loc(dc,&ndt,m)
+}
+
+pub fn lookup_def_of_node_tree_loc(dc:&RFindCtx,node_tree_loc:&NodeTreeLoc,m:ShowDefMode)->Option<~str> {
+	lookup_def_of_node(dc,node_tree_loc.last(),m)
+}
+
+pub fn lookup_def_of_node(dc:&RFindCtx,node:&AstNode,m:ShowDefMode)->Option<~str> {
+	println("def of node:"+node.get_id().unwrap_or_default(0).to_str());
+	let node_spans=build_node_info_map(dc.crate);
+	let node_def_node = build_node_def_node_table(dc);
+	lookup_def_of_node_sub(dc,node,m,node_spans,node_def_node)
+}
+
+
+pub fn lookup_def_of_node_sub(dc:&RFindCtx,node:&AstNode,m:ShowDefMode,nim:&FNodeInfoMap, node_def_node:&HashMap<ast::NodeId,ast::def_id>)->Option<~str> {
+	// TODO - cache outside?
+
+
+	fn mk_result(dc:&RFindCtx,  m:ShowDefMode, nim:&FNodeInfoMap, def_node_id:ast::def_id, extra_str:&str)->Option<~str> {
+		if def_node_id.crate!=0 {
+			Some(~"{cross-crate-def not implemented, "+def_node_id.to_str()+"}")
+		}
+		else {
+			match nim.find(&def_node_id.node) {
+				None=>None,
+				Some(def_info)=>{
+					let loc=get_source_loc(dc,def_info.span.lo);
+					let def_pos_str=
+						loc.file.name + ":"+loc.line.to_str()+": "+
+							match m { SDM_LineCol=>loc.col.to_str()+": ", _ =>~"" }+"\n";
+					return	match m{
+						SDM_Source=>Some(def_pos_str+get_node_source(dc.tycx,nim, def_node_id)+"\n"),
+						SDM_GeditCmd=>Some("+"+loc.line.to_str()+" "+loc.file.name+" "),
+						_ => Some(def_pos_str)
+					};
+
+				}
+			}
+		}
+	}
+	match lookup_def_node_of_node(dc, node, nim, node_def_node) {
+		None=>None,
+		Some(def_node_id)=>mk_result(dc,m, nim,def_node_id, "")
+	}
 }
