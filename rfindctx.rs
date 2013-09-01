@@ -14,7 +14,7 @@ use rustc::{front, metadata, driver, middle};
 use rustc::middle::mem_categorization::ast_node;
 use rustc::middle::ty;
 
-use std::hashmap;
+use std::hashmap::HashMap;
 //use codemaput::*;
 
 pub struct RFindCtx {

@@ -2,6 +2,26 @@ use std::str;
 use syntax::{ast,ast_map};
 use rustc::middle::ty;
 
+
+pub fn auto_deref_ty<'a>(t:&'a ty::t_box_)->&'a ty::t_box_ {
+	match t.sty {
+		ty::ty_box(mt)|ty::ty_ptr(mt)|ty::ty_uniq(mt)|ty::ty_rptr(_,mt)=>{
+			ty::get(mt.ty)
+		},	
+		_=>t
+	}
+}
+ 
+
+pub fn dump_ctxt_def_map(tycx:ty::ctxt) {
+//	let a:()=ctxt.tycx.node_types
+	logi!("===Test ctxt def-map table..===");
+	for (key,value) in tycx.def_map.iter(){
+		dump!(key,value);
+	}
+}
+
+
 pub fn dump_methods_of_t(tycx:&ty::ctxt_, t:*ty::t_opaque) {
 	for (&k,&method) in tycx.methods.iter() {
 		dump!(method.transformed_self_ty, t);
@@ -10,6 +30,21 @@ pub fn dump_methods_of_t(tycx:&ty::ctxt_, t:*ty::t_opaque) {
 		}
 	}
 
+}
+
+pub fn dump_methods_of_type(tycx:&ty::ctxt_, type_node_id:ast::NodeId) {
+	let ot = tycx.node_types.find(&(type_node_id as uint));
+	match ot {
+		None=> {}, 
+		Some(t)=> {
+			for (&k,&method) in tycx.methods.iter() {
+				dump!(method.transformed_self_ty, ot);
+				if method.transformed_self_ty==Some(*t) {
+					dump!(method);
+				}
+			}
+		}
+	}
 }
 
 

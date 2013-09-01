@@ -17,10 +17,11 @@ use syntax::visit;
 use syntax::parse::token;
 //use syntax::visit::*;
 use syntax::visit::{Visitor, fn_kind};
-use find_ast_node::{FNodeInfoMap,build_node_info_map,get_def_id,get_node_info_str,JumpToDefMap,safe_node_id_to_type,byte_pos_from_text_file_pos_str,AstNode,byte_pos_from_text_file_pos_str,find_node_tree_loc_at_byte_pos,NodeTreeLoc,astnode_expr,FNodeInfo,ToJsonStr,ToJsonStrFc,AstNodeAccessors,KindToStr};
+use find_ast_node::{FNodeInfoMap,build_node_info_map,get_def_id,get_node_info_str,safe_node_id_to_type,byte_pos_from_text_file_pos_str,AstNode,byte_pos_from_text_file_pos_str,find_node_tree_loc_at_byte_pos,NodeTreeLoc,astnode_expr,FNodeInfo,ToJsonStr,ToJsonStrFc,AstNodeAccessors,KindToStr};
 use syntax::diagnostic;
 use syntax::codemap::BytePos;
 use std::io;
+use jumptodefmap::*;
 
 use syntax::abi::AbiSet;
 use syntax::ast;
@@ -36,7 +37,7 @@ pub use codemaput::{ZTextFilePos,ZTextFilePosLen,get_span_str,ToZTextFilePos,ZIn
 use rsfind::{ShowDefMode,SDM_LineCol,SDM_Line,SDM_Source,SDM_GeditCmd,MyOption};
 use crosscratemap::{CrossCrateMap,CrossCrateMapItem};
 use rfserver::rustfind_interactive;
-
+use jumptodefmap::*;
 pub mod find_ast_node;
 pub mod text_formatting;
 pub mod ioutil;
@@ -49,6 +50,8 @@ pub mod crosscratemap;
 pub mod rfserver;
 pub mod util;
 pub mod rf_ast_ut;
+pub mod jumptodefmap;
+
 
 /*
   test multiline
@@ -93,24 +96,6 @@ pub fn dump_json(dc:&RFindCtx) {
 	println("}");
 }
 
-
-
-pub fn build_jump_to_def_map(dc:&RFindCtx, nim:@mut FNodeInfoMap,nd:&HashMap<ast::NodeId,ast::def_id>)->~JumpToDefMap{
-// todo: NodeId->AStNode  .. lookup_def_ inner functionality extracted
-	let mut jdm=~HashMap::new();
-	for (k,node_info) in nim.iter() {
-		match lookup_def_node_of_node(dc,&node_info.node,nim,nd) {
-			None=>{},
-			Some(def_node_id)=>{
-//				if *k != def_node_id.node && def_node_id.crate==0 || (def_node_id.crate!=0) 
-				{
-					jdm.insert(*k,def_node_id);
-				}
-			}
-		}
-	}
-	jdm
-}
 
 /*
 pub fn build_jump_to_def_map(dc:&RFindCtx, nim:@mut FNodeInfoMap,nd:&HashMap<ast::NodeId,ast::def_id>)->~JumpToDefMap{
@@ -220,7 +205,7 @@ fn main() {
 	};
 	if matches.free.len()>0 {
 		let mut done=false;
-		let filename=get_filename_only(matches.free[0]);
+		let filename=util::get_filename_only(matches.free[0]);
 		let dc = @get_ast_and_resolve(&Path(filename), libs);
 		local_data::set(ctxtkey, dc);
 	
@@ -252,11 +237,6 @@ fn main() {
 			println("Creating HTML pages from source.. done");
 		}
 	}
-}
-
-struct HrcNode<NODE> {
-	node:NODE,
-	child:~[HrcNode<NODE>]
 }
 
 /// tags: crate,ast,parse resolve
@@ -295,26 +275,13 @@ fn get_ast_and_resolve(
 	let ca=driver::driver::phase_3_run_analysis_passes(sess,crate2);  
     RFindCtx { crate: crate2, tycx: ca.ty_cx, sess: sess, ca:ca }
 }
-fn get_filename_only(fnm:&str)->~str {
-	let toks:~[&str]=fnm.split_iter(':').collect();
-	return toks[0].to_str();
-}
+
 pub fn some<T>(o:&Option<T>,f:&fn(t:&T)) {
 	match *o {
 		Some(ref x)=>f(x),
 		None=>{}
 	}
 }
-pub fn some_else<T,X,Y>(o:&Option<T>,f:&fn(t:&T)->Y,default_value:Y)->Y {
-	match *o {
-		Some(ref x)=>f(x),
-		None=>default_value
-	}
-}
-
-/// todo - collect stage.
-
-
 
 
 
@@ -382,39 +349,6 @@ pub fn dump_node_tree_loc(ndt:&NodeTreeLoc) {
 	 {print(x.kind_to_str()+".");} print("\n");
 }
 
-
-pub fn dump_methods_of_type(tycx:&ty::ctxt_, type_node_id:ast::NodeId) {
-	let ot = tycx.node_types.find(&(type_node_id as uint));
-	match ot {
-		None=> {}, 
-		Some(t)=> {
-			for (&k,&method) in tycx.methods.iter() {
-				dump!(method.transformed_self_ty, ot);
-				if method.transformed_self_ty==Some(*t) {
-					dump!(method);
-				}
-			}
-		}
-	}
-}
-
-fn auto_deref_ty<'a>(t:&'a ty::t_box_)->&'a ty::t_box_ {
-	match t.sty {
-		ty::ty_box(mt)|ty::ty_ptr(mt)|ty::ty_uniq(mt)|ty::ty_rptr(_,mt)=>{
-			ty::get(mt.ty)
-		},	
-		_=>t
-	}
-}
- 
-
-fn some_or_else<T:Clone>(opt:&Option<T>,fallback_value:&T)->T {
-	match *opt {
-		Some(ref value)=>value.clone(),
-		None=>fallback_value.clone()
-	}
-}
-
 fn lookup_def_of_node_tree_loc(dc:&RFindCtx,node_tree_loc:&NodeTreeLoc,m:ShowDefMode)->Option<~str> {
 	lookup_def_of_node(dc,node_tree_loc.last(),m)
 }
@@ -426,78 +360,6 @@ fn lookup_def_of_node(dc:&RFindCtx,node:&AstNode,m:ShowDefMode)->Option<~str> {
 	lookup_def_of_node_sub(dc,node,m,node_spans,node_def_node)
 }
 
-fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, nodeinfomap:&FNodeInfoMap, node_def_node:&HashMap<ast::NodeId,ast::def_id>)->Option<ast::def_id> {
-	
-	match *node {
-		astnode_expr(e)=>match e.node {
-			// handle methods-calls
-			ast::expr_method_call(ref id,ref receiver,ref ident,ref ty_params,ref arg_exprs,ref call_sugar)=>{
-				let rec_ty_node= astnode_expr(*receiver).ty_node_id();
-				let rec_ty_node1= dc.tycx.node_types.find(&(*id as uint));
-
-				match dc.ca.maps.method_map.find(&e.id) {
-					None=> {},//logi!("no method map entry for",e.id),
-					Some(mme)=>{
-						//logi!("Method Map entry for",e.id);
-						match mme.origin {
-							typeck::method_static(def_id)=> 
-								return Some(def_id),
-							typeck::method_trait(def_id,_)=>
-								return Some(def_id),
-							typeck::method_param(mp)=>{
-								match dc.tycx.trait_method_def_ids.find(&mp.trait_id) {
-									None=>{},
-									Some(method_def_ids)=>{
-										return Some(method_def_ids[mp.method_num])
-									}
-								}
-							}
-						}
-					}
-				}
-			},
-			// handle struct-fields? "object.field"
-			ast::expr_field(ref object_expr,ref ident,ref ty_params)=>{
-				// we want the type of the object..
-				let obj_ty=dc.tycx.node_types.find(&(object_expr.id as uint));
-				let tydef=auto_deref_ty(ty::get(*obj_ty.unwrap()));
-				match tydef.sty {
-					ty::ty_struct(def,_)=> {
-						let node_to_show=rf_ast_ut::find_named_struct_field(dc.tycx, def.node, ident).unwrap_or_default(def);
-						return Some(node_to_show);//mk_result(dc,m,node_spans,node_to_show,"(struct_field)");
-					},
-					_=>return None
-				}
-			}
-			_=>{}
-		},
-		_=>{}
-
-	}
-
-	// handle everything else
-	match node.ty_node_id() {
-		Some(id) =>{
-			let (def_id,opt_info)= def_info_from_node_id(dc,nodeinfomap,id); 
-			return if def_id != ast::def_id{crate:0,node:id} {Some(def_id)} else {None}
-/*			match opt_info {
-				Some(info)=> {
-					return Some(def_id);
-				},
-				_=>{ println("can't find def for"+node.get_id().to_str()+".ty_node_id="+id.to_str()); //return None;
-					//let (def_id,opt_info)= def_info_from_node_id(dc,nodeinfomap,node.get_id().unwrap()); 
-					//match opt_info {
-					//	Some(info)=> {return Some(def_id);}
-					//	None=>{}
-					//}
-				}
-			}
-*/
-		},
-		None=> {}
-	};
-	return None;
-}
 
 fn lookup_def_of_node_sub(dc:&RFindCtx,node:&AstNode,m:ShowDefMode,nim:&FNodeInfoMap, node_def_node:&HashMap<ast::NodeId,ast::def_id>)->Option<~str> {
 	// TODO - cache outside?
@@ -582,36 +444,6 @@ pub fn def_info_from_node_id<'a,'b>(dc:&'a RFindCtx, node_info:&'b FNodeInfoMap,
 // see: tycx.node_types:node_type_table:HashMap<id,t>
 // 't'=opaque ptr, ty::get(:t)->t_box_ to resolve it
 
-pub fn dump_ctxt_def_map(dc:&RFindCtx) {
-//	let a:()=ctxt.tycx.node_types
-	logi!("===Test ctxt def-map table..===");
-	for (key,value) in dc.tycx.def_map.iter(){
-		dump!(key,value);
-	}
-}
-
-pub fn text_line_pos_to_offset(text:&[u8], (line,ofs_in_line):(uint,uint))->Option<uint> {
-	// line as reported by grep & text editors,counted from '1' not '0'
-	let mut pos = 0;
-	let tlen=text.len();	
-	let	mut tline=0;
-	let mut line_start_pos=0;
-	while pos<tlen{
-		match text[pos] as char{
-			'\n' => {tline+=1; line_start_pos=pos;},
-//			"\a" => {tpos=0;line_pos=pos;},
-			_ => {}
-		}
-		// todo - clamp line end
-		if tline==(line-1){ 
-			return Some(line_start_pos + ofs_in_line);
-		}
-		pos+=1;
-	}
-	return None;
-}
-
-
 
 
 
@@ -668,7 +500,7 @@ fn debug_test(dc:&RFindCtx) {
 
 
 	logi!("==== dump def table.===");
-	dump_ctxt_def_map(dc);
+	rf_ast_ut::dump_ctxt_def_map(dc.tycx);
 
 	logi!("==== Test node search by location...===");
 

@@ -41,7 +41,6 @@ pub enum AstNode {
 }
 
 
-pub type JumpToDefMap = hashmap::HashMap<ast::NodeId,ast::def_id> ;
 
 pub struct FNodeInfo {
 	ident:Option<ast::ident>, 		//.. TODO - does it make sense to cache an ident here? not all nodes have..

@@ -8,9 +8,10 @@ use std::vec;
 use std::str;
 use extra::sort;
 use codemaput::{ZIndexFilePos,ToZIndexFilePos};
-use find_ast_node::{FNodeInfoMap,JumpToDefMap,FNodeInfo};
+use find_ast_node::{FNodeInfoMap,FNodeInfo};
 use rfindctx::{RFindCtx};
 use crosscratemap::{CrossCrateMap,CrossCrateMapItem};
+use jumptodefmap::*;
 //use self::htmlwriter::HtmlWriter;
 mod htmlwriter;
 
