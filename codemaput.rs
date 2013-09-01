@@ -1,7 +1,9 @@
+use std::str;
 use syntax::ast;
 use syntax::codemap;
 use rustc::middle::ty;
 use rustc::metadata::{cstore};
+use super::util;//::text_offset_to_line_pos;
 
 // TODO:
 // we've done many permuations of how to represent code position,
@@ -315,15 +317,37 @@ pub fn flatten_to_str<T,U:ToStr>(xs:&[T],f:&fn(x:&T)->U, sep:&str)->~str {
 	acc
 }
 
-pub fn dump_methods_of_t(tycx:&ty::ctxt_, t:*ty::t_opaque) {
-	for (&k,&method) in tycx.methods.iter() {
-		dump!(method.transformed_self_ty, t);
-		if method.transformed_self_ty==Some(t) {
-			dump!(method);
+pub fn loc_to_str(loc:codemap::Loc)->~str {
+	loc.file.name+":"+loc.line.to_str()+":"+loc.col.to_str()+":"
+}
+
+pub fn zget_file_line_str(cx:ty::ctxt, filename:&str, src_line:uint)->~str {
+//	for c.sess.codemap.files.rev_iter().advance |fm:&codemap::FileMap| {
+	let mut i=cx.sess.codemap.files.len();
+	while i>0 {	// caution, need loop because we return, wait for new foreach ..in..
+		i-=1;
+		let fm=&cx.sess.codemap.files[i];
+		let filemap_filename:&str=fm.name;	
+		if filename==filemap_filename {
+			let s=*fm.lines[src_line];
+			let e=if (src_line+1)>=fm.lines.len() {
+				*fm.start_pos+fm.src.len()
+			} else {
+				*fm.lines[src_line+1]
+			};
 		}
 	}
-
+	return ~"";
 }
+
+pub fn dump_span(text:&[u8], sp:&codemap::span) {
+
+	let line_col=util::text_offset_to_line_pos(text, *sp.lo);
+	logi!(" line,ofs=",line_col.to_str()," text=\'",
+		str::from_bytes(text_span(text,sp)),"\'");
+}
+
+
 
 
 

@@ -531,36 +531,15 @@ fn lookup_def_of_node_sub(dc:&RFindCtx,node:&AstNode,m:ShowDefMode,nim:&FNodeInf
 	}
 }
 
-fn zget_file_line_str(cx:ty::ctxt, filename:&str, src_line:uint)->~str {
-//	for c.sess.codemap.files.rev_iter().advance |fm:&codemap::FileMap| {
-	let mut i=cx.sess.codemap.files.len();
-	while i>0 {	// caution, need loop because we return, wait for new foreach ..in..
-		i-=1;
-		let fm=&cx.sess.codemap.files[i];
-		let filemap_filename:&str=fm.name;	
-		if filename==filemap_filename {
-			let s=*fm.lines[src_line];
-			let e=if (src_line+1)>=fm.lines.len() {
-				*fm.start_pos+fm.src.len()
-			} else {
-				*fm.lines[src_line+1]
-			};
-		}
-	}
-	return ~"";
-}
 
 fn get_source_loc(dc:&RFindCtx, pos:codemap::BytePos)->codemap::Loc {
 	dc.tycx.sess.codemap.lookup_char_pos(pos)
-}
-fn loc_to_str(loc:codemap::Loc)->~str {
-	loc.file.name+":"+loc.line.to_str()+":"+loc.col.to_str()+":"
 }
 
 pub fn dump_node_source_for_single_file_only(text:&[u8], ns:&FNodeInfoMap, id:ast::NodeId) {
 	match(ns.find(&id)) {None=>logi!("()"),
 		Some(info)=>{
-			dump_span(text, &info.span);
+			codemaput::dump_span(text, &info.span);
 		}
 	}
 }
@@ -579,13 +558,6 @@ pub fn get_node_source(c:ty::ctxt, nim:&FNodeInfoMap, did:ast::def_id)->~str {
 	}
 }
 
-
-pub fn dump_span(text:&[u8], sp:&codemap::span) {
-
-	let line_col=util::text_offset_to_line_pos(text, *sp.lo);
-	logi!(" line,ofs=",line_col.to_str()," text=\'",
-		std::str::from_bytes(codemaput::text_span(text,sp)),"\'");
-}
 
 
 pub fn def_info_from_node_id<'a,'b>(dc:&'a RFindCtx, node_info:&'b FNodeInfoMap, id:ast::NodeId)->(ast::def_id,Option<&'b FNodeInfo>) {
@@ -743,8 +715,8 @@ fn debug_test(dc:&RFindCtx) {
 		let (lo,hi)=x;
 		logi!(get_span_str(dc.tycx, &codemap::span{lo:lo,hi:hi,expn_info:None} ));
 	});
-	dump!(zget_file_line_str(dc.tycx,"test_input2.rs",5-1));
-	dump!(zget_file_line_str(dc.tycx,"test_input.rs",9-1));
+	dump!(codemaput::zget_file_line_str(dc.tycx,"test_input2.rs",5-1));
+	dump!(codemaput::zget_file_line_str(dc.tycx,"test_input.rs",9-1));
 	
 	logi!("\n====test full file:pos lookup====");
 	dump!(lookup_def_at_text_file_pos(dc, &ZTextFilePos::new("test_input.rs",8-1,21),SDM_Source));println("");

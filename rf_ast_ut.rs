@@ -1,3 +1,4 @@
+use std::str;
 use syntax::{ast,ast_map};
 use rustc::middle::ty;
 
