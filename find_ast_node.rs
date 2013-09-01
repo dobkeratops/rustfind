@@ -15,7 +15,17 @@ use rustc::middle::ty;
 use rfindctx::{RFindCtx,};
 use std::hashmap;
 use std::hashmap::HashMap;
-use codemaput::{ZTextFilePos,ToZIndexFilePos};
+use codemaput::{ZTextFilePos,ToZIndexFilePos,dump_span,get_span_str};
+
+/*
+todo .. this wants to be split more, eg visitor dependancies in a sepearate file,
+ast accessors/helpers in a seperate file
+but for the timebeing, we are using it to 
+move code out of the crate root where things are tangled up  much worse
+*/
+pub macro_rules! logi{ 
+	($($a:expr),*)=>(println(""$(+$a.to_str())*) )
+}
 
 #[deriving(Clone)]
 pub enum AstNode {
@@ -52,6 +62,12 @@ pub struct FNodeInfo {
 pub type FNodeInfoMap= hashmap::HashMap<ast::NodeId,FNodeInfo>;
 
 pub type NodeTreeLoc = ~[AstNode];
+pub fn dump_node_tree_loc(ndt:&NodeTreeLoc) {
+//	for ndt.iter().advance |x|
+	for x in ndt.iter()
+	 {print(x.kind_to_str()+".");} print("\n");
+}
+
 
 pub trait AstNodeAccessors {
 	fn get_id(&self)->Option<ast::NodeId>;
@@ -1099,4 +1115,28 @@ pub fn def_node_id_from_node_id(dc:&RFindCtx, id:ast::NodeId)->ast::NodeId {
 
 pub fn def_of_symbol_to_str(dc:&RFindCtx, ns:&FNodeInfoMap,ds:&HashMap<ast::NodeId, ast::def_id>,s:&str)->~str {
 	~"TODO"	
+}
+
+
+// TODO- this should return a slice?
+pub fn get_node_source(c:ty::ctxt, nim:&FNodeInfoMap, did:ast::def_id)->~str {
+	if did.crate==0{
+		match (nim.find(&did.node)){
+			None=>~"",
+			Some(info)=>{
+				get_span_str(c,&info.span)
+			}
+		}
+	} else {
+		"{out of crate def:"+did.to_str()+"}"
+	}
+}
+
+
+pub fn dump_node_source_for_single_file_only(text:&[u8], ns:&FNodeInfoMap, id:ast::NodeId) {
+	match(ns.find(&id)) {None=>logi!("()"),
+		Some(info)=>{
+			dump_span(text, &info.span);
+		}
+	}
 }

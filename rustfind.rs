@@ -9,6 +9,10 @@ use rustc::metadata::cstore;
 use std::num;
 use std::num::*;
 use std::str;
+use std::io;
+use std::hashmap::HashMap;
+use std::os;
+use std::local_data;
 
 use syntax::parse;
 use syntax::ast;
@@ -17,19 +21,15 @@ use syntax::visit;
 use syntax::parse::token;
 //use syntax::visit::*;
 use syntax::visit::{Visitor, fn_kind};
-use find_ast_node::{FNodeInfoMap,build_node_info_map,get_def_id,get_node_info_str,safe_node_id_to_type,byte_pos_from_text_file_pos_str,AstNode,byte_pos_from_text_file_pos_str,find_node_tree_loc_at_byte_pos,NodeTreeLoc,astnode_expr,FNodeInfo,ToJsonStr,ToJsonStrFc,AstNodeAccessors,KindToStr,build_node_def_node_table};
+use find_ast_node::{FNodeInfoMap,build_node_info_map,get_def_id,get_node_info_str,safe_node_id_to_type,byte_pos_from_text_file_pos_str,AstNode,byte_pos_from_text_file_pos_str,find_node_tree_loc_at_byte_pos,NodeTreeLoc,astnode_expr,FNodeInfo,ToJsonStr,ToJsonStrFc,AstNodeAccessors,KindToStr,build_node_def_node_table,get_node_source};
 use syntax::diagnostic;
 use syntax::codemap::BytePos;
-use std::io;
 use jumptodefmap::*;
 
 use syntax::abi::AbiSet;
 use syntax::ast;
 use syntax::codemap;
 
-use std::hashmap::HashMap;
-use std::os;
-use std::local_data;
 use extra::json::ToJson;
 use rfindctx::{RFindCtx,ctxtkey};
 pub use codemaput::{ZTextFilePos,ZTextFilePosLen,get_span_str,ToZTextFilePos,ZIndexFilePos,ToZIndexFilePos};
@@ -69,33 +69,6 @@ pub fn lookup_struct_fields(cx: ctxt, did: ast::def_id) -> ~[field_ty] {
 	}
 */
 
-pub fn dump_json(dc:&RFindCtx) {
-	// TODO: full/partial options - we currently wwrite out all the nodes we find.
-	// need option to only write out nodes that map to definitons. 
-	println("{");
-	println("\tcode_map:[");
-//	for dc.sess.codemap.files.iter().advance |f| {
-	for f in dc.sess.codemap.files.iter() {
-		print("\t\t{ name:\""+f.name+"\",\tglobal_start_pos:"+f.start_pos.to_str()+
-			",\tlength:"+(f.src.len()).to_str()+
-			",\tnum_lines:"+f.lines.len().to_str()+
-			",\tlines:[\n"+ util::flatten_to_str(*f.lines, |&x|{*x-*f.start_pos} ,",") +
-			"\n\t\t]\n\t},\n");
-	}
-	println("\t]");
-	println("\tnode_spans:");
-	let nim=build_node_info_map(dc.crate);
-	let node_def_node = build_node_def_node_table(dc);
-	let jdm=build_jump_to_def_map(dc,nim,node_def_node);
-	println(nim.to_json_str(dc));	
-	println(",");
-	println("\tnode_defs [\n");
-	println(jdm.to_json_str());
-	println("\t],\n");
-	println("\tdef_ids:");
-	println(node_def_node.to_json_str());
-	println("}");
-}
 
 
 /*
@@ -339,22 +312,18 @@ pub fn node_from_text_file_pos_str(dc:&RFindCtx, file_pos_str:&str)->Option<AstN
 }
 
 
+
+
 pub fn lookup_def_at_byte_pos(dc:&RFindCtx, bp:BytePos, m:ShowDefMode)->Option<~str> {
 	let ndt=find_node_tree_loc_at_byte_pos(dc.crate,bp);
 	lookup_def_of_node_tree_loc(dc,&ndt,m)
 }
 
-pub fn dump_node_tree_loc(ndt:&NodeTreeLoc) {
-//	for ndt.iter().advance |x|
-	for x in ndt.iter()
-	 {print(x.kind_to_str()+".");} print("\n");
-}
-
-fn lookup_def_of_node_tree_loc(dc:&RFindCtx,node_tree_loc:&NodeTreeLoc,m:ShowDefMode)->Option<~str> {
+pub fn lookup_def_of_node_tree_loc(dc:&RFindCtx,node_tree_loc:&NodeTreeLoc,m:ShowDefMode)->Option<~str> {
 	lookup_def_of_node(dc,node_tree_loc.last(),m)
 }
 
-fn lookup_def_of_node(dc:&RFindCtx,node:&AstNode,m:ShowDefMode)->Option<~str> {
+pub fn lookup_def_of_node(dc:&RFindCtx,node:&AstNode,m:ShowDefMode)->Option<~str> {
 	println("def of node:"+node.get_id().unwrap_or_default(0).to_str());
 	let node_spans=build_node_info_map(dc.crate);
 	let node_def_node = build_node_def_node_table(dc);
@@ -362,7 +331,7 @@ fn lookup_def_of_node(dc:&RFindCtx,node:&AstNode,m:ShowDefMode)->Option<~str> {
 }
 
 
-fn lookup_def_of_node_sub(dc:&RFindCtx,node:&AstNode,m:ShowDefMode,nim:&FNodeInfoMap, node_def_node:&HashMap<ast::NodeId,ast::def_id>)->Option<~str> {
+pub fn lookup_def_of_node_sub(dc:&RFindCtx,node:&AstNode,m:ShowDefMode,nim:&FNodeInfoMap, node_def_node:&HashMap<ast::NodeId,ast::def_id>)->Option<~str> {
 	// TODO - cache outside?
 
 
@@ -394,28 +363,6 @@ fn lookup_def_of_node_sub(dc:&RFindCtx,node:&AstNode,m:ShowDefMode,nim:&FNodeInf
 	}
 }
 
-
-pub fn dump_node_source_for_single_file_only(text:&[u8], ns:&FNodeInfoMap, id:ast::NodeId) {
-	match(ns.find(&id)) {None=>logi!("()"),
-		Some(info)=>{
-			codemaput::dump_span(text, &info.span);
-		}
-	}
-}
-
-// TODO- this should return a slice?
-pub fn get_node_source(c:ty::ctxt, nim:&FNodeInfoMap, did:ast::def_id)->~str {
-	if did.crate==0{
-		match (nim.find(&did.node)){
-			None=>~"",
-			Some(info)=>{
-				get_span_str(c,&info.span)
-			}
-		}
-	} else {
-		"{out of crate def:"+did.to_str()+"}"
-	}
-}
 
 
 
@@ -506,44 +453,6 @@ fn debug_test(dc:&RFindCtx) {
 	
 }
 
-pub fn read_cross_crate_map(dc:&RFindCtx, crate_num:int, crate_name:&str,lib_path:&str)->~CrossCrateMap {
-	let mut raw_bytes=ioutil::fileLoad(crate_name);
-	if (raw_bytes.len()==0) {
-		println("loading lib crosscratemap "+lib_path+"/"+crate_name);
-		raw_bytes=ioutil::fileLoad(lib_path+"/"+crate_name);
-	}
-	let rfx=str::from_bytes(raw_bytes);
-	println("loaded cratemap "+rfx.len().to_str()+"bytes"+" as crate "+crate_num.to_str());
-//	for &x in raw_bytes.iter() { rfx.push_char(x as char); }
-
-	let mut xcm=~HashMap::new();
-	for s in rfx.line_iter() {
-//		println(s.to_str());
-		let toks=s.split_iter('\t').to_owned_vec();
-		if toks.len()>=6 {
-			match toks[0] {
-				"jdef"=> {
-					// special entries
-				}
-				_=>{	// everything else is a node instance
-
-					let node_id:int=std::int::from_str(toks[1]).unwrap_or_default(0);
-					xcm.insert(ast::def_id{crate:crate_num, node:node_id,},
-						CrossCrateMapItem{
-							fname:	toks[2].to_owned(),
-							line:	std::uint::from_str(toks[3]).unwrap_or_default(0)-1,
-							col:	std::uint::from_str(toks[4]).unwrap_or_default(0),
-							len:	std::uint::from_str(toks[5]).unwrap_or_default(0)
-						}
-					);
-				}
-			}
-		}
-	}
-	//dump!(xcm);
-	println("from cratemap "+rfx.len().to_str()+"bytes");
-	xcm
-}
 
 
 pub fn write_source_as_html(dc:&RFindCtx,lib_html_path:~str,opts:uint) {
@@ -552,7 +461,7 @@ pub fn write_source_as_html(dc:&RFindCtx,lib_html_path:~str,opts:uint) {
 	cstore::iter_crate_data(dc.tycx.cstore, |i,md| {
 //		dump!(i, md.name,md.data.len(),md.cnum);
 		println("loading cross crate data "+i.to_str()+" "+md.name);
-		let xcm_sub=read_cross_crate_map(dc, i, md.name+&".rfx",lib_html_path);
+		let xcm_sub=crosscratemap::read_cross_crate_map(dc, i, md.name+&".rfx",lib_html_path);
 		for (k,v) in xcm_sub.iter() {xcm.insert(*k,(*v).clone());}
 	});
 
@@ -560,49 +469,6 @@ pub fn write_source_as_html(dc:&RFindCtx,lib_html_path:~str,opts:uint) {
 	let ndm = build_node_def_node_table(dc);
 	let jdm=build_jump_to_def_map(dc,nim,ndm);
 	rust2html::write_source_as_html_sub(dc,nim,jdm,xcm,lib_html_path,opts);
-	write_cross_crate_map(dc,lib_html_path,nim,ndm,jdm);
-}
-fn str_of_opt_ident(dc:&RFindCtx, ident:Option<ast::ident>)->~str{
-	match ident {
-		Some(i)=>dc.sess.str_of(i).to_owned(), None=>~""
-	}
-}
-pub fn write_cross_crate_map(dc:&RFindCtx,lib_html_path:~str,nim:&FNodeInfoMap, ndm:&HashMap<ast::NodeId, ast::def_id>, jdm:&JumpToDefMap) {
-	// write inter-crate node map
-	let crate_rel_path_name= dc.sess.codemap.files[0].name;
-	
-
-	let curr_crate_name_only=crate_rel_path_name.split_iter('/').last().unwrap_or_default("").split_iter('.').nth(0).unwrap_or_default("");
-	println("writing rustfind cross-crate link info for "+curr_crate_name_only);
-	let mut outp=~"";
-	// todo - idents to a seperate block, they're rare.
-	for (k,ni) in nim.iter() {
-		match ni.span.lo.to_text_file_pos(dc.tycx) {
-			Some(tfp)=>{	
-				outp.push_str(curr_crate_name_only+"\t"+k.to_str()+"\t"+tfp.name+"\t"+(tfp.line+1).to_str()+"\t"+tfp.col.to_str()+"\t"+(*ni.span.hi-*ni.span.lo).to_str() + "\t"+ni.kind+ "\t"+str_of_opt_ident(dc,ni.ident)+"\n");
-			},
-			None=>{}
-		}
-	}
-	
-	for (k,v) in jdm.iter()  {
-		let cname:~str= if v.crate>0 {
-			cstore::get_crate_data(dc.tycx.cstore,v.crate).name.to_str()
-		} else {
-			curr_crate_name_only.to_str()
-		};
-		//println(cdata.name);
-		outp.push_str("jdef\t"+k.to_str()+"\t"+cname+"\t" +v.node.to_str()+"\n");
-	}	
-
-//	for (k,v) in ndm.iter()  {
-//		outp.push_str("def\t"+k.to_str()+"\t"+dc.tycx.cstore.crate() +v.node.to_str()+"\n");
-//	}	
-
-	
-	{	let x=curr_crate_name_only+~".rfx";
-		println("writing "+x);
-		ioutil::fileSaveStr(outp, x);
-	}	
+	crosscratemap::write_cross_crate_map(dc,lib_html_path,nim,ndm,jdm);
 }
 

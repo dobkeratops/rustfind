@@ -5,6 +5,7 @@ use std::hashmap::HashMap;
 use find_ast_node::*;
 use rfindctx::*;
 use rf_ast_ut::*;
+use util::flatten_to_str; //todo - why is qualifying manually not working?!
 //use super::rf_use_ast;
 
 
@@ -123,3 +124,31 @@ pub fn def_info_from_node_id<'a,'b>(dc:&'a RFindCtx, node_info:&'b FNodeInfoMap,
 }
 
 
+
+pub fn dump_json(dc:&RFindCtx) {
+	// TODO: full/partial options - we currently wwrite out all the nodes we find.
+	// need option to only write out nodes that map to definitons. 
+	println("{");
+	println("\tcode_map:[");
+//	for dc.sess.codemap.files.iter().advance |f| {
+	for f in dc.sess.codemap.files.iter() {
+		print("\t\t{ name:\""+f.name+"\",\tglobal_start_pos:"+f.start_pos.to_str()+
+			",\tlength:"+(f.src.len()).to_str()+
+			",\tnum_lines:"+f.lines.len().to_str()+
+			",\tlines:[\n"+ flatten_to_str(*f.lines, |&x|{*x-*f.start_pos} ,",") +
+			"\n\t\t]\n\t},\n");
+	}
+	println("\t]");
+	println("\tnode_spans:");
+	let nim=build_node_info_map(dc.crate);
+	let node_def_node = build_node_def_node_table(dc);
+	let jdm=build_jump_to_def_map(dc,nim,node_def_node);
+	println(nim.to_json_str(dc));	
+	println(",");
+	println("\tnode_defs [\n");
+	println(jdm.to_json_str());
+	println("\t],\n");
+	println("\tdef_ids:");
+	println(node_def_node.to_json_str());
+	println("}");
+}

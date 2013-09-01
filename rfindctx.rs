@@ -45,3 +45,9 @@ pub fn get_source_loc(dc:&RFindCtx, pos:codemap::BytePos)->codemap::Loc {
 }
 
 
+pub fn str_of_opt_ident(dc:&RFindCtx, ident:Option<ast::ident>)->~str{
+	match ident {
+		Some(i)=>dc.sess.str_of(i).to_owned(), None=>~""
+	}
+}
+

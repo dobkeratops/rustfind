@@ -3,7 +3,7 @@ use syntax::ast;
 use syntax::codemap;
 use rustc::middle::ty;
 use rustc::metadata::{cstore};
-use super::util;//::text_offset_to_line_pos;
+use util::text_offset_to_line_pos;//todo - why is qualifying manually not working?!
 
 // TODO:
 // we've done many permuations of how to represent code position,
@@ -304,7 +304,7 @@ pub fn dump_cstore_info(tc:ty::ctxt) {
 		dump!(i, md.name,md.data.len(),md.cnum);
 	});	
 }
-
+/*
 pub fn flatten_to_str<T,U:ToStr>(xs:&[T],f:&fn(x:&T)->U, sep:&str)->~str {
 	let mut acc=~"";
 	let mut i=0; // TODO - functional way.
@@ -316,7 +316,7 @@ pub fn flatten_to_str<T,U:ToStr>(xs:&[T],f:&fn(x:&T)->U, sep:&str)->~str {
 	}
 	acc
 }
-
+*/
 pub fn loc_to_str(loc:codemap::Loc)->~str {
 	loc.file.name+":"+loc.line.to_str()+":"+loc.col.to_str()+":"
 }
@@ -342,7 +342,7 @@ pub fn zget_file_line_str(cx:ty::ctxt, filename:&str, src_line:uint)->~str {
 
 pub fn dump_span(text:&[u8], sp:&codemap::span) {
 
-	let line_col=util::text_offset_to_line_pos(text, *sp.lo);
+	let line_col=text_offset_to_line_pos(text, *sp.lo);
 	logi!(" line,ofs=",line_col.to_str()," text=\'",
 		str::from_bytes(text_span(text,sp)),"\'");
 }
