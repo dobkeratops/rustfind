@@ -6,38 +6,24 @@ use rustc::{front, metadata, driver, middle};
 use rustc::middle::{ty,typeck};
 use rustc::metadata::cstore;
 
-use std::num;
 use std::num::*;
-use std::str;
-use std::io;
+use std::{num,str,io,os,local_data};
 use std::hashmap::HashMap;
-use std::os;
-use std::local_data;
 
-use syntax::parse;
-use syntax::ast;
-use syntax::ast_map;
-use syntax::visit;
+use syntax::{parse,ast,ast_map,codemap,diagnostic};
 use syntax::parse::token;
-//use syntax::visit::*;
 use syntax::visit::{Visitor, fn_kind};
-use find_ast_node::{FNodeInfoMap,build_node_info_map,get_def_id,get_node_info_str,safe_node_id_to_type,byte_pos_from_text_file_pos_str,AstNode,byte_pos_from_text_file_pos_str,find_node_tree_loc_at_byte_pos,NodeTreeLoc,astnode_expr,FNodeInfo,ToJsonStr,ToJsonStrFc,AstNodeAccessors,KindToStr,build_node_def_node_table,get_node_source};
-use syntax::diagnostic;
-use syntax::codemap::BytePos;
+use find_ast_node::{FNodeInfoMap,safe_node_id_to_type,get_node_info_str,build_node_info_map,AstNode,find_node_tree_loc_at_byte_pos,NodeTreeLoc,astnode_expr,FNodeInfo,ToJsonStr,ToJsonStrFc,AstNodeAccessors,KindToStr,build_node_def_node_table,get_node_source};
 use jumptodefmap::*;
 
 use syntax::abi::AbiSet;
-use syntax::ast;
-use syntax::codemap;
 
-use extra::json::ToJson;
+//use extra::json::ToJson;
 use rfindctx::{RFindCtx,ctxtkey};
 pub use codemaput::{ZTextFilePos,ZTextFilePosLen,get_span_str,ToZTextFilePos,ZIndexFilePos,ToZIndexFilePos};
-//pub use codemaput::*;
 use rsfind::{ShowDefMode,SDM_LineCol,SDM_Line,SDM_Source,SDM_GeditCmd,MyOption};
 use crosscratemap::{CrossCrateMap,CrossCrateMapItem};
 use rfserver::rustfind_interactive;
-use jumptodefmap::*;
 
 pub mod find_ast_node;
 pub mod text_formatting;
@@ -233,11 +219,11 @@ fn debug_test(dc:&RFindCtx) {
 	let mut test_cursor=15 as uint;
 
 	while test_cursor<500 {
-		let loc = rfindctx::get_source_loc(dc,BytePos(test_cursor));
+		let loc = rfindctx::get_source_loc(dc,codemap::BytePos(test_cursor));
 
 		logi!(~"\n=====Find AST node at: ",loc.file.name,":",loc.line,":",loc.col,":"," =========");
 
-		let nodetloc = find_node_tree_loc_at_byte_pos(dc.crate,BytePos(test_cursor));
+		let nodetloc = find_node_tree_loc_at_byte_pos(dc.crate,codemap::BytePos(test_cursor));
 		let node_info =  get_node_info_str(dc,&nodetloc);
 		dump!(node_info);
 		println("node ast loc:"+(do nodetloc.map |x| { x.get_id().to_str() }).to_str());
