@@ -12,7 +12,7 @@ use syntax::codemap;
 use rustc::{front, metadata, driver, middle};
 use rustc::middle::mem_categorization::ast_node;
 use rustc::middle::ty;
-use rfindctx::*;
+//use rfindctx::*;
 use std::hashmap;
 use codemaput::*;
 
