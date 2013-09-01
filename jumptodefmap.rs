@@ -266,3 +266,11 @@ pub fn lookup_def_of_node_sub(dc:&RFindCtx,node:&AstNode,m:ShowDefMode,nim:&FNod
 		Some(def_node_id)=>mk_result(dc,m, nim,def_node_id, "")
 	}
 }
+
+pub fn make_jdm(dc:&RFindCtx)->(@mut FNodeInfoMap, ~HashMap<ast::NodeId,ast::def_id>,~JumpToDefMap) 
+{
+    let nim=build_node_info_map(dc.crate);
+    let ndm=build_node_def_node_table(dc);
+    let jdm=build_jump_to_def_map(dc,nim,ndm);
+    (nim,ndm,jdm)
+}

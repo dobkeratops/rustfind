@@ -18,7 +18,6 @@ use jumptodefmap::*;
 
 use syntax::abi::AbiSet;
 
-//use extra::json::ToJson;
 use rfindctx::{RFindCtx,ctxtkey};
 pub use codemaput::{ZTextFilePos,ZTextFilePosLen,get_span_str,ToZTextFilePos,ZIndexFilePos,ToZIndexFilePos};
 use rsfind::{ShowDefMode,SDM_LineCol,SDM_Line,SDM_Source,SDM_GeditCmd,MyOption};
@@ -197,16 +196,14 @@ fn debug_test(dc:&RFindCtx) {
 
 	// TODO: parse commandline source locations,convert to codemap locations
 	//dump!(ctxt.tycx);
-	logi!("==== Get table of node-spans...===")
-	let node_info_map=build_node_info_map(dc.crate);
+	logi!("==== Get tables of node-spans,def_maps,JumpToDefTable..===")
+    let (node_info_map,node_def_node,jdm)=jumptodefmap::make_jdm(dc);
 	println(node_info_map.to_json_str(dc));
 
 	logi!("==== Node Definition mappings...===")
-	let node_def_node = build_node_def_node_table(dc);
 	println(node_def_node.to_json_str());
 
 	logi!("==== JumpToDef Table ===");
-	let jdm = build_jump_to_def_map(dc,node_info_map,node_def_node);
 	println(jdm.to_json_str());
 
 
@@ -282,9 +279,7 @@ pub fn write_source_as_html(dc:&RFindCtx,lib_html_path:~str,opts:uint) {
 		for (k,v) in xcm_sub.iter() {xcm.insert(*k,(*v).clone());}
 	});
 
-	let nim=build_node_info_map(dc.crate);
-	let ndm = build_node_def_node_table(dc);
-	let jdm=build_jump_to_def_map(dc,nim,ndm);
+    let (nim,ndm,jdm)=jumptodefmap::make_jdm(dc);
 	rust2html::write_source_as_html_sub(dc,nim,jdm,xcm,lib_html_path,opts);
 	crosscratemap::write_cross_crate_map(dc,lib_html_path,nim,ndm,jdm);
 }
