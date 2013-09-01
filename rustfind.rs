@@ -53,49 +53,6 @@ pub mod util;
 pub mod rf_ast_ut;
 pub mod jumptodefmap;
 
-
-/*
-  test multiline
-  */
-
-/*
-example of cross crate referencing
-/home/walter/gplsrc/rust/src/librustc/middle/ty.rs:4080:	
-pub fn lookup_struct_fields(cx: ctxt, did: ast::def_id) -> ~[field_ty] {
-	if did.crate == ast::LOCAL_CRATE {
-		....
-	} else {
-		return csearch::get_struct_fields(cx.sess.cstore, did);
-	}
-*/
-
-
-
-/*
-pub fn build_jump_to_def_map(dc:&RFindCtx, nim:@mut FNodeInfoMap,nd:&HashMap<ast::NodeId,ast::def_id>)->~JumpToDefMap{
-// todo: NodeId->AStNode  .. lookup_def_ inner functionality extracted
-	let mut jdm=~HashMap::new();
-	for (k,nim) in nim.iter() {
-		match get_ast_node_of_node_id(nim,*k) {
-			None=>{},
-			Some(ast_node)=>{
-				match lookup_def_node_of_node(dc,&ast_node,nim,nd) {
-					None=>{},
-					Some(def_node_id)=>{
-						if *k != def_node_id.node && def_node_id.crate==0 || (def_node_id.crate!=0) {
-							jdm.insert(*k,def_node_id);
-						}
-					}
-				}
-			}
-		}
-	}
-	jdm
-}
-*/
-
-
-
 pub macro_rules! if_some {
 	($b:ident in $a:expr then $c:expr)=>(
 		match $a {
@@ -249,27 +206,6 @@ fn get_ast_and_resolve(
 	let ca=driver::driver::phase_3_run_analysis_passes(sess,crate2);  
     RFindCtx { crate: crate2, tycx: ca.ty_cx, sess: sess, ca:ca }
 }
-/*
-pub fn some<T>(o:&Option<T>,f:&fn(t:&T)) {
-	match *o {
-		Some(ref x)=>f(x),
-		None=>{}
-	}
-}
-*/
-
-
-
-
-
-// see: tycx.node_types:node_type_table:HashMap<id,t>
-// 't'=opaque ptr, ty::get(:t)->t_box_ to resolve it
-
-
-
-
-
-
 
 fn debug_test(dc:&RFindCtx) {
 
