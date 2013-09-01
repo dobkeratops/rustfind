@@ -36,7 +36,7 @@ use extra::json::ToJson;
 //use rsfind::*;
 
 
-pub static ctxtkey: local_data::Key<@DocContext> = &local_data::Key;
+//pub static ctxtkey: local_data::Key<@DocContext> = &local_data::Key;
 
 pub macro_rules! if_some {
 	($b:ident in $a:expr then $c:expr)=>(
@@ -77,6 +77,35 @@ pub macro_rules! if_some {
 			None=>{$d}
 		}
 	);
+}
+
+
+#[deriving(Clone, Eq, Encodable, Decodable)]
+pub enum ShowDefMode {
+	SDM_Line=0,
+	SDM_LineCol=1,
+	SDM_Source=2,
+	SDM_GeditCmd=3
+}
+
+
+pub trait MyOption<T> {
+	fn for_some(&self, f:&fn(t:&T));
+	fn do_some<R>(&self, f:&fn(t:&T)->R)->Option<R>;
+}
+impl<T> MyOption<T> for Option<T>{
+	fn for_some(&self, f:&fn(t:&T)) {
+		match self {
+			&None=>{},
+			&Some(ref t)=>f(t)
+		}
+	}
+	fn do_some<R>(&self, f:&fn(t:&T)->R)->Option<R> {
+		match self {
+			&None=>None,
+			&Some(ref t)=>Some(f(t))
+		}
+	}
 }
 
 

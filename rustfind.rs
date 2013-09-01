@@ -36,7 +36,9 @@ use rfindctx::*;
 
 use rust2html::*;
 use codemaput::*;
-
+use rsfind::*;
+use crosscratemap::*;
+use rfserver::rustfind_interactive;
 
 pub mod find_ast_node;
 pub mod text_formatting;
@@ -45,16 +47,13 @@ pub mod htmlwriter;
 pub mod rust2html;
 pub mod codemaput;
 pub mod rfindctx;
+pub mod rsfind;
+pub mod crosscratemap;
+pub mod rfserver;
+
 /*
   test multiline
   */
-#[deriving(Clone, Eq, Encodable, Decodable)]
-enum ShowDefMode {
-	SDM_Line=0,
-	SDM_LineCol=1,
-	SDM_Source=2,
-	SDM_GeditCmd=3
-}
 
 /*
 example of cross crate referencing
@@ -67,7 +66,7 @@ pub fn lookup_struct_fields(cx: ctxt, did: ast::def_id) -> ~[field_ty] {
 	}
 */
 
-fn dump_json(dc:&RFindCtx) {
+pub fn dump_json(dc:&RFindCtx) {
 	// TODO: full/partial options - we currently wwrite out all the nodes we find.
 	// need option to only write out nodes that map to definitons. 
 	println("{");
@@ -138,7 +137,6 @@ pub fn build_jump_to_def_map(dc:&RFindCtx, nim:@mut FNodeInfoMap,nd:&HashMap<ast
 */
 
 
-pub static ctxtkey: local_data::Key<@RFindCtx> = &local_data::Key;
 
 pub macro_rules! if_some {
 	($b:ident in $a:expr then $c:expr)=>(
@@ -832,37 +830,11 @@ fn debug_test(dc:&RFindCtx) {
 	
 }
 
-fn first_file_name(dc:&RFindCtx)->~str {
-	dc.tycx.sess.codemap.files[0].name.to_str() // clone?
-}
-
-fn find_file_name_in(dc:&RFindCtx,fname:&str)->Option<~str> {
-	// todo subsequence match..
-	// TODO - is there an existing way of doing this, "index_of.." ..contains()..?
-	for f in dc.tycx.sess.codemap.files.iter() {
-		if fname==f.name {return Some(fname.to_owned());}
-	}
-	None
-}
 
 pub fn def_of_symbol_to_str(dc:&RFindCtx, ns:&FNodeInfoMap,ds:&HashMap<ast::NodeId, ast::def_id>,s:&str)->~str {
 	~"TODO"	
 }
-type ZeroBasedIndex=uint;
 
-/// cross crate map, extra info written out when compiling links of a crate
-/// allows sunsequent crates to jump to definitions in that crate
-/// TODO - check if this already exists in the 'cstore/create metadata'
-/// specificially we need node->span info
-#[deriving(Clone)]
-pub struct CrossCrateMapItem {
-	fname:~str,
-	line:ZeroBasedIndex,	
-	col:uint,
-	len:uint
-}
-
-pub type CrossCrateMap = HashMap<ast::def_id,CrossCrateMapItem>;
 
 pub fn read_cross_crate_map(dc:&RFindCtx, crate_num:int, crate_name:&str,lib_path:&str)->~CrossCrateMap {
 	let mut raw_bytes=ioutil::fileLoad(crate_name);
@@ -965,130 +937,6 @@ pub fn write_cross_crate_map(dc:&RFindCtx,lib_html_path:~str,nim:&FNodeInfoMap, 
 	
 }
 
-pub fn dump_cstore_info(tc:ty::ctxt) {
-//struct ctxt_ {
-//    cstore: @mut metadata::cstore::CStore,
-//    def_map: resolve::DefMap,
-//		tc.cstore.
-// home/walter/gplsrc/rust/src/librustc/metadata/cstore.rs:37:	
-//pub struct CStore {
-//    priv metas: HashMap <ast::CrateNum, @crate_metadata>,
-//    priv extern_mod_crate_map: extern_mod_crate_map,
-//    priv used_crate_files: ~[Path],
-//    priv used_libraries: ~[@str],
-//    priv used_link_args: ~[@str],
-//    intr: @ident_interner
-//}
-// home/walter/gplsrc/rust/src/librustc/metadata/cstore.rs:30:	
-//pub struct crate_metadata {
-//    name: @str,
-//    data: @~[u8],
-//    cnum_map: cnum_map,
-//    cnum: ast::CrateNum
-//}
-
-	println("crate files");
-	let ucf=cstore::get_used_crate_files(tc.cstore);
-	let num_crates=ucf.len();
-	for x in ucf.iter() {
-		dump!(x);
-	}
-/*	println("crate metadata");
-	for i in range(1,num_crates) {
-		let cd= cstore::get_crate_data(tc.cstore, i as int);
-		
-		dump!(i, cd.name, cd.data.len(), cd.cnum_map, cd.cnum);
-	}	
-*/
-	println("crate metadata");
-	cstore::iter_crate_data(tc.cstore, |i,md| {
-		dump!(i, md.name,md.data.len(),md.cnum);
-	});
-	
-	
-}
-
-pub fn get_crate_name(tc:ty::ctxt, i:ast::CrateNum)->~str {
-	if i>0 {
-		let cd = cstore::get_crate_data(tc.cstore,i);
-		cd.name.to_owned()
-	} else {
-		~""
-	}
-}
 
 
 
-pub fn rustfind_interactive(dc:&RFindCtx) {
-	// TODO - check if RUSTI can already do this.. it would be better there IMO
-	let node_spans=build_node_info_map(dc.crate);
-
-	let node_def_node = build_node_def_node_table(dc);
-	let mut curr_file=first_file_name(dc);
-
-	loop {
-		print("rustfind "+curr_file+">");
-		let input_line=io::stdin().read_line();
-		let toks:~[&str]=input_line.split_iter(' ').collect();
-		if toks.len()>0 {
-			match toks[0] {
-				"h"|"help"=> print("interactive mode\n - enter file:line:pos or line:pos for current file\n - show location & def of symbol there\n j-dump json q-quit i-info\n"),
-				"i"=> {
-					println("files in current crate:-\n");
-					for x in dc.tycx.sess.codemap.files.iter() {
-						println("\t"+x.name);
-					}
-				}
-				"j"=> dump_json(dc),
-				"q"=> break,
-				_ =>{
-					// todo - if you just supply line, lookup defs on that line
-					// todo - lookup defs from symbol, remembering context of previous lookups?
-					let cmd=toks[0];
-					let cmd1=match cmd[0] as char { '0'..'9'=>curr_file+":"+cmd,_=>cmd.to_str() };
-					let subtoks:~[&str]=cmd1.split_iter(':').collect();
-					curr_file=find_file_name_in(dc, subtoks[0].to_str()).unwrap_or_default(curr_file);
-					//dump!(cmd1,subtoks,curr_file);
-					let def=lookup_def_at_text_file_pos_str(dc, cmd1,SDM_Source);
-					print(def.unwrap_or_default
-					(~"no def found\n"));
-					//println(def_of_symbol_to_str(dc,node_spans,node_def_node,toks[0]));
-				}
-			}
-		}
-	}
-}
-
-pub trait MyOption<T> {
-	fn for_some(&self, f:&fn(t:&T));
-	fn do_some<R>(&self, f:&fn(t:&T)->R)->Option<R>;
-}
-impl<T> MyOption<T> for Option<T>{
-	fn for_some(&self, f:&fn(t:&T)) {
-		match self {
-			&None=>{},
-			&Some(ref t)=>f(t)
-		}
-	}
-	fn do_some<R>(&self, f:&fn(t:&T)->R)->Option<R> {
-		match self {
-			&None=>None,
-			&Some(ref t)=>Some(f(t))
-		}
-	}
-
-}
-/*
-test for default args compiler hack
-struct Foo {
-	x:int,y:int
-}
-fn test_default_arg(a:int=1,(x,y):(int,int)=(a,a)) {
-	println(fmt!("%i %i %i",a,x,y));
-}
-impl Foo {
-	fn substr(&self, a:~str, lo:int=0, hi:int=a.len())->~str {
-		~""
-	}
-}
-*/

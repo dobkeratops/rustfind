@@ -11,6 +11,7 @@ use find_ast_node::*;
 use rfindctx::*;
 use syntax::*;
 use rustc::middle::ty;
+use crosscratemap::*;
 //use self::htmlwriter::HtmlWriter;
 mod htmlwriter;
 
@@ -35,7 +36,7 @@ pub static DefaultOptions:uint 	=WriteFilePath | WriteReferences;
 
 
 //nim:&FNodeInfoMap,jdm:&JumpToDefMap, jrm:&JumpToRefMap
-pub fn make_html(dc:&RFindCtx, fm:&codemap::FileMap,nmaps:&NodeMaps,xcm:&::CrossCrateMap, fln:&FileLineNodes, lib_path:&str,options:uint)->~str {
+pub fn make_html(dc:&RFindCtx, fm:&codemap::FileMap,nmaps:&NodeMaps,xcm:&CrossCrateMap, fln:&FileLineNodes, lib_path:&str,options:uint)->~str {
 	// todo - Rust2HtmlCtx { fm,nim,jdm,jrm } .. cleanup common intermediates
 	
 	let mut doc= htmlwriter::HtmlWriter::new();
@@ -95,7 +96,7 @@ pub fn make_html(dc:&RFindCtx, fm:&codemap::FileMap,nmaps:&NodeMaps,xcm:&::Cross
 	doc.doc
 }
 
-pub fn write_source_as_html_sub(dc:&RFindCtx, nim:&FNodeInfoMap, jdm:&JumpToDefMap,xcm:&::CrossCrateMap,lib_path:&str, options:uint) {
+pub fn write_source_as_html_sub(dc:&RFindCtx, nim:&FNodeInfoMap, jdm:&JumpToDefMap,xcm:&CrossCrateMap,lib_path:&str, options:uint) {
 	
 	let npl=NodesPerLinePerFile::new(dc,nim);
 
@@ -186,7 +187,7 @@ pub fn get_file_index(dc:&RFindCtx,fname:&str)->Option<uint> {
 	None
 }
 pub fn get_crate_name(dc:&RFindCtx,ci:ast::CrateNum)->~str {
-	::get_crate_name(dc.tycx,ci)
+	super::codemaput::get_crate_name(dc.tycx,ci)
 }
 
 
@@ -371,7 +372,7 @@ static link_to_refs:bool	=true;
 static link_debug:bool		=true;
 
 
-fn write_line_with_links(dst:&mut SourceCodeWriter<htmlwriter::HtmlWriter>,dc:&RFindCtx,fm:&codemap::FileMap,lib_path:&str, nmaps:&NodeMaps,xcm:&::CrossCrateMap, line:&str, nodes:&[ast::NodeId]) {
+fn write_line_with_links(dst:&mut SourceCodeWriter<htmlwriter::HtmlWriter>,dc:&RFindCtx,fm:&codemap::FileMap,lib_path:&str, nmaps:&NodeMaps,xcm:&CrossCrateMap, line:&str, nodes:&[ast::NodeId]) {
 	// todo ... BREAK THIS FUNCTION UP!!!!
 	// and there is a load of messy cut paste too.
 
@@ -550,7 +551,7 @@ fn write_line_with_links(dst:&mut SourceCodeWriter<htmlwriter::HtmlWriter>,dc:&R
 	write_line_attr_links(dst,line,color,link, resolver );
 }
 
-fn resolve_link(link:i64, dc:&RFindCtx,fm:&codemap::FileMap,lib_path:&str, nmaps:&NodeMaps,xcm:&::CrossCrateMap)->~str {
+fn resolve_link(link:i64, dc:&RFindCtx,fm:&codemap::FileMap,lib_path:&str, nmaps:&NodeMaps,xcm:&CrossCrateMap)->~str {
 	let nim=nmaps.nim;
 /*
 	if link_debug==false {
@@ -894,9 +895,9 @@ impl htmlwriter::HtmlWriter{
 				self.begin_tag("c40");
 				self.writeln(dc.sess.codemap.files[ifp.file_index].name+":"+(ifp.line+1).to_str()+":"+ifp.col.to_str()
 							+"-"+(ifpe.line+1).to_str()+":"+ifpe.col.to_str() +" -" +info.kind + "- definition:");
-				self.end_tag();
+       			self.end_tag();
 				self.begin_tag("pr");
-		//			dump!(def_tfp);
+    		//			dump!(def_tfp);
 				self.writeln(get_source_line(fm,ifp.line) );
 				self.writeln(get_source_line(fm,ifp.line+1) );
 				self.end_tag();
@@ -965,7 +966,7 @@ fn count_chars_in(f:&str, x:char)->uint{
 	let mut n=0;
 	for c in f.iter() { if c==x {n+=1} }
 	n
-}
+}     
 
 
 fn make_html_name_reloc(f:&str, origin:&str, reloc:&str)->~str {

@@ -1,6 +1,7 @@
 use syntax::ast;
 use syntax::codemap;
 use rustc::middle::ty;
+use rustc::metadata::*;
 
 // TODO:
 // we've done many permuations of how to represent code position,
@@ -247,7 +248,57 @@ impl ToZIndexFilePos for codemap::BytePos {
 	}
 }
 
+pub fn get_crate_name(tc:ty::ctxt, i:ast::CrateNum)->~str {
+	if i>0 {
+		let cd = cstore::get_crate_data(tc.cstore,i);
+		cd.name.to_owned()
+	} else {
+		~""
+	}
+}
 
+
+
+pub fn dump_cstore_info(tc:ty::ctxt) {
+//struct ctxt_ {
+//    cstore: @mut metadata::cstore::CStore,
+//    def_map: resolve::DefMap,
+//		tc.cstore.
+// home/walter/gplsrc/rust/src/librustc/metadata/cstore.rs:37:	
+//pub struct CStore {
+//    priv metas: HashMap <ast::CrateNum, @crate_metadata>,
+//    priv extern_mod_crate_map: extern_mod_crate_map,
+//    priv used_crate_files: ~[Path],
+//    priv used_libraries: ~[@str],
+//    priv used_link_args: ~[@str],
+//    intr: @ident_interner
+//}
+// home/walter/gplsrc/rust/src/librustc/metadata/cstore.rs:30:	
+//pub struct crate_metadata {
+//    name: @str,
+//    data: @~[u8],
+//    cnum_map: cnum_map,
+//    cnum: ast::CrateNum
+//}
+
+	println("crate files");
+	let ucf=cstore::get_used_crate_files(tc.cstore);
+	let num_crates=ucf.len();
+	for x in ucf.iter() {
+		dump!(x);
+	}
+/*	println("crate metadata");
+	for i in range(1,num_crates) {
+		let cd= cstore::get_crate_data(tc.cstore, i as int);
+		
+		dump!(i, cd.name, cd.data.len(), cd.cnum_map, cd.cnum);
+	}	
+*/
+	println("crate metadata");
+	cstore::iter_crate_data(tc.cstore, |i,md| {
+		dump!(i, md.name,md.data.len(),md.cnum);
+	});	
+}
 
 
 
