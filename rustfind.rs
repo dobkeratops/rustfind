@@ -22,7 +22,6 @@ use rfindctx::{RFindCtx,ctxtkey};
 pub use codemaput::{ZTextFilePos,ZTextFilePosLen,get_span_str,ToZTextFilePos,ZIndexFilePos,ToZIndexFilePos};
 use rsfind::{ShowDefMode,SDM_LineCol,SDM_Line,SDM_Source,SDM_GeditCmd,MyOption};
 use crosscratemap::{CrossCrateMap,CrossCrateMapItem};
-use rfserver::rustfind_interactive;
 
 pub mod find_ast_node;
 pub mod text_formatting;
@@ -142,7 +141,7 @@ fn main() {
 			}
 		}
 		if opt_present(&matches,"i") {
-			rustfind_interactive(dc);
+			rfserver::run_server(dc);
 			done=true;
 		}
 
@@ -279,8 +278,9 @@ pub fn write_source_as_html(dc:&RFindCtx,lib_html_path:~str,opts:uint) {
 		for (k,v) in xcm_sub.iter() {xcm.insert(*k,(*v).clone());}
 	});
 
-    let (nim,ndm,jdm)=jumptodefmap::make_jdm(dc);
-	rust2html::write_source_as_html_sub(dc,nim,jdm,xcm,lib_html_path,opts);
-	crosscratemap::write_cross_crate_map(dc,lib_html_path,nim,ndm,jdm);
+    let (info_map,def_map,jump_map)=make_jdm(dc);
+	rust2html::write_source_as_html_sub(dc,info_map,jump_map,xcm,lib_html_path,opts);
+	crosscratemap::write_cross_crate_map(dc,lib_html_path,
+        info_map,def_map,jump_map);
 }
 
