@@ -31,7 +31,8 @@ use std::os;
 use std::local_data;
 use extra::json::ToJson;
 use rfindctx::{RFindCtx,ctxtkey};
-use codemaput::{ZTextFilePos,ZTextFilePosLen,get_span_str,ToZTextFilePos};
+pub use codemaput::{ZTextFilePos,ZTextFilePosLen,get_span_str,ToZTextFilePos,ZIndexFilePos,ToZIndexFilePos};
+//pub use codemaput::*;
 use rsfind::{ShowDefMode,SDM_LineCol,SDM_Line,SDM_Source,SDM_GeditCmd,MyOption};
 use crosscratemap::{CrossCrateMap,CrossCrateMapItem};
 use rfserver::rustfind_interactive;
@@ -46,6 +47,7 @@ pub mod rfindctx;
 pub mod rsfind;
 pub mod crosscratemap;
 pub mod rfserver;
+pub mod util;
 
 /*
   test multiline
@@ -627,9 +629,9 @@ pub fn get_node_source(c:ty::ctxt, nim:&FNodeInfoMap, did:ast::def_id)->~str {
 
 pub fn dump_span(text:&[u8], sp:&codemap::span) {
 
-	let line_col=text_offset_to_line_pos(text, *sp.lo);
+	let line_col=util::text_offset_to_line_pos(text, *sp.lo);
 	logi!(" line,ofs=",line_col.to_str()," text=\'",
-		std::str::from_bytes(text_span(text,sp)),"\'");
+		std::str::from_bytes(codemaput::text_span(text,sp)),"\'");
 }
 
 
@@ -689,32 +691,6 @@ pub fn text_line_pos_to_offset(text:&[u8], (line,ofs_in_line):(uint,uint))->Opti
 
 
 
-pub fn text_offset_to_line_pos(text:&[u8], src_ofs:uint)->Option<(uint,uint)> {
-	// line as reported by grep & text editors,counted from '1' not '0'
-	let mut pos = 0;
-	let tlen=text.len();	
-	let	mut tline=0;
-	let mut line_start_pos=0;
-	while pos<tlen{
-		match text[pos] as char{
-			'\n' => {
-				if src_ofs<=pos && src_ofs>line_start_pos {
-					return Some((tline+1,src_ofs-line_start_pos));
-				}
-				tline+=1; line_start_pos=pos;
-			},
-//			"\a" => {tpos=0;line_pos=pos;},
-			_ => {}
-		}
-		// todo - clamp line end
-		pos+=1;
-	}
-	return None;
-}
-
-pub fn text_span<'a,'b>(text:&'a [u8],s:&'b codemap::span)->&'a[u8] {
-	text.slice(*s.lo,*s.hi)
-}
 
 pub fn build_node_def_node_table(dc:&RFindCtx)->~HashMap<ast::NodeId, ast::def_id>
 {
@@ -929,10 +905,6 @@ pub fn write_cross_crate_map(dc:&RFindCtx,lib_html_path:~str,nim:&FNodeInfoMap, 
 	{	let x=curr_crate_name_only+~".rfx";
 		println("writing "+x);
 		ioutil::fileSaveStr(outp, x);
-	}
-	
+	}	
 }
-
-
-
 

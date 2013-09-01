@@ -257,6 +257,9 @@ pub fn get_crate_name(tc:ty::ctxt, i:ast::CrateNum)->~str {
 	}
 }
 
+pub fn text_span<'a,'b>(text:&'a [u8],s:&'b codemap::span)->&'a[u8] {
+	text.slice(*s.lo,*s.hi)
+}
 
 
 pub fn dump_cstore_info(tc:ty::ctxt) {
