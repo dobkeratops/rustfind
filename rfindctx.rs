@@ -15,7 +15,7 @@ use rustc::middle::mem_categorization::ast_node;
 use rustc::middle::ty;
 
 use std::hashmap;
-use codemaput::*;
+//use codemaput::*;
 
 pub struct RFindCtx {
      crate: @ast::Crate,
