@@ -12,11 +12,9 @@ use syntax::codemap;
 use rustc::{front, metadata, driver, middle};
 use rustc::middle::mem_categorization::ast_node;
 use rustc::middle::ty;
-//use rfindctx::*;
+use rfindctx::{RFindCtx,};
 use std::hashmap;
-use codemaput::*;
-
-
+use codemaput::{ZTextFilePos,ToZIndexFilePos};
 
 #[deriving(Clone)]
 pub enum AstNode {
