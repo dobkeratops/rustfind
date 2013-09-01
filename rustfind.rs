@@ -3,9 +3,8 @@ extern mod rustc;
 extern mod extra;
 
 use rustc::{front, metadata, driver, middle};
-use rustc::middle::*;
-use rustc::middle::typeck;
-//use rustc::metadata::;
+use rustc::middle::{ty,typeck};
+use rustc::metadata::cstore;
 
 use std::num;
 use std::num::*;
@@ -16,7 +15,7 @@ use syntax::ast;
 use syntax::ast_map;
 use syntax::visit;
 use syntax::parse::token;
-use syntax::visit::*;
+//use syntax::visit::*;
 use syntax::visit::{Visitor, fn_kind};
 use find_ast_node::{FNodeInfoMap,build_node_info_map,get_def_id,get_node_info_str,JumpToDefMap,safe_node_id_to_type,byte_pos_from_text_file_pos_str,AstNode,byte_pos_from_text_file_pos_str,find_node_tree_loc_at_byte_pos,NodeTreeLoc,astnode_expr,FNodeInfo,ToJsonStr,ToJsonStrFc,AstNodeAccessors,KindToStr};
 use syntax::diagnostic;
