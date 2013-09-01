@@ -5,7 +5,7 @@ extern mod extra;
 use rustc::{front, metadata, driver, middle};
 use rustc::middle::*;
 use rustc::middle::typeck;
-use rustc::metadata::*;
+//use rustc::metadata::;
 
 use std::num;
 use std::num::*;
