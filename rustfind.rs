@@ -17,7 +17,7 @@ use syntax::visit;
 use syntax::parse::token;
 //use syntax::visit::*;
 use syntax::visit::{Visitor, fn_kind};
-use find_ast_node::{FNodeInfoMap,build_node_info_map,get_def_id,get_node_info_str,safe_node_id_to_type,byte_pos_from_text_file_pos_str,AstNode,byte_pos_from_text_file_pos_str,find_node_tree_loc_at_byte_pos,NodeTreeLoc,astnode_expr,FNodeInfo,ToJsonStr,ToJsonStrFc,AstNodeAccessors,KindToStr};
+use find_ast_node::{FNodeInfoMap,build_node_info_map,get_def_id,get_node_info_str,safe_node_id_to_type,byte_pos_from_text_file_pos_str,AstNode,byte_pos_from_text_file_pos_str,find_node_tree_loc_at_byte_pos,NodeTreeLoc,astnode_expr,FNodeInfo,ToJsonStr,ToJsonStrFc,AstNodeAccessors,KindToStr,build_node_def_node_table};
 use syntax::diagnostic;
 use syntax::codemap::BytePos;
 use std::io;
@@ -38,6 +38,7 @@ use rsfind::{ShowDefMode,SDM_LineCol,SDM_Line,SDM_Source,SDM_GeditCmd,MyOption};
 use crosscratemap::{CrossCrateMap,CrossCrateMapItem};
 use rfserver::rustfind_interactive;
 use jumptodefmap::*;
+
 pub mod find_ast_node;
 pub mod text_formatting;
 pub mod ioutil;
@@ -275,14 +276,14 @@ fn get_ast_and_resolve(
 	let ca=driver::driver::phase_3_run_analysis_passes(sess,crate2);  
     RFindCtx { crate: crate2, tycx: ca.ty_cx, sess: sess, ca:ca }
 }
-
+/*
 pub fn some<T>(o:&Option<T>,f:&fn(t:&T)) {
 	match *o {
 		Some(ref x)=>f(x),
 		None=>{}
 	}
 }
-
+*/
 
 
 
@@ -373,7 +374,7 @@ fn lookup_def_of_node_sub(dc:&RFindCtx,node:&AstNode,m:ShowDefMode,nim:&FNodeInf
 			match nim.find(&def_node_id.node) {
 				None=>None,
 				Some(def_info)=>{
-					let loc=get_source_loc(dc,def_info.span.lo);
+					let loc=rfindctx::get_source_loc(dc,def_info.span.lo);
 					let def_pos_str=
 						loc.file.name + ":"+loc.line.to_str()+": "+
 							match m { SDM_LineCol=>loc.col.to_str()+": ", _ =>~"" }+"\n";
@@ -393,10 +394,6 @@ fn lookup_def_of_node_sub(dc:&RFindCtx,node:&AstNode,m:ShowDefMode,nim:&FNodeInf
 	}
 }
 
-
-fn get_source_loc(dc:&RFindCtx, pos:codemap::BytePos)->codemap::Loc {
-	dc.tycx.sess.codemap.lookup_char_pos(pos)
-}
 
 pub fn dump_node_source_for_single_file_only(text:&[u8], ns:&FNodeInfoMap, id:ast::NodeId) {
 	match(ns.find(&id)) {None=>logi!("()"),
@@ -422,24 +419,6 @@ pub fn get_node_source(c:ty::ctxt, nim:&FNodeInfoMap, did:ast::def_id)->~str {
 
 
 
-pub fn def_info_from_node_id<'a,'b>(dc:&'a RFindCtx, node_info:&'b FNodeInfoMap, id:ast::NodeId)->(ast::def_id,Option<&'b FNodeInfo>) {
-	let crate_num=0;
-	match dc.tycx.def_map.find(&id) { // finds a def..
-		Some(a)=>{
-			match get_def_id(crate_num,*a){
-				Some(b)=>
-					(b,node_info.find(&b.node)),
-//				match b.crate {
-//					0=>(b.node,node_info.find(&b.node)),
-//					_ => (id as int, None)
-//				},
-				None=>(ast::def_id{crate:0,node:id as int},None)
-			}
-		},
-		None=>(ast::def_id{crate:0,node:id as int},None)
-	}
-}
-
 
 // see: tycx.node_types:node_type_table:HashMap<id,t>
 // 't'=opaque ptr, ty::get(:t)->t_box_ to resolve it
@@ -448,38 +427,6 @@ pub fn def_info_from_node_id<'a,'b>(dc:&'a RFindCtx, node_info:&'b FNodeInfoMap,
 
 
 
-
-pub fn build_node_def_node_table(dc:&RFindCtx)->~HashMap<ast::NodeId, ast::def_id>
-{
-	let mut r=~HashMap::new();
-	let curr_crate_id_hack=0;	// TODO WHAT IS CRATE ID REALLY?!
-	// todo .. for range(0,c.next_id) || ??
-	let mut id:ast::NodeId=0;
-	while id<*(dc.tycx.next_id) as ast::NodeId {
-		if_some!(t in safe_node_id_to_type(dc.tycx,id as int) then {
-			if_some!(def in dc.tycx.def_map.find(&(id as int)) then { // finds a def..
-				if_some!(did in get_def_id(curr_crate_id_hack,*def) then {
-					r.insert(id as ast::NodeId,did);
-				})
-			});
-		});
-		id+=1;
-	}
-	r
-}
-
-pub fn def_node_id_from_node_id(dc:&RFindCtx, id:ast::NodeId)->ast::NodeId {
-	let crate_num=0;	// TODO - whats crate Id really???
-	match dc.tycx.def_map.find(&id) { // finds a def..
-		Some(a)=>{
-			match get_def_id(crate_num,*a) {
-				Some(b)=>b.node,
-				None=>id as int
-			}
-		},
-		None=>(id as int)	// no definition? say its its own definition
-	}
-}
 
 
 fn debug_test(dc:&RFindCtx) {
@@ -508,7 +455,7 @@ fn debug_test(dc:&RFindCtx) {
 	let mut test_cursor=15 as uint;
 
 	while test_cursor<500 {
-		let loc = get_source_loc(dc,BytePos(test_cursor));
+		let loc = rfindctx::get_source_loc(dc,BytePos(test_cursor));
 
 		logi!(~"\n=====Find AST node at: ",loc.file.name,":",loc.line,":",loc.col,":"," =========");
 
@@ -558,12 +505,6 @@ fn debug_test(dc:&RFindCtx) {
 	dump!(lookup_def_at_text_file_pos(dc, &ZTextFilePos::new("test_input.rs",11-1,10),SDM_Source));println("");
 	
 }
-
-
-pub fn def_of_symbol_to_str(dc:&RFindCtx, ns:&FNodeInfoMap,ds:&HashMap<ast::NodeId, ast::def_id>,s:&str)->~str {
-	~"TODO"	
-}
-
 
 pub fn read_cross_crate_map(dc:&RFindCtx, crate_num:int, crate_name:&str,lib_path:&str)->~CrossCrateMap {
 	let mut raw_bytes=ioutil::fileLoad(crate_name);

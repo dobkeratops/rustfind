@@ -14,6 +14,7 @@ use rustc::middle::mem_categorization::ast_node;
 use rustc::middle::ty;
 use rfindctx::{RFindCtx,};
 use std::hashmap;
+use std::hashmap::HashMap;
 use codemaput::{ZTextFilePos,ToZIndexFilePos};
 
 #[deriving(Clone)]
@@ -1061,3 +1062,41 @@ pub fn byte_pos_from_text_file_pos_str(dc:&RFindCtx,filepos:&str)->Option<codema
 	return None;
 }
 
+
+pub fn build_node_def_node_table(dc:&RFindCtx)->~HashMap<ast::NodeId, ast::def_id>
+{
+	let mut r=~HashMap::new();
+	let curr_crate_id_hack=0;	// TODO WHAT IS CRATE ID REALLY?!
+	// todo .. for range(0,c.next_id) || ??
+	let mut id:ast::NodeId=0;
+	while id<*(dc.tycx.next_id) as ast::NodeId {
+		if_some!(t in safe_node_id_to_type(dc.tycx,id as int) then {
+			if_some!(def in dc.tycx.def_map.find(&(id as int)) then { // finds a def..
+				if_some!(did in get_def_id(curr_crate_id_hack,*def) then {
+					r.insert(id as ast::NodeId,did);
+				})
+			});
+		});
+		id+=1;
+	}
+	r
+}
+
+
+pub fn def_node_id_from_node_id(dc:&RFindCtx, id:ast::NodeId)->ast::NodeId {
+	let crate_num=0;	// TODO - whats crate Id really???
+	match dc.tycx.def_map.find(&id) { // finds a def..
+		Some(a)=>{
+			match get_def_id(crate_num,*a) {
+				Some(b)=>b.node,
+				None=>id as int
+			}
+		},
+		None=>(id as int)	// no definition? say its its own definition
+	}
+}
+
+
+pub fn def_of_symbol_to_str(dc:&RFindCtx, ns:&FNodeInfoMap,ds:&HashMap<ast::NodeId, ast::def_id>,s:&str)->~str {
+	~"TODO"	
+}

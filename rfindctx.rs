@@ -40,3 +40,8 @@ pub fn find_file_name_in(dc:&RFindCtx,fname:&str)->Option<~str> {
 }
 
 
+pub fn get_source_loc(dc:&RFindCtx, pos:codemap::BytePos)->codemap::Loc {
+	dc.tycx.sess.codemap.lookup_char_pos(pos)
+}
+
+

@@ -1,7 +1,6 @@
 use rfindctx::{RFindCtx,find_file_name_in,first_file_name};
 use crosscratemap::CrossCrateMap;
-use find_ast_node::{build_node_info_map};
-use super::build_node_def_node_table;
+use find_ast_node::{build_node_info_map,build_node_def_node_table};
 use super::dump_json;
 use super::lookup_def_at_text_file_pos_str;
 use std::io;
