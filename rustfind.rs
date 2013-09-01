@@ -18,8 +18,7 @@ use syntax::visit;
 use syntax::parse::token;
 use syntax::visit::*;
 use syntax::visit::{Visitor, fn_kind};
-use find_ast_node::*;
-use text_formatting::*;
+use find_ast_node::{FNodeInfoMap,build_node_info_map,get_def_id,get_node_info_str,JumpToDefMap,safe_node_id_to_type,byte_pos_from_text_file_pos_str,AstNode,byte_pos_from_text_file_pos_str,find_node_tree_loc_at_byte_pos,NodeTreeLoc,astnode_expr,FNodeInfo,ToJsonStr,ToJsonStrFc,AstNodeAccessors,KindToStr};
 use syntax::diagnostic;
 use syntax::codemap::BytePos;
 use std::io;
@@ -28,14 +27,14 @@ use syntax::abi::AbiSet;
 use syntax::ast;
 use syntax::codemap;
 
-use std::hashmap::*;
+use std::hashmap::HashMap;
 use std::os;
 use std::local_data;
 use extra::json::ToJson;
 use rfindctx::{RFindCtx,ctxtkey};
 use codemaput::{ZTextFilePos,ZTextFilePosLen,get_span_str,ToZTextFilePos};
-use rsfind::*;
-use crosscratemap::*;
+use rsfind::{ShowDefMode,SDM_LineCol,SDM_Line,SDM_Source,SDM_GeditCmd,MyOption};
+use crosscratemap::{CrossCrateMap,CrossCrateMapItem};
 use rfserver::rustfind_interactive;
 
 pub mod find_ast_node;

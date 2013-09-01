@@ -1,7 +1,7 @@
 use syntax::ast;
 use syntax::codemap;
 use rustc::middle::ty;
-use rustc::metadata::*;
+use rustc::metadata::{cstore};
 
 // TODO:
 // we've done many permuations of how to represent code position,

@@ -1,17 +1,16 @@
 use syntax::codemap;
 use syntax::ast;
-use ioutil::*;
+use rustc::middle::ty;
+use iou=ioutil;
 //use htmlwriter::*;
-use std::hashmap::*;
+use std::hashmap::HashMap;
 use std::vec;
 use std::str;
 use extra::sort;
-use codemaput::*;
-use find_ast_node::*;
-use rfindctx::*;
-use syntax::*;
-use rustc::middle::ty;
-use crosscratemap::*;
+use codemaput::{ZIndexFilePos,ToZIndexFilePos};
+use find_ast_node::{FNodeInfoMap,JumpToDefMap,FNodeInfo};
+use rfindctx::{RFindCtx};
+use crosscratemap::{CrossCrateMap,CrossCrateMapItem};
 //use self::htmlwriter::HtmlWriter;
 mod htmlwriter;
 
@@ -114,7 +113,7 @@ pub fn write_source_as_html_sub(dc:&RFindCtx, nim:&FNodeInfoMap, jdm:&JumpToDefM
 		if is_valid_filename(fm.name) {
 			println("generating "+fi.to_str()+ ": "+make_html_name(fm.name)+"..");
 			let doc_str=make_html(dc, *fm, &nmaps,xcm, &npl.file[fi] , lib_path,options);
-			fileSaveStr(doc_str,make_html_name(fm.name));
+			iou::fileSaveStr(doc_str,make_html_name(fm.name));
 		}
 	}
 }
@@ -206,8 +205,8 @@ impl NodesPerLinePerFile {
 //			let num_lines=dc.sess.codemap.files[fi].lines.len();
 			let num_lines=cmfile.lines.len();
 			npl.file.push(FileLineNodes{
-				nodes_per_line:from_elem(num_lines,~[]),
-				def_nodes_per_line:from_elem(num_lines,~[])
+				nodes_per_line: vec::from_elem(num_lines,~[]),
+				def_nodes_per_line: vec::from_elem(num_lines,~[])
 			});
 //			fi+=1;
 		};

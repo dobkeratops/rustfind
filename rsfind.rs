@@ -16,9 +16,6 @@ use syntax::visit;
 use syntax::parse::token;
 use syntax::visit::*;
 use syntax::visit::{Visitor, fn_kind};
-use find_ast_node::*;
-
-use text_formatting::*;
 use syntax::diagnostic;
 use syntax::codemap::BytePos;
 use std::io;

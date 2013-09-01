@@ -1,5 +1,5 @@
 use syntax::ast;
-use std::hashmap::*;
+use std::hashmap::HashMap;
 /*new file*/  
 
 pub type ZeroBasedIndex=uint;
