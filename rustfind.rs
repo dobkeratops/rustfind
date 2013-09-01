@@ -32,10 +32,8 @@ use std::hashmap::*;
 use std::os;
 use std::local_data;
 use extra::json::ToJson;
-use rfindctx::*;
-
-use rust2html::*;
-use codemaput::*;
+use rfindctx::{RFindCtx,ctxtkey};
+use codemaput::{ZTextFilePos,ZTextFilePosLen,get_span_str,ToZTextFilePos};
 use rsfind::*;
 use crosscratemap::*;
 use rfserver::rustfind_interactive;
