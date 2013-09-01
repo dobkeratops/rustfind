@@ -303,5 +303,18 @@ pub fn dump_cstore_info(tc:ty::ctxt) {
 	});	
 }
 
+pub fn flatten_to_str<T,U:ToStr>(xs:&[T],f:&fn(x:&T)->U, sep:&str)->~str {
+	let mut acc=~"";
+	let mut i=0; // TODO - functional way.
+	while i<xs.len() {
+		if i>0 {acc.push_str(sep);}
+		acc.push_str( f(&xs[i]).to_str() );
+	
+		i+=1;
+	}
+	acc
+}
+
+
 
 

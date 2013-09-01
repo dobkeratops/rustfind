@@ -74,7 +74,7 @@ pub fn dump_json(dc:&RFindCtx) {
 		print("\t\t{ name:\""+f.name+"\",\tglobal_start_pos:"+f.start_pos.to_str()+
 			",\tlength:"+(f.src.len()).to_str()+
 			",\tnum_lines:"+f.lines.len().to_str()+
-			",\tlines:[\n"+ flatten_to_str(*f.lines, |&x|{*x-*f.start_pos} ,",") +
+			",\tlines:[\n"+ util::flatten_to_str(*f.lines, |&x|{*x-*f.start_pos} ,",") +
 			"\n\t\t]\n\t},\n");
 	}
 	println("\t]");
@@ -313,17 +313,6 @@ pub fn some_else<T,X,Y>(o:&Option<T>,f:&fn(t:&T)->Y,default_value:Y)->Y {
 
 /// todo - collect stage.
 
-fn flatten_to_str<T,U:ToStr>(xs:&[T],f:&fn(x:&T)->U, sep:&str)->~str {
-	let mut acc=~"";
-	let mut i=0; // TODO - functional way.
-	while i<xs.len() {
-		if i>0 {acc.push_str(sep);}
-		acc.push_str( f(&xs[i]).to_str() );
-	
-		i+=1;
-	}
-	acc
-}
 
 
 
