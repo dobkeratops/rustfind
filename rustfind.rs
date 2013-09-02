@@ -92,7 +92,7 @@ fn main() {
     let args = os::args();
 
     let opts = ~[
-        optmulti("L"),optflag("d"),optflag("j"),optflag("h"),optflag("i"),optflag("g"),optflag("w"),optflag("f"),optopt("x")
+        optmulti("L"),optflag("d"),optflag("r"),optflag("j"),optflag("h"),optflag("i"),optflag("g"),optflag("w"),optflag("f"),optopt("x")
     ];
 
 	let matches = getopts(args.tail(), opts).unwrap();
@@ -105,17 +105,19 @@ fn main() {
 	};
 
 	if opt_present(&matches,"h") {
-		println("rustfind: useage:-");
+		println("rustfind: args/useage:-");
 		println(" filename.rs [-L<lib path>] : create linked html pages for sources in crate");
-		println(" -j filename.rs [-L<library path>]  : dump JSON map of the ast nodes & defintions");
+		println(" -r filename.rs [-L<library path>]  : dump .rfx 'crosscratemap'  containing ast nodes and jump definitions");
+		println(" -x where to look for html of external crates -  :eg rustfind filename mysource.rs -x ~/rust/src\n");
 		println(" cratename.rs anotherfile.rs:line:col:");
 		println("    - load cratename.rs; look for definition at anotherfile.rs:line:col");
 		println("    - where anotherfile.rs is assumed to be a module of the crate");
 		println(" -f filename.rs:line:col : return definition reference of symbol at given position");
 		println(" -i filename.rs [-L<lib path>] : interactive mode");
-		println(" -d filename.rs [-L<lib path>] : debug for this tool");
 		println(" -g format output as gedit filepos +line filename");
-		println(" -x where to look for html of external crates -  :eg rustfind filename mysource.rs -x ~/rust/src\n");
+		println(" debug opts:-\n");
+		println(" -j filename.rs [-L<library path>]  : dump JSON map of the ast nodes & defintions");
+		println(" -d filename.rs [-L<lib path>] : debug for this tool");
 		println(" set RUST_LIBS for a default library search path");
 	};
 	if matches.free.len()>0 {
@@ -144,11 +146,17 @@ fn main() {
 			rfserver::run_server(dc);
 			done=true;
 		}
+		if opt_present(&matches,"r") {
+			println("Writing .rfx ast nodes/cross-crate-map:-");
+			write_source_as_html_and_rfx(dc,lib_html_path, rust2html::DefaultOptions,false);
+			println("Writing .rfx .. done");
+			done=true;
+		}
 
 		// Dump as html..
 		if opt_present(&matches,"w") || !(done) {
-			println("Creating HTML pages from source:-");
-			write_source_as_html(dc,lib_html_path, rust2html::DefaultOptions);
+			println("Creating HTML pages from source & .rfx:-");
+			write_source_as_html_and_rfx(dc,lib_html_path, rust2html::DefaultOptions,true);
 			println("Creating HTML pages from source.. done");
 		}
 	}
@@ -268,7 +276,7 @@ fn debug_test(dc:&RFindCtx) {
 
 
 
-pub fn write_source_as_html(dc:&RFindCtx,lib_html_path:~str,opts:uint) {
+pub fn write_source_as_html_and_rfx(dc:&RFindCtx,lib_html_path:&str,opts:uint, write_html:bool) {
 
 	let mut xcm:~CrossCrateMap=~HashMap::new();
 	cstore::iter_crate_data(dc.tycx.cstore, |i,md| {
@@ -279,8 +287,10 @@ pub fn write_source_as_html(dc:&RFindCtx,lib_html_path:~str,opts:uint) {
 	});
 
     let (info_map,def_map,jump_map)=make_jdm(dc);
-	rust2html::write_source_as_html_sub(dc,info_map,jump_map,xcm,lib_html_path,opts);
 	crosscratemap::write_cross_crate_map(dc,lib_html_path,
         info_map,def_map,jump_map);
+	if write_html {
+		rust2html::write_source_as_html_sub(dc,info_map,jump_map,xcm,lib_html_path,opts);
+	}
 }
 
