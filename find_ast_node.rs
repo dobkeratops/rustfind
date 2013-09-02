@@ -345,7 +345,7 @@ impl KindToStr for ast::expr {
 	    ast::expr_log(_,_)=>"log",
 	    ast::expr_inline_asm(_)=>"inline_asm",
 	    ast::expr_mac(_)=>"mac",
-	    ast::expr_struct(_,_,_)=>"struct",
+	    ast::expr_struct(_,_,_)=>"expr_struct",
 	    ast::expr_repeat(_,_,_)=>"repeat",
 	    ast::expr_paren(_)=>"paren",
 		}
