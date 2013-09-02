@@ -47,9 +47,25 @@ pub fn read_cross_crate_map(dc:&RFindCtx, crate_num:int, crate_name:&str,lib_pat
 		if toks.len()>=6 {
 			match toks[0] {
 				"jdef"=> {
-					// special entries
+					// jimp- to def info, we dont need this here as we already generated it
+					// for the current crate. TODO , genarlized rfx would use it..
 				}
-				_=>{	// everything else is a node instance
+				"node"=> {// node cratename nodeid parentid sourcefile line col len type [ident]
+					//cratename is ignoredd, because we already know it.
+					// pareent id ignored, we use span information to reconstruct AST
+
+					let node_id:int=int::from_str(toks[2]).unwrap_or_default(0);
+					xcm.insert(ast::def_id{crate:crate_num, node:node_id,},
+						CrossCrateMapItem{
+							fname:	toks[4].to_owned(),
+							line:   uint::from_str(toks[5]).unwrap_or_default(0)-1,
+							col:	uint::from_str(toks[6]).unwrap_or_default(0),
+							len:	uint::from_str(toks[7]).unwrap_or_default(0)
+						}
+					);
+				}
+				// legacy noode definitons,no keyword
+				_=>{
 
 					let node_id:int=int::from_str(toks[1]).unwrap_or_default(0);
 					xcm.insert(ast::def_id{crate:crate_num, node:node_id,},
@@ -74,7 +90,7 @@ pub fn read_cross_crate_map(dc:&RFindCtx, crate_num:int, crate_name:&str,lib_pat
 pub fn write_cross_crate_map(dc:&RFindCtx,lib_html_path:~str,nim:&FNodeInfoMap, ndm:&HashMap<ast::NodeId, ast::def_id>, jdm:&JumpToDefMap) {
 	// write inter-crate node map
 	let crate_rel_path_name= dc.sess.codemap.files[0].name;
-	
+	let new_format:bool=true;
 
 	let curr_crate_name_only=crate_rel_path_name.split_iter('/').last().unwrap_or_default("").split_iter('.').nth(0).unwrap_or_default("");
 	println("writing rustfind cross-crate link info for "+curr_crate_name_only);
@@ -82,8 +98,19 @@ pub fn write_cross_crate_map(dc:&RFindCtx,lib_html_path:~str,nim:&FNodeInfoMap, 
 	// todo - idents to a seperate block, they're rare.
 	for (k,ni) in nim.iter() {
 		match ni.span.lo.to_text_file_pos(dc.tycx) {
-			Some(tfp)=>{	
-				outp.push_str(curr_crate_name_only+"\t"+k.to_str()+"\t"+tfp.name+"\t"+(tfp.line+1).to_str()+"\t"+tfp.col.to_str()+"\t"+(*ni.span.hi-*ni.span.lo).to_str() + "\t"+ni.kind+ "\t"+str_of_opt_ident(dc,ni.ident)+"\n");
+			Some(tfp)=>{
+				// new format, a little more verbose, 
+				// "node" cratename id parent_id filename line col len type [ident]
+				// and includes parnet id for easier reconstruction of full AST
+				if new_format {
+					outp.push_str(
+							"node\t"+
+							curr_crate_name_only+"\t"+k.to_str()+"\t"+ni.parent_id.to_str()+"\t"+tfp.name+"\t"+(tfp.line+1).to_str()+"\t"+tfp.col.to_str()+"\t"+(*ni.span.hi-*ni.span.lo).to_str() + "\t"+ni.kind+ "\t"+str_of_opt_ident(dc,ni.ident)+"\n");
+				} else 	{
+					// old format, relies on spans to reconstruct AST.
+					// cratename id filename line col len type [ident]
+					outp.push_str(curr_crate_name_only+"\t"+k.to_str()+"\t"+tfp.name+"\t"+(tfp.line+1).to_str()+"\t"+tfp.col.to_str()+"\t"+(*ni.span.hi-*ni.span.lo).to_str() + "\t"+ni.kind+ "\t"+str_of_opt_ident(dc,ni.ident)+"\n");
+				}
 			},
 			None=>{}
 		}

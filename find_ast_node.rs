@@ -58,6 +58,7 @@ pub struct FNodeInfo {
 	kind:~str,
 	span:codemap::span,
 	node:AstNode,
+	parent_id:ast::NodeId,
 }
 pub type FNodeInfoMap= hashmap::HashMap<ast::NodeId,FNodeInfo>;
 
@@ -171,10 +172,10 @@ pub fn build_node_info_map(c:@ast::Crate)->@mut FNodeInfoMap {
 		visit_struct_field:fcns_struct_field,
 		visit_generics:fcns_generics,
 
-		.. *default_visitor::<@mut FNodeInfoMap>()
+		.. *default_visitor::<(@mut FNodeInfoMap,ast::NodeId)>()
 		}
 	);
-	visit_crate(c,(node_spans,vt));
+	visit_crate(c,((node_spans,0/*0=root*/),vt));
 	node_spans
 }
 
@@ -653,13 +654,13 @@ pub fn get_ast_node_of_node_id(info:&FNodeInfoMap,id:ast::NodeId)->Option<AstNod
 	}
 }
 
-pub fn push_span(spt:&mut FNodeInfoMap,n:ast::NodeId,idt:Option<ast::ident>,k:&str, s:codemap::span,nd:AstNode) {
-	spt.insert(n,FNodeInfo{ident:nd.get_ident(), kind:k.to_str(),span:s,node:nd});
+pub fn push_span(spt:&mut FNodeInfoMap,n:ast::NodeId,p:ast::NodeId,idt:Option<ast::ident>,k:&str, s:codemap::span,nd:AstNode) {
+	spt.insert(n,FNodeInfo{ident:nd.get_ident(), kind:k.to_str(),span:s,node:nd, parent_id:p});
 }
 
-pub fn push_spanned<T:AstNodeAccessors>(spt:&mut FNodeInfoMap,k:&str,s:&codemap::spanned<T>,nd:AstNode) {
+pub fn push_spanned<T:AstNodeAccessors>(spt:&mut FNodeInfoMap,k:&str,s:&codemap::spanned<T>,nd:AstNode,p:ast::NodeId) {
 	match s.node.get_id() {
-		Some(id)=>{spt.insert(id,FNodeInfo{ident:nd.get_ident(), kind:k.to_str(),span:s.span,node:nd});}
+		Some(id)=>{spt.insert(id,FNodeInfo{ident:nd.get_ident(), kind:k.to_str(),span:s.span,node:nd, parent_id:p});}
 		None=>{}
 	}
 }
@@ -667,121 +668,126 @@ pub fn push_spanned<T:AstNodeAccessors>(spt:&mut FNodeInfoMap,k:&str,s:&codemap:
 pub fn span_contains(x:uint,s:codemap::span)->bool {
 	x>=*s.lo && x<*s.hi
 }
-type FNodeInfoMapSV = (@mut FNodeInfoMap, vt<@mut FNodeInfoMap>);
-fn fcns_view_item(a:&ast::view_item, (s,v):FNodeInfoMapSV) {
-	visit_view_item(a,(s,v))
+type FNodeInfoMapSV = (
+				(@mut FNodeInfoMap,ast::NodeId),  // state: accumulated infomap, parentNodeId
+				vt<(@mut FNodeInfoMap,ast::NodeId)>);	// visitor table for state
+
+fn fcns_view_item(a:&ast::view_item, ((s,p),v):FNodeInfoMapSV) {
+	visit_view_item(a,((s,p),v))
 }
 
-fn fcns_generics(g:&ast::Generics,(s,v):FNodeInfoMapSV) {
+fn fcns_generics(g:&ast::Generics,((s,p),v):FNodeInfoMapSV) {
 	for tp in g.ty_params.iter() {
 //		push_span(s, g.def_id.id, Some(g.ident), "ty_param_def", g.def_id.span, astnode_ty_param_def(tp))
 // todo - we dont have a span for the 'X' in <X>
 		for tb in tp.bounds.iter() {
 			match(tb) {
-				&ast::TraitTyParamBound(ref tr)=>fcns_trait_ref(tr,(s,v)),
+				&ast::TraitTyParamBound(ref tr)=>fcns_trait_ref(tr,((s,p),v)),
 				_=>{}
 			}
 		}
 	}
 }
 
-fn fcns_trait_ref(tr:&ast::trait_ref, (s,v):FNodeInfoMapSV) {
-	push_span(s, tr.ref_id, None, "trait_ref", tr.path.span, astnode_trait_ref(@tr.clone()))
+fn fcns_trait_ref(tr:&ast::trait_ref, ((s,p),v):FNodeInfoMapSV) {
+	push_span(s, tr.ref_id, p,None, "trait_ref", tr.path.span, astnode_trait_ref(@tr.clone()))
+	
 }
 
-fn fcns_variant(va:&ast::variant, (s,v):FNodeInfoMapSV) {
-	push_span(s, va.node.id, Some(va.node.name),"variant", va.span, astnode_variant(@va.clone()))
+fn fcns_variant(va:&ast::variant, ((s,p),v):FNodeInfoMapSV) {
+	push_span(s, va.node.id,p, Some(va.node.name),"variant", va.span, astnode_variant(@va.clone()))
+	//visit_item(va,(s,va.node.id,v)) - TODO , are we actually suppoed to iterate here? why was't it done
 }
 
-fn fcns_item(a:@ast::item, sv:FNodeInfoMapSV) {
-	let (s,v)=sv;
-	push_span(s,a.id,item_get_ident(a),a.kind_to_str(),a.span,astnode_item(a));
+fn fcns_item(a:@ast::item, spv:FNodeInfoMapSV) {
+	let ((s,p),v)=spv;
+	push_span(s,a.id,p,item_get_ident(a),a.kind_to_str(),a.span,astnode_item(a));
 	// todo: Push nodes for type-params... since we want to click on their defs...
 	match (a.node) {
 		ast::item_impl(ref g,ref o_traitref,ref self_ty, ref methods)=> {
 //			fcns_generics(g,sv);
 			match *o_traitref {
 				None=>{},
-				Some(ref tr)=>fcns_trait_ref(tr,sv)
+				Some(ref tr)=>fcns_trait_ref(tr,spv)
 			};
 			for m in methods.iter() {
-				push_span(s,m.id,Some(a.ident),"method",m.span,astnode_method(*m));
+				push_span(s,m.id,p,Some(a.ident),"method",m.span,astnode_method(*m));
 				// iterate sub??
 			}
 		},
 		ast::item_enum(ref ed, ref g)=>{
-			for v in ed.variants.iter() { fcns_variant(v,sv) } 
+			for v in ed.variants.iter() { fcns_variant(v,spv) } 
 		},
 //		ast::item_fn(_,_,_,ref g,ref b)=>{fcns_generics(g,sv);},
 //		ast::item_struct(_,ref g)=>{fcns_generics(g,sv);},
-		ast::item_trait(ref g,ref tr, ref tm)=>{/*fcns_generics(g,sv);*/ for t in tr.iter() {fcns_trait_ref(t,sv)} },
+		ast::item_trait(ref g,ref tr, ref tm)=>{/*fcns_generics(g,sv);*/ for t in tr.iter() {fcns_trait_ref(t,spv)} },
 		_ => {}
 	}
-	visit_item(a,sv)
+	visit_item(a,((s,a.id),v))
 }
-fn fcns_local(a:@ast::Local, (s,v):FNodeInfoMapSV) {
+fn fcns_local(a:@ast::Local, ((s,p),v):FNodeInfoMapSV) {
 //	push_spanned(s,"local",a);
 	// local var? pattern not ident..
-	push_span(s, a.id, None,"local",a.span,astnode_local(a));
-	visit_local(a,(s,v))
+	push_span(s, a.id, p,None,"local",a.span,astnode_local(a));
+	visit_local(a,((s,a.id),v))
 }
-fn fcns_block(a:&ast::Block, (s,v):FNodeInfoMapSV) {
+fn fcns_block(a:&ast::Block, ((s,p),v):FNodeInfoMapSV) {
 //	push_spanned(s,"block",a);
-	push_span(s, a.id, None, "block",a.span,astnode_none);
-	visit_block(a,(s,v))
+	push_span(s, a.id,p, None, "block",a.span,astnode_none);
+	visit_block(a,((s,a.id),v))
 }
-fn fcns_stmt(a:@ast::stmt, (s,v):FNodeInfoMapSV) {
-	push_spanned(s,"stmt",a,astnode_stmt(a));
-	visit_stmt(a,(s,v))
+fn fcns_stmt(a:@ast::stmt, ((s,p),v):FNodeInfoMapSV) {
+	push_spanned(s,"stmt",a,astnode_stmt(a),p);
+	visit_stmt(a,((s,p),v))
 }
-fn fcns_arm(a:&ast::arm, (s,v):FNodeInfoMapSV) {
+fn fcns_arm(a:&ast::arm, ((s,p),v):FNodeInfoMapSV) {
 //	push_spanned(s,"arm",&a.body);
 	// todo - does an arm even have a node id?
 //	push_span(s, a.body.id, None,"arm", a.span);
 // ERRORTODO..
-	visit_arm(a,(s,v))
+	visit_arm(a,((s,p),v))
 }
-fn fcns_pat(a:@ast::pat, (s,v):FNodeInfoMapSV) {
-	push_span(s,a.id,None,"pat",a.span,astnode_pat(a));
-	visit_pat(a,(s,v))
+fn fcns_pat(a:@ast::pat, ((s,p),v):FNodeInfoMapSV) {
+	push_span(s,a.id,p,None,"pat",a.span,astnode_pat(a));
+	visit_pat(a,((s,a.id),v))
 }
-fn fcns_decl(a:@ast::decl, (s,v):FNodeInfoMapSV) {
-	push_spanned(s,"decl",a,astnode_decl(a));
-	visit_decl(a,(s,v))
+fn fcns_decl(a:@ast::decl, ((s,p),v):FNodeInfoMapSV) {
+	push_spanned(s,"decl",a,astnode_decl(a),p);
+	visit_decl(a,((s,p),v))
 }
-fn fcns_struct_def(sd:@ast::struct_def, ide:ast::ident, g:&ast::Generics, id:ast::NodeId, sv:FNodeInfoMapSV) {
-	visit_struct_def(sd,ide,g,id,sv)
+fn fcns_struct_def(sd:@ast::struct_def, ide:ast::ident, g:&ast::Generics, id:ast::NodeId, ((s,p),v):FNodeInfoMapSV) {
+	visit_struct_def(sd,ide,g,id,((s,id),v))
 }
 
 // struct Visitor<E>.visit_expr: @fn(@expr, (E, vt<E>)),
-fn fcns_expr(a:@ast::expr, (s,v):FNodeInfoMapSV) {
-	push_span(s,a.id,expr_get_ident(a),a.kind_to_str(),a.span,astnode_expr(a));
-	visit_expr(a,(s,v))
+fn fcns_expr(a:@ast::expr, ((s,p),v):FNodeInfoMapSV) {
+	push_span(s,a.id,p,expr_get_ident(a),a.kind_to_str(),a.span,astnode_expr(a));
+	visit_expr(a,((s,a.id),v))
 }
 
 // struct Visitor<E>.visit_expr_post: @fn(@expr, (E, vt<E>)),
-fn fcns_expr_post(a:@ast::expr, (s,v):FNodeInfoMapSV) {
-	visit_expr(a,(s,v))
+fn fcns_expr_post(a:@ast::expr, ((s,p),v):FNodeInfoMapSV) {
+	visit_expr(a,((s,p),v))
 }
 
 // struct Visitor<E>.visit_ty: @fn(&Ty, (E, vt<E>)),
-fn fcns_ty(a:&ast::Ty, (s,v):FNodeInfoMapSV) {
+fn fcns_ty(a:&ast::Ty, ((s,p),v):FNodeInfoMapSV) {
 	//todo - can't we borrow? do we need opaque hack? can we access another way?
-	push_span(s,a.id,None,"ty",a.span,astnode_ty(@a.clone()));
-	visit_ty(a,(s,v))
+	push_span(s,a.id,p,None,"ty",a.span,astnode_ty(@a.clone()));
+	visit_ty(a,((s,a.id),v))
 }
-fn fcns_fn(fk:&oldvisit::fn_kind, fd:&ast::fn_decl, body:&ast::Block, sp:codemap::span, nid:ast::NodeId, (s,v):FNodeInfoMapSV) {
-	visit_fn(fk,fd,body,sp,nid,(s,v))
+fn fcns_fn(fk:&oldvisit::fn_kind, fd:&ast::fn_decl, body:&ast::Block, sp:codemap::span, nid:ast::NodeId, ((s,p),v):FNodeInfoMapSV) {
+	visit_fn(fk,fd,body,sp,nid,((s,nid),v))
 }
-fn fcns_struct_field(a:@ast::struct_field, (s,v):FNodeInfoMapSV) {
-	push_spanned(s,"struct_field",a,astnode_struct_field(a));
-	visit_struct_field(a,(s,v))
+fn fcns_struct_field(a:@ast::struct_field, ((s,p),v):FNodeInfoMapSV) {
+	push_spanned(s,"struct_field",a,astnode_struct_field(a),p);
+	visit_struct_field(a,((s,p),v))
 }
 
-fn fcns_type_method(a:&ast::TypeMethod, (s,v):FNodeInfoMapSV) {
+fn fcns_type_method(a:&ast::TypeMethod, ((s,p),v):FNodeInfoMapSV) {
 	//todo - can't we borrow? do we need opaque hack? can we access another way?
-	push_span(s,a.id,Some(a.ident),"type_method",a.span,astnode_ty_method(@a.clone()));
-	visit_ty_method(a,(s,v))
+	push_span(s,a.id,p,Some(a.ident),"type_method",a.span,astnode_ty_method(@a.clone()));
+	visit_ty_method(a,((s,a.id),v))
 }
 
 
