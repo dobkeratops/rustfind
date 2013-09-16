@@ -24,15 +24,15 @@ pub macro_rules! if_some {
 	);
 }
 
-pub type JumpToDefMap = HashMap<ast::NodeId,ast::def_id> ;
+pub type JumpToDefMap = HashMap<ast::NodeId,ast::DefId> ;
 
 
-pub fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, nodeinfomap:&FNodeInfoMap, node_def_node:&HashMap<ast::NodeId,ast::def_id>)->Option<ast::def_id> {
+pub fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, nodeinfomap:&FNodeInfoMap, node_def_node:&HashMap<ast::NodeId,ast::DefId>)->Option<ast::DefId> {
 	
 	match *node {
 		astnode_expr(e)=>match e.node {
 			// handle methods-calls
-			ast::expr_method_call(ref id,ref receiver,ref ident,ref ty_params,ref arg_exprs,ref call_sugar)=>{
+			ast::ExprMethodCall(ref id,ref receiver,ref ident,ref ty_params,ref arg_exprs,ref call_sugar)=>{
 				let rec_ty_node= astnode_expr(*receiver).ty_node_id();
 				let rec_ty_node1= dc.tycx.node_types.find(&(*id as uint));
 
@@ -43,7 +43,7 @@ pub fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, nodeinfomap:&FNodeInf
 						match mme.origin {
 							typeck::method_static(def_id)=> 
 								return Some(def_id),
-							typeck::method_trait(def_id,_)=>
+							typeck::MethodTrait(def_id,_)=>
 								return Some(def_id),
 							typeck::method_param(mp)=>{
 								match dc.tycx.trait_method_def_ids.find(&mp.trait_id) {
@@ -58,7 +58,7 @@ pub fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, nodeinfomap:&FNodeInf
 				}
 			},
 			// handle struct-fields? "object.field"
-			ast::expr_field(ref object_expr,ref ident,ref ty_params)=>{
+			ast::ExprField(ref object_expr,ref ident,ref ty_params)=>{
 				// we want the type of the object..
 				let obj_ty=dc.tycx.node_types.find(&(object_expr.id as uint));
 				let tydef=/*rf_ast_ut::*/auto_deref_ty(ty::get(*obj_ty.unwrap()));
@@ -80,7 +80,7 @@ pub fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, nodeinfomap:&FNodeInf
 	match node.ty_node_id() {
 		Some(id) =>{
 			let (def_id,opt_info)= def_info_from_node_id(dc,nodeinfomap,id); 
-			return if def_id != ast::def_id{crate:0,node:id} {Some(def_id)} else {None}
+			return if def_id != ast::DefId{crate:0,node:id} {Some(def_id)} else {None}
 /*			match opt_info {
 				Some(info)=> {
 					return Some(def_id);
@@ -100,7 +100,7 @@ pub fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, nodeinfomap:&FNodeInf
 	return None;
 }
 
-pub fn build_jump_to_def_map(dc:&RFindCtx, nim:@mut FNodeInfoMap,nd:&HashMap<ast::NodeId,ast::def_id>)->~JumpToDefMap{
+pub fn build_jump_to_def_map(dc:&RFindCtx, nim:@mut FNodeInfoMap,nd:&HashMap<ast::NodeId,ast::DefId>)->~JumpToDefMap{
 // todo: NodeId->AStNode  .. lookup_def_ inner functionality extracted
 	let mut jdm=~HashMap::new();
 	for (k,node_info) in nim.iter() {
@@ -117,7 +117,7 @@ pub fn build_jump_to_def_map(dc:&RFindCtx, nim:@mut FNodeInfoMap,nd:&HashMap<ast
 	jdm
 }
 
-pub fn def_info_from_node_id<'a,'b>(dc:&'a RFindCtx, node_info:&'b FNodeInfoMap, id:ast::NodeId)->(ast::def_id,Option<&'b FNodeInfo>) {
+pub fn def_info_from_node_id<'a,'b>(dc:&'a RFindCtx, node_info:&'b FNodeInfoMap, id:ast::NodeId)->(ast::DefId,Option<&'b FNodeInfo>) {
 	let crate_num=0;
 	match dc.tycx.def_map.find(&id) { // finds a def..
 		Some(a)=>{
@@ -128,10 +128,10 @@ pub fn def_info_from_node_id<'a,'b>(dc:&'a RFindCtx, node_info:&'b FNodeInfoMap,
 //					0=>(b.node,node_info.find(&b.node)),
 //					_ => (id as int, None)
 //				},
-				None=>(ast::def_id{crate:0,node:id as int},None)
+				None=>(ast::DefId{crate:0,node:id as int},None)
 			}
 		},
-		None=>(ast::def_id{crate:0,node:id as int},None)
+		None=>(ast::DefId{crate:0,node:id as int},None)
 	}
 }
 
@@ -235,11 +235,11 @@ pub fn lookup_def_of_node(dc:&RFindCtx,node:&AstNode,m:ShowDefMode)->Option<~str
 }
 
 
-pub fn lookup_def_of_node_sub(dc:&RFindCtx,node:&AstNode,m:ShowDefMode,nim:&FNodeInfoMap, node_def_node:&HashMap<ast::NodeId,ast::def_id>)->Option<~str> {
+pub fn lookup_def_of_node_sub(dc:&RFindCtx,node:&AstNode,m:ShowDefMode,nim:&FNodeInfoMap, node_def_node:&HashMap<ast::NodeId,ast::DefId>)->Option<~str> {
 	// TODO - cache outside?
 
 
-	fn mk_result(dc:&RFindCtx,  m:ShowDefMode, nim:&FNodeInfoMap, def_node_id:ast::def_id, extra_str:&str)->Option<~str> {
+	fn mk_result(dc:&RFindCtx,  m:ShowDefMode, nim:&FNodeInfoMap, def_node_id:ast::DefId, extra_str:&str)->Option<~str> {
 		if def_node_id.crate!=0 {
 			Some(~"{cross-crate-def not implemented, "+def_node_id.to_str()+"}")
 		}
@@ -267,7 +267,7 @@ pub fn lookup_def_of_node_sub(dc:&RFindCtx,node:&AstNode,m:ShowDefMode,nim:&FNod
 	}
 }
 
-pub fn make_jdm(dc:&RFindCtx)->(@mut FNodeInfoMap, ~HashMap<ast::NodeId,ast::def_id>,~JumpToDefMap) 
+pub fn make_jdm(dc:&RFindCtx)->(@mut FNodeInfoMap, ~HashMap<ast::NodeId,ast::DefId>,~JumpToDefMap) 
 {
     let nim=build_node_info_map(dc.crate);
     let ndm=build_node_def_node_table(dc);

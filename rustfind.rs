@@ -177,7 +177,7 @@ fn get_ast_and_resolve(
         ..  (*rustc::driver::session::basic_options()).clone()
     };
 	let quiet=true;
-	fn no_emit(cmsp: Option<(@codemap::CodeMap, codemap::span)>, msg: &str, lvl: syntax::diagnostic::level) {
+	fn no_emit(cmsp: Option<(@codemap::CodeMap, codemap::Span)>, msg: &str, lvl: syntax::diagnostic::level) {
 	}
 
 
@@ -234,7 +234,7 @@ fn debug_test(dc:&RFindCtx) {
 
 
 		if_some!(id in nodetloc.last().ty_node_id() then {
-			logi!("source=",get_node_source(dc.tycx, node_info_map,ast::def_id{crate:0,node:id}));
+			logi!("source=",get_node_source(dc.tycx, node_info_map,ast::DefId{crate:0,node:id}));
 			if_some!(t in safe_node_id_to_type(dc.tycx, id) then {
 				println(fmt!("typeinfo: %?",
 					{let ntt= rustc::middle::ty::get(t); ntt}));
@@ -260,7 +260,7 @@ fn debug_test(dc:&RFindCtx) {
 	let ospan=ZTextFilePosLen::new("test_input2.rs", 10-1,0,32).to_byte_pos(dc.tycx);
 	if_some!(x in ospan then {
 		let (lo,hi)=x;
-		logi!(get_span_str(dc.tycx, &codemap::span{lo:lo,hi:hi,expn_info:None} ));
+		logi!(get_span_str(dc.tycx, &codemap::Span{lo:lo,hi:hi,expn_info:None} ));
 	});
 	dump!(codemaput::zget_file_line_str(dc.tycx,"test_input2.rs",5-1));
 	dump!(codemaput::zget_file_line_str(dc.tycx,"test_input.rs",9-1));
