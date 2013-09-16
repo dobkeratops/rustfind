@@ -27,7 +27,7 @@ pub struct CrossCrateMapItem {
 	len:uint
 }
 
-pub type CrossCrateMap = HashMap<ast::def_id,CrossCrateMapItem>;
+pub type CrossCrateMap = HashMap<ast::DefId,CrossCrateMapItem>;
 
 
 pub fn read_cross_crate_map(dc:&RFindCtx, crate_num:int, crate_name:&str,lib_path:&str)->~CrossCrateMap {
@@ -36,7 +36,7 @@ pub fn read_cross_crate_map(dc:&RFindCtx, crate_num:int, crate_name:&str,lib_pat
 		println("loading lib crosscratemap "+lib_path+"/"+crate_name);
 		raw_bytes=fileLoad(lib_path+"/"+crate_name);
 	}
-	let rfx=str::from_bytes(raw_bytes);
+	let rfx=str::from_utf8(raw_bytes);
 	println("loaded cratemap "+rfx.len().to_str()+"bytes"+" as crate "+crate_num.to_str());
 //	for &x in raw_bytes.iter() { rfx.push_char(x as char); }
 
@@ -55,7 +55,7 @@ pub fn read_cross_crate_map(dc:&RFindCtx, crate_num:int, crate_name:&str,lib_pat
 					// pareent id ignored, we use span information to reconstruct AST
 
 					let node_id:int=int::from_str(toks[2]).unwrap_or_default(0);
-					xcm.insert(ast::def_id{crate:crate_num, node:node_id,},
+					xcm.insert(ast::DefId{crate:crate_num, node:node_id,},
 						CrossCrateMapItem{
 							fname:	toks[4].to_owned(),
 							line:   uint::from_str(toks[5]).unwrap_or_default(0)-1,
@@ -68,7 +68,7 @@ pub fn read_cross_crate_map(dc:&RFindCtx, crate_num:int, crate_name:&str,lib_pat
 				_=>{
 
 					let node_id:int=int::from_str(toks[1]).unwrap_or_default(0);
-					xcm.insert(ast::def_id{crate:crate_num, node:node_id,},
+					xcm.insert(ast::DefId{crate:crate_num, node:node_id,},
 						CrossCrateMapItem{
 							fname:	toks[2].to_owned(),
 							line:   uint::from_str(toks[3]).unwrap_or_default(0)-1,
@@ -87,7 +87,7 @@ pub fn read_cross_crate_map(dc:&RFindCtx, crate_num:int, crate_name:&str,lib_pat
 
 
 
-pub fn write_cross_crate_map(dc:&RFindCtx,lib_html_path:&str,nim:&FNodeInfoMap, ndm:&HashMap<ast::NodeId, ast::def_id>, jdm:&JumpToDefMap) {
+pub fn write_cross_crate_map(dc:&RFindCtx,lib_html_path:&str,nim:&FNodeInfoMap, ndm:&HashMap<ast::NodeId, ast::DefId>, jdm:&JumpToDefMap) {
 	// write inter-crate node map
 	let crate_rel_path_name= dc.sess.codemap.files[0].name;
 	let new_format:bool=true;

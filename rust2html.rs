@@ -592,7 +592,7 @@ fn resolve_link(link:i64, dc:&RFindCtx,fm:&codemap::FileMap,lib_path:&str, nmaps
 		{
 			let def_crate = (link>>48) as int;
 			let def_node=(link&((1<<48)-1)) as int;
-			match xcm.find(&ast::def_id{crate:def_crate,node:def_node}) {
+			match xcm.find(&ast::DefId{crate:def_crate,node:def_node}) {
 				None=>//"#n"+def_node.to_str(), by node linnk
 				{
 					match (nmaps.nim,def_node).to_index_file_pos(dc.tycx) {
