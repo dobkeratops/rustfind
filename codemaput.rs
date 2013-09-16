@@ -128,7 +128,7 @@ impl ZTextFilePos {
 				self.to_byte_pos_len(cx,len);
 		match  a  {
 			Some((bp_lo,bp_hi))=>get_span_str(cx,
-				&codemap::span{lo:bp_lo,hi:bp_hi,expn_info:None}
+				&codemap::Span{lo:bp_lo,hi:bp_hi,expn_info:None}
 			),
 			None=>~""
 		}
@@ -153,7 +153,7 @@ impl ZTextFilePosLen {
 	}
 }
 
-pub fn get_span_str(c:ty::ctxt, sp:&codemap::span)->~str {
+pub fn get_span_str(c:ty::ctxt, sp:&codemap::Span)->~str {
 	let loc_lo=c.sess.codemap.lookup_char_pos(sp.lo);
 	let loc_hi=c.sess.codemap.lookup_char_pos(sp.hi);
 	// TODO-assert both in same file!
@@ -259,7 +259,7 @@ pub fn get_crate_name(tc:ty::ctxt, i:ast::CrateNum)->~str {
 	}
 }
 
-pub fn text_span<'a,'b>(text:&'a [u8],s:&'b codemap::span)->&'a[u8] {
+pub fn text_span<'a,'b>(text:&'a [u8],s:&'b codemap::Span)->&'a[u8] {
 	text.slice(*s.lo,*s.hi)
 }
 
@@ -340,11 +340,11 @@ pub fn zget_file_line_str(cx:ty::ctxt, filename:&str, src_line:uint)->~str {
 	return ~"";
 }
 
-pub fn dump_span(text:&[u8], sp:&codemap::span) {
+pub fn dump_span(text:&[u8], sp:&codemap::Span) {
 
 	let line_col=text_offset_to_line_pos(text, *sp.lo);
 	logi!(" line,ofs=",line_col.to_str()," text=\'",
-		str::from_bytes(text_span(text,sp)),"\'");
+		str::from_utf8(text_span(text,sp)),"\'");
 }
 
 
