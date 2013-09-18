@@ -45,20 +45,20 @@ pub macro_rules! if_some {
 		}
 	);
 }
-pub macro_rules! tlogi{ 
+pub macro_rules! tlogi{
 	($($a:expr),*)=>(println((file!()+":"+line!().to_str()+": " $(+$a.to_str())*) ))
 }
-pub macro_rules! logi{ 
+pub macro_rules! logi{
 	($($a:expr),*)=>(println(""$(+$a.to_str())*) )
 }
 //macro_rules! dump{ ($a:expr)=>(logi!(fmt!("%s=%?",stringify!($a),$a).indent(2,160));)}
 macro_rules! dump{ ($($a:expr),*)=>
-	(	{	let mut txt=~""; 
+	(	{	let mut txt=~"";
 			$( { txt=txt.append(
-				 fmt!("%s=%?",stringify!($a),$a)+",") 
+				 fmt!("%s=%?",stringify!($a),$a)+",")
 				}
-			);*; 
-			logi!(txt); 
+			);*;
+			logi!(txt);
 		}
 	)
 }
@@ -125,7 +125,7 @@ fn main() {
 		let filename=util::get_filename_only(matches.free[0]);
 		let dc = @get_ast_and_resolve(&Path(filename), libs);
 		local_data::set(ctxtkey, dc);
-	
+
 		if (opt_present(&matches,"d")) {
 			debug_test(dc);
 			done=true;
@@ -137,7 +137,7 @@ fn main() {
 		if (opt_present(&matches,"f")) {
 			while i<matches.free.len() {
 				let mode=if opt_present(&matches,"g"){SDM_GeditCmd} else {SDM_Source};
-				print(lookup_def_at_text_file_pos_str(dc,matches.free[i],mode).unwrap_or_default(~"no def found\n"));
+				print(lookup_def_at_text_file_pos_str(dc,matches.free[i],mode).unwrap_or(~"no def found\n"));
 				i+=1;
 				done=true;
 			}
@@ -165,8 +165,8 @@ fn main() {
 /// tags: crate,ast,parse resolve
 /// Parses, resolves the given crate
 fn get_ast_and_resolve(
-	cpath: &std::path::PosixPath, 
-	libs: ~[std::path::PosixPath]) 
+	cpath: &std::path::PosixPath,
+	libs: ~[std::path::PosixPath])
 	-> RFindCtx {
 
     let parsesess = parse::new_parse_sess(None);
@@ -194,8 +194,8 @@ fn get_ast_and_resolve(
 
 	let crate1=driver::driver::phase_1_parse_input(sess,cfg.clone(),&input);
 	let crate2=driver::driver::phase_2_configure_and_expand(sess,cfg,crate1);
-	
-	let ca=driver::driver::phase_3_run_analysis_passes(sess,crate2);  
+
+	let ca=driver::driver::phase_3_run_analysis_passes(sess,crate2);
     RFindCtx { crate: crate2, tycx: ca.ty_cx, sess: sess, ca:ca }
 }
 
@@ -240,7 +240,7 @@ fn debug_test(dc:&RFindCtx) {
 					{let ntt= rustc::middle::ty::get(t); ntt}));
 				dump!(id,dc.tycx.def_map.find(&id));
 				});
-			let (def_id,opt_info)= def_info_from_node_id(dc,node_info_map,id); 
+			let (def_id,opt_info)= def_info_from_node_id(dc,node_info_map,id);
 			if_some!(info in opt_info then{
 				logi!("src node=",id," def node=",def_id,
 					" span=",fmt!("%?",info.span));
@@ -264,14 +264,14 @@ fn debug_test(dc:&RFindCtx) {
 	});
 	dump!(codemaput::zget_file_line_str(dc.tycx,"test_input2.rs",5-1));
 	dump!(codemaput::zget_file_line_str(dc.tycx,"test_input.rs",9-1));
-	
+
 	logi!("\n====test full file:pos lookup====");
 	dump!(lookup_def_at_text_file_pos(dc, &ZTextFilePos::new("test_input.rs",8-1,21),SDM_Source));println("");
 	dump!(lookup_def_at_text_file_pos(dc, &ZTextFilePos::new("test_input2.rs",3-1,12),SDM_Source));println("");
 	dump!(lookup_def_at_text_file_pos(dc, &ZTextFilePos::new("test_input.rs",10-1,8),SDM_Source));println("");
 	dump!(lookup_def_at_text_file_pos(dc, &ZTextFilePos::new("test_input.rs",13-1,16),SDM_Source));println("");
 	dump!(lookup_def_at_text_file_pos(dc, &ZTextFilePos::new("test_input.rs",11-1,10),SDM_Source));println("");
-	
+
 }
 
 

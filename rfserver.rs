@@ -36,11 +36,10 @@ pub fn run_server(dc:&RFindCtx) {
 					let cmd=toks[0];
 					let cmd1=match cmd[0] as char { '0'..'9'=>curr_file+":"+cmd,_=>cmd.to_str() };
 					let subtoks:~[&str]=cmd1.split_iter(':').collect();
-					curr_file=find_file_name_in(dc, subtoks[0].to_str()).unwrap_or_default(curr_file);
+					curr_file=find_file_name_in(dc, subtoks[0].to_str()).unwrap_or(curr_file);
 					//dump!(cmd1,subtoks,curr_file);
 					let def=lookup_def_at_text_file_pos_str(dc, cmd1,SDM_Source);
-					print(def.unwrap_or_default
-					(~"no def found\n"));
+					print(def.unwrap_or(~"no def found\n"));
 					//println(def_of_symbol_to_str(dc,node_spans,node_def_node,toks[0]));
 				}
 			}
