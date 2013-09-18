@@ -44,7 +44,8 @@ pub fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, nodeinfomap:&FNodeInf
 							typeck::method_static(def_id)=>
 								return Some(def_id),
 							typeck::method_object(mp)=>
-								return Some(mp.trait_id),
+// 								return Some(mp.trait_id),
+								return None,
 							typeck::method_param(mp)=>{
 								match dc.tycx.trait_method_def_ids.find(&mp.trait_id) {
 									None=>{},

@@ -7,6 +7,11 @@ pub use std::ptr::*;
 pub use std::sys::*;	// for size_of
 pub use std::vec::*;
 pub use std::num::*;
+use std::rt::io::{buffered, file};
+use std::rt::io;
+use std::rt::io::extensions::ReaderUtil;
+use std::rt::io::support::PathLike;
+use std::path::PosixPath;
 
 pub type Size_t=u64;	// todo - we're not sure this should be u64
 						// as the libc stuff seems to want.

@@ -1,18 +1,21 @@
 use std::str;
+use std::hashmap::HashMap;
+use std::iter::range_inclusive;
+
 pub struct HtmlWriter {
 	doc:~str,
 	tag_stack:~[~str],
-	xlat:~[~str]
+	xlat:HashMap<char, ~str>,
 }
 
 /// convert u8 into html char.
-fn mk_xlat_table()->~[~str]
+fn mk_xlat_table()-> HashMap<char,~str>
 {
-	let mut xlat=~[];
-	let mut i=0u8;
-	while i<256 {
+	let mut xlat= HashMap::new();
+// 	let mut i=0u8;
+	for i in range_inclusive(0u8, 255) {
 
-		xlat.push(
+		xlat.insert(i as char,
 			match i as char{
 			' ' =>~"&nbsp;",
 			'<' =>~"&lt;",
@@ -21,8 +24,6 @@ fn mk_xlat_table()->~[~str]
 			'\t' =>~"&nbsp;&nbsp;&nbsp;&nbsp;",
 			c=>str::from_char(i as char)//x.slice(0,1)
 			});
-
-		i+=1;
 	}
 	xlat
 }
@@ -78,7 +79,7 @@ impl<'self> HtmlWriter {
 	}
 	pub fn write(&'self mut self,t:&str)->&'self mut HtmlWriter {
 		for x in t.iter() {
-			self.doc.push_str(self.xlat[x as u32]);
+			self.doc.push_str(self.xlat.get(&x).clone());
 		};
 		self
 	}
@@ -97,7 +98,7 @@ impl<'self> HtmlWriter {
 		self.write(text).write_tag("br")
 	}
 	pub fn write_u8_(&'self mut self, x:u8)->&'self mut HtmlWriter {
-		self.doc.push_str(self.xlat[x]);
+		self.doc.push_str(self.xlat.get(&(x as char)).to_owned());
 		self
 	}
 	pub fn begin_tag_anchor(&'self mut self, anchor:&str)->&'self mut HtmlWriter {

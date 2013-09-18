@@ -9,8 +9,9 @@ use rustc::metadata::cstore;
 use rfindctx::{str_of_opt_ident};
 use find_ast_node::FNodeInfoMap;
 use jumptodefmap::*;
-use ioutil::*;
+use ioutil;
 use rfindctx::*;
+
 /*new file*/
 
 pub type ZeroBasedIndex=uint;
@@ -31,10 +32,10 @@ pub type CrossCrateMap = HashMap<ast::DefId,CrossCrateMapItem>;
 
 
 pub fn read_cross_crate_map(dc:&RFindCtx, crate_num:int, crate_name:&str,lib_path:&str)->~CrossCrateMap {
-	let mut raw_bytes=fileLoad(crate_name);
+	let mut raw_bytes=ioutil::fileLoad(crate_name);
 	if (raw_bytes.len()==0) {
 		println("loading lib crosscratemap "+lib_path+"/"+crate_name);
-		raw_bytes=fileLoad(lib_path+"/"+crate_name);
+		raw_bytes=ioutil::fileLoad(lib_path+"/"+crate_name);
 	}
 	let rfx=str::from_utf8(raw_bytes);
 	println("loaded cratemap "+rfx.len().to_str()+"bytes"+" as crate "+crate_num.to_str());
@@ -133,6 +134,6 @@ pub fn write_cross_crate_map(dc:&RFindCtx,lib_html_path:&str,nim:&FNodeInfoMap, 
 
 	{	let x=curr_crate_name_only+~".rfx";
 		println("writing "+x);
-		fileSaveStr(outp, x);
+		ioutil::fileSaveStr(outp, x);
 	}
 }
