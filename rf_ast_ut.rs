@@ -7,11 +7,11 @@ pub fn auto_deref_ty<'a>(t:&'a ty::t_box_)->&'a ty::t_box_ {
 	match t.sty {
 		ty::ty_box(mt)|ty::ty_ptr(mt)|ty::ty_uniq(mt)|ty::ty_rptr(_,mt)=>{
 			ty::get(mt.ty)
-		},	
+		},
 		_=>t
 	}
 }
- 
+
 
 pub fn dump_ctxt_def_map(tycx:ty::ctxt) {
 //	let a:()=ctxt.tycx.node_types
@@ -35,7 +35,7 @@ pub fn dump_methods_of_t(tycx:&ty::ctxt_, t:*ty::t_opaque) {
 pub fn dump_methods_of_type(tycx:&ty::ctxt_, type_node_id:ast::NodeId) {
 	let ot = tycx.node_types.find(&(type_node_id as uint));
 	match ot {
-		None=> {}, 
+		None=> {},
 		Some(t)=> {
 			for (&k,&method) in tycx.methods.iter() {
 				dump!(method.transformed_self_ty, ot);
@@ -69,7 +69,7 @@ pub fn find_named_struct_field(tc:&ty::ctxt_, struct_node_id:ast::NodeId, field_
 		Some((it,sd,ge))=>{
 			for f in sd.fields.iter() {
 				match f.node.kind {
-					ast::named_field(ref ident,vis)=>if *ident==*field_ident {return Some(ast::DefId{crate:0,node:f.node.id});},
+					ast::named_field(ref ident,vis)=>if ident.name ==field_ident.name {return Some(ast::DefId{crate:0,node:f.node.id});},
 					_=>return None
 				}
 			}

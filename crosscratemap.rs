@@ -9,9 +9,10 @@ use rustc::metadata::cstore;
 use rfindctx::{str_of_opt_ident};
 use find_ast_node::FNodeInfoMap;
 use jumptodefmap::*;
-use ioutil::*;
+use ioutil;
 use rfindctx::*;
-/*new file*/  
+
+/*new file*/
 
 pub type ZeroBasedIndex=uint;
 
@@ -22,7 +23,7 @@ pub type ZeroBasedIndex=uint;
 #[deriving(Clone)]
 pub struct CrossCrateMapItem {
 	fname:~str,
-	line:ZeroBasedIndex,	
+	line:ZeroBasedIndex,
 	col:uint,
 	len:uint
 }
@@ -31,10 +32,10 @@ pub type CrossCrateMap = HashMap<ast::DefId,CrossCrateMapItem>;
 
 
 pub fn read_cross_crate_map(dc:&RFindCtx, crate_num:int, crate_name:&str,lib_path:&str)->~CrossCrateMap {
-	let mut raw_bytes=fileLoad(crate_name);
+	let mut raw_bytes=ioutil::fileLoad(crate_name);
 	if (raw_bytes.len()==0) {
 		println("loading lib crosscratemap "+lib_path+"/"+crate_name);
-		raw_bytes=fileLoad(lib_path+"/"+crate_name);
+		raw_bytes=ioutil::fileLoad(lib_path+"/"+crate_name);
 	}
 	let rfx=str::from_utf8(raw_bytes);
 	println("loaded cratemap "+rfx.len().to_str()+"bytes"+" as crate "+crate_num.to_str());
@@ -54,26 +55,26 @@ pub fn read_cross_crate_map(dc:&RFindCtx, crate_num:int, crate_name:&str,lib_pat
 					//cratename is ignoredd, because we already know it.
 					// pareent id ignored, we use span information to reconstruct AST
 
-					let node_id:int=int::from_str(toks[2]).unwrap_or_default(0);
+					let node_id:int= from_str(toks[2]).unwrap_or(0);
 					xcm.insert(ast::DefId{crate:crate_num, node:node_id,},
 						CrossCrateMapItem{
 							fname:	toks[4].to_owned(),
-							line:   uint::from_str(toks[5]).unwrap_or_default(0)-1,
-							col:	uint::from_str(toks[6]).unwrap_or_default(0),
-							len:	uint::from_str(toks[7]).unwrap_or_default(0)
+							line:   from_str(toks[5]).unwrap_or(0)-1,
+							col:	from_str(toks[6]).unwrap_or(0),
+							len:	from_str(toks[7]).unwrap_or(0)
 						}
 					);
 				}
 				// legacy noode definitons,no keyword
 				_=>{
 
-					let node_id:int=int::from_str(toks[1]).unwrap_or_default(0);
+					let node_id:int=from_str(toks[1]).unwrap_or(0);
 					xcm.insert(ast::DefId{crate:crate_num, node:node_id,},
 						CrossCrateMapItem{
 							fname:	toks[2].to_owned(),
-							line:   uint::from_str(toks[3]).unwrap_or_default(0)-1,
-							col:	uint::from_str(toks[4]).unwrap_or_default(0),
-							len:	uint::from_str(toks[5]).unwrap_or_default(0)
+							line:   from_str(toks[3]).unwrap_or(0)-1,
+							col:	from_str(toks[4]).unwrap_or(0),
+							len:	from_str(toks[5]).unwrap_or(0)
 						}
 					);
 				}
@@ -92,14 +93,14 @@ pub fn write_cross_crate_map(dc:&RFindCtx,lib_html_path:&str,nim:&FNodeInfoMap, 
 	let crate_rel_path_name= dc.sess.codemap.files[0].name;
 	let new_format:bool=true;
 
-	let curr_crate_name_only=crate_rel_path_name.split_iter('/').last().unwrap_or_default("").split_iter('.').nth(0).unwrap_or_default("");
+	let curr_crate_name_only=crate_rel_path_name.split_iter('/').last().unwrap_or("").split_iter('.').nth(0).unwrap_or("");
 	println("writing rustfind cross-crate link info for "+curr_crate_name_only);
 	let mut outp=~"";
 	// todo - idents to a seperate block, they're rare.
 	for (k,ni) in nim.iter() {
 		match ni.span.lo.to_text_file_pos(dc.tycx) {
 			Some(tfp)=>{
-				// new format, a little more verbose, 
+				// new format, a little more verbose,
 				// "node" cratename id parent_id filename line col len type [ident]
 				// and includes parnet id for easier reconstruction of full AST
 				if new_format {
@@ -115,7 +116,7 @@ pub fn write_cross_crate_map(dc:&RFindCtx,lib_html_path:&str,nim:&FNodeInfoMap, 
 			None=>{}
 		}
 	}
-	
+
 	for (k,v) in jdm.iter()  {
 		let cname:~str= if v.crate>0 {
 			cstore::get_crate_data(dc.tycx.cstore,v.crate).name.to_str()
@@ -124,15 +125,15 @@ pub fn write_cross_crate_map(dc:&RFindCtx,lib_html_path:&str,nim:&FNodeInfoMap, 
 		};
 		//println(cdata.name);
 		outp.push_str("jdef\t"+k.to_str()+"\t"+cname+"\t" +v.node.to_str()+"\n");
-	}	
+	}
 
 //	for (k,v) in ndm.iter()  {
 //		outp.push_str("def\t"+k.to_str()+"\t"+dc.tycx.cstore.crate() +v.node.to_str()+"\n");
-//	}	
+//	}
 
-	
+
 	{	let x=curr_crate_name_only+~".rfx";
 		println("writing "+x);
-		fileSaveStr(outp, x);
-	}	
+		ioutil::fileSaveStr(outp, x);
+	}
 }
