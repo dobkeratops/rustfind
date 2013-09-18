@@ -9,9 +9,9 @@ pub struct HtmlWriter {
 fn mk_xlat_table()->~[~str]
 {
 	let mut xlat=~[];
-	let mut i=0;
+	let mut i=0u8;
 	while i<256 {
-		
+
 		xlat.push(
 			match i as char{
 			' ' =>~"&nbsp;",
@@ -72,13 +72,13 @@ impl<'self> HtmlWriter {
 	}
 	pub fn end_all_tags(&'self mut self)->&'self mut HtmlWriter {
 		while self.tag_stack.len()>0 {
-			self.end_tag();		
+			self.end_tag();
 		}
 		self
 	}
 	pub fn write(&'self mut self,t:&str)->&'self mut HtmlWriter {
 		for x in t.iter() {
-			self.doc.push_str(self.xlat[x]);
+			self.doc.push_str(self.xlat[x as u32]);
 		};
 		self
 	}

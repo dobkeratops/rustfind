@@ -28,7 +28,7 @@ pub type JumpToDefMap = HashMap<ast::NodeId,ast::DefId> ;
 
 
 pub fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, nodeinfomap:&FNodeInfoMap, node_def_node:&HashMap<ast::NodeId,ast::DefId>)->Option<ast::DefId> {
-	
+
 	match *node {
 		astnode_expr(e)=>match e.node {
 			// handle methods-calls
@@ -41,10 +41,10 @@ pub fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, nodeinfomap:&FNodeInf
 					Some(mme)=>{
 						//logi!("Method Map entry for",e.id);
 						match mme.origin {
-							typeck::method_static(def_id)=> 
+							typeck::method_static(def_id)=>
 								return Some(def_id),
-							typeck::MethodTrait(def_id,_)=>
-								return Some(def_id),
+							typeck::method_object(mp)=>
+								return Some(mp.trait_id),
 							typeck::method_param(mp)=>{
 								match dc.tycx.trait_method_def_ids.find(&mp.trait_id) {
 									None=>{},
@@ -64,7 +64,7 @@ pub fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, nodeinfomap:&FNodeInf
 				let tydef=/*rf_ast_ut::*/auto_deref_ty(ty::get(*obj_ty.unwrap()));
 				match tydef.sty {
 					ty::ty_struct(def,_)=> {
-						let node_to_show=/*rf_ast_ut::*/find_named_struct_field(dc.tycx, def.node, ident).unwrap_or_default(def);
+						let node_to_show=/*rf_ast_ut::*/find_named_struct_field(dc.tycx, def.node, ident).unwrap_or(def);
 						return Some(node_to_show);//mk_result(dc,m,node_spans,node_to_show,"(struct_field)");
 					},
 					_=>return None
@@ -79,14 +79,14 @@ pub fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, nodeinfomap:&FNodeInf
 	// handle everything else
 	match node.ty_node_id() {
 		Some(id) =>{
-			let (def_id,opt_info)= def_info_from_node_id(dc,nodeinfomap,id); 
+			let (def_id,opt_info)= def_info_from_node_id(dc,nodeinfomap,id);
 			return if def_id != ast::DefId{crate:0,node:id} {Some(def_id)} else {None}
 /*			match opt_info {
 				Some(info)=> {
 					return Some(def_id);
 				},
 				_=>{ println("can't find def for"+node.get_id().to_str()+".ty_node_id="+id.to_str()); //return None;
-					//let (def_id,opt_info)= def_info_from_node_id(dc,nodeinfomap,node.get_id().unwrap()); 
+					//let (def_id,opt_info)= def_info_from_node_id(dc,nodeinfomap,node.get_id().unwrap());
 					//match opt_info {
 					//	Some(info)=> {return Some(def_id);}
 					//	None=>{}
@@ -107,7 +107,7 @@ pub fn build_jump_to_def_map(dc:&RFindCtx, nim:@mut FNodeInfoMap,nd:&HashMap<ast
 		match lookup_def_node_of_node(dc,&node_info.node,nim,nd) {
 			None=>{},
 			Some(def_node_id)=>{
-//				if *k != def_node_id.node && def_node_id.crate==0 || (def_node_id.crate!=0) 
+//				if *k != def_node_id.node && def_node_id.crate==0 || (def_node_id.crate!=0)
 				{
 					jdm.insert(*k,def_node_id);
 				}
@@ -139,7 +139,7 @@ pub fn def_info_from_node_id<'a,'b>(dc:&'a RFindCtx, node_info:&'b FNodeInfoMap,
 
 pub fn dump_json(dc:&RFindCtx) {
 	// TODO: full/partial options - we currently wwrite out all the nodes we find.
-	// need option to only write out nodes that map to definitons. 
+	// need option to only write out nodes that map to definitons.
 	println("{");
 	println("\tcode_map:[");
 //	for dc.sess.codemap.files.iter().advance |f| {
@@ -155,7 +155,7 @@ pub fn dump_json(dc:&RFindCtx) {
 	let nim=build_node_info_map(dc.crate);
 	let node_def_node = build_node_def_node_table(dc);
 	let jdm=build_jump_to_def_map(dc,nim,node_def_node);
-	println(nim.to_json_str(dc));	
+	println(nim.to_json_str(dc));
 	println(",");
 	println("\tnode_defs [\n");
 	println(jdm.to_json_str());
@@ -172,8 +172,8 @@ fn lookup_def_at_file_line_pos_old(dc:&RFindCtx,filepos:&str, show_all:ShowDefMo
 	if toks.len()<3 { return None }
 
 //	let line:Option<uint> = FromStr::from_str(toks[1]);
-	if_some!(line in FromStr::from_str::<uint>(toks[1]) then {
-		if_some!(col in FromStr::from_str::<uint>(toks[2]) then {
+	if_some!(line in from_str::<uint>(toks[1]) then {
+		if_some!(col in from_str::<uint>(toks[2]) then {
 			//todo - if no column specified, just lookup everything on that line!
 
 			match ZTextFilePos::new(toks[0],line-1,col-1).to_byte_pos(dc.tycx) {
@@ -228,7 +228,7 @@ pub fn lookup_def_of_node_tree_loc(dc:&RFindCtx,node_tree_loc:&NodeTreeLoc,m:Sho
 }
 
 pub fn lookup_def_of_node(dc:&RFindCtx,node:&AstNode,m:ShowDefMode)->Option<~str> {
-	println("def of node:"+node.get_id().unwrap_or_default(0).to_str());
+	println("def of node:"+node.get_id().unwrap_or(0).to_str());
 	let node_spans=build_node_info_map(dc.crate);
 	let node_def_node = build_node_def_node_table(dc);
 	lookup_def_of_node_sub(dc,node,m,node_spans,node_def_node)
@@ -267,7 +267,7 @@ pub fn lookup_def_of_node_sub(dc:&RFindCtx,node:&AstNode,m:ShowDefMode,nim:&FNod
 	}
 }
 
-pub fn make_jdm(dc:&RFindCtx)->(@mut FNodeInfoMap, ~HashMap<ast::NodeId,ast::DefId>,~JumpToDefMap) 
+pub fn make_jdm(dc:&RFindCtx)->(@mut FNodeInfoMap, ~HashMap<ast::NodeId,ast::DefId>,~JumpToDefMap)
 {
     let nim=build_node_info_map(dc.crate);
     let ndm=build_node_def_node_table(dc);
