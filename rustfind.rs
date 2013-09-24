@@ -133,7 +133,7 @@ fn main() {
 			dump_json(dc);
 		}
 		let mut i=0;
-		let lib_html_path=if matches.opt_present("x"){ matches.opt_str("x")} else {~""};
+		let lib_html_path=if matches.opt_present("x"){ matches.opt_str("x").unwrap()} else {~""};
 		if (matches.opt_present("f")) {
 			while i<matches.free.len() {
 				let mode=if matches.opt_present("g"){SDM_GeditCmd} else {SDM_Source};
@@ -187,7 +187,7 @@ fn get_ast_and_resolve(
 
 
     let mut sess = driver::driver::build_session_(sessopts, parsesess.cm,
-                                                  if quiet{no_emit}else{syntax::diagnostic::emit},
+                                                  if quiet{no_emit}else{no_emit},
                                                   span_diagnostic_handler);
 	let input=driver::driver::file_input(cpath.clone());
 	let cfg= driver::driver::build_configuration(sess); //was, @"", &input);
