@@ -31,7 +31,10 @@ test0 : rustfind
 
 SRC=$(wildcard *.rs)
 
-rustfind: rustfind.rs $(SRC)
+tags:
+	ctags -e -f TAGS.emacs --options=$(RUST_SRC)/etc/ctags.rust -R .
+
+rustfind: rustfind.rs $(SRC) tags
 	rustc rustfind.rs
 
 clean:

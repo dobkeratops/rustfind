@@ -96,7 +96,7 @@ fn main() {
     ];
 
 	let matches = getopts(args.tail(), opts).unwrap();
-    let libs1 = opt_strs(&matches, "L").map(|s| Path(*s));
+    let libs1 = matches.opt_strs("L").map(|s| Path(*s));
 	let libs=if libs1.len()>0 {libs1} else {
 		match (os::getenv(&"RUST_LIBS")) {
 			Some(x)=>~[Path(x)],
@@ -104,7 +104,7 @@ fn main() {
 		}
 	};
 
-	if opt_present(&matches,"h") {
+	if matches.opt_present("h") {
 		println("rustfind: args/useage:-");
 		println(" filename.rs [-L<lib path>] : create linked html pages for sources in crate");
 		println(" -r filename.rs [-L<library path>]  : dump .rfx 'crosscratemap'  containing ast nodes and jump definitions");
@@ -126,27 +126,27 @@ fn main() {
 		let dc = @get_ast_and_resolve(&Path(filename), libs);
 		local_data::set(ctxtkey, dc);
 
-		if (opt_present(&matches,"d")) {
+		if (matches.opt_present("d")) {
 			debug_test(dc);
 			done=true;
-		} else if (opt_present(&matches,"j")){
+		} else if (matches.opt_present("j")){
 			dump_json(dc);
 		}
 		let mut i=0;
-		let lib_html_path=if opt_present(&matches,"x"){ opt_str(&matches,"x")} else {~""};
-		if (opt_present(&matches,"f")) {
+		let lib_html_path=if matches.opt_present("x"){ matches.opt_str("x")} else {~""};
+		if (matches.opt_present("f")) {
 			while i<matches.free.len() {
-				let mode=if opt_present(&matches,"g"){SDM_GeditCmd} else {SDM_Source};
+				let mode=if matches.opt_present("g"){SDM_GeditCmd} else {SDM_Source};
 				print(lookup_def_at_text_file_pos_str(dc,matches.free[i],mode).unwrap_or(~"no def found\n"));
 				i+=1;
 				done=true;
 			}
 		}
-		if opt_present(&matches,"i") {
+		if matches.opt_present("i") {
 			rfserver::run_server(dc);
 			done=true;
 		}
-		if opt_present(&matches,"r") {
+		if matches.opt_present("r") {
 			println("Writing .rfx ast nodes/cross-crate-map:-");
 			write_source_as_html_and_rfx(dc,lib_html_path, rust2html::DefaultOptions,false);
 			println("Writing .rfx .. done");
@@ -154,7 +154,7 @@ fn main() {
 		}
 
 		// Dump as html..
-		if opt_present(&matches,"w") || !(done) {
+		if matches.opt_present("w") || !(done) {
 			println("Creating HTML pages from source & .rfx:-");
 			write_source_as_html_and_rfx(dc,lib_html_path, rust2html::DefaultOptions,true);
 			println("Creating HTML pages from source.. done");
