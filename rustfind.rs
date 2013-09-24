@@ -164,6 +164,13 @@ fn main() {
 
 /// tags: crate,ast,parse resolve
 /// Parses, resolves the given crate
+
+struct BlankEmitter;
+impl syntax::diagnostic::Emitter for BlankEmitter {
+	fn emit(&self, _: Option<(@codemap::CodeMap, codemap::Span)>, _: &str, _: syntax::diagnostic::level) {
+	}
+}
+
 fn get_ast_and_resolve(
 	cpath: &std::path::PosixPath,
 	libs: ~[std::path::PosixPath])
@@ -177,8 +184,6 @@ fn get_ast_and_resolve(
         ..  (*rustc::driver::session::basic_options()).clone()
     };
 	let quiet=true;
-	fn no_emit(cmsp: Option<(@codemap::CodeMap, codemap::Span)>, msg: &str, lvl: syntax::diagnostic::level) {
-	}
 
 
     let diagnostic_handler = syntax::diagnostic::mk_handler(None);
@@ -187,7 +192,7 @@ fn get_ast_and_resolve(
 
 
     let mut sess = driver::driver::build_session_(sessopts, parsesess.cm,
-                                                  if quiet{no_emit}else{no_emit},
+                                                  @BlankEmitter as @syntax::diagnostic::Emitter,
                                                   span_diagnostic_handler);
 	let input=driver::driver::file_input(cpath.clone());
 	let cfg= driver::driver::build_configuration(sess); //was, @"", &input);
