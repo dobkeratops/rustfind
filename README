@@ -4,6 +4,7 @@ finds struct-defs, functions, methods, fields
 writes ast node def info into '.rfx' files in plaintext.
 
 "make" to compile and run test program
+"make rustsrc" to generate HTML source for the main rust source tree at $(RUST_PATH)/src
 ./rustfind -h to display options
 
 ./rustfind cratename.rs sourcefile.rs:line:col

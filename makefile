@@ -1,13 +1,14 @@
-RF_LIBS= -L $(RUST)/x86_64-unknown-linux-gnu/stage2/lib
+RF_LIBS= -L $(RUST_PATH)/x86_64-unknown-linux-gnu/stage2/lib
 OPTS= test_input.rs $(RF_LIBS)
 SRC=$(wildcard *.rs)
 RUSTFIND=$(pwd)/rustfind
+RUSTSRC=$(RUST_PATH)/src
 
 # generate HTML browser for the main sourcetree
 html: rustfind
-	@echo "(set RUST_SRC=<rust tree> & do 'make rustsrc' to generate html for rust stdlibs/compiler)"
+	@echo "(set RUSTSRC=<rust tree> & do 'make rustsrc' to generate html for rust stdlibs/compiler)"
 	@echo "generting HTML view of this sourcetree .."
-	./rustfind rustfind.rs $(RF_LIBS) -x $(RUST_SRC)
+	./rustfind rustfind.rs $(RF_LIBS) -x $(RUSTSRC)
 	firefox rustfind.rs.html &
 
 test1 : rustfind
@@ -32,53 +33,54 @@ test1 : rustfind
 test0 : rustfind
 	@if [ ! $(RUST) ] ; then echo "set RUST to point to root of rust sourcetree" ; fi
 	echo $(RUST)
-	./rustfind test_input0.rs -j -x $(RUST_SRC) $RF_LIBS
-	./rustfind test_input0.rs -w -x $(RUST_SRC) $RF_LIBS
+	./rustfind test_input0.rs -j -x $(RUSTSRC) $RF_LIBS
+	./rustfind test_input0.rs -w -x $(RUSTSRC) $RF_LIBS
 	firefox test_input0.rs.html
 
 
 #make emacs ctags for this project
 tags:
-	ctags -e -f TAGS.emacs --options=$(RUST_SRC)/etc/ctags.rust -R .
+	ctags -e -f TAGS.emacs --options=$(RUSTSRC)/etc/ctags.rust -R .
+	
 
 # Make the HTML view of the main rust sourcetree
 rustsrc: rustfind
-	cp rustfind ~/bin
+	cp ./rustfind ~/bin
 	@echo "generating HTML for main rust sourcetree "
 	@echo "be patient, sorry this is unoptimized and will take a few mins"
-	cd $(RUST_SRC);pwd; rustfind libstd/std.rs
-	cd $(RUST_SRC);pwd; rustfind libsyntax/syntax.rs
-	export CFG_VERSION=0;export CFG_PREFIX=0;export CFG_LIBDIR=0;export CFG_COMPILER_TRIPLE=0;cd $(RUST_SRC);pwd; rustfind librustc/rustc.rs
-	cd $(RUST_SRC);pwd;  rustfind libextra/extra.rs
-	firefox $(RUST_SRC)/libstd/iterator.rs.html
+	cd $(RUSTSRC);pwd; rustfind libstd/std.rs
+	cd $(RUSTSRC);pwd;  rustfind libextra/extra.rs
+	cd $(RUSTSRC);pwd; rustfind libsyntax/syntax.rs
+	export CFG_VERSION=0;export CFG_PREFIX=0;export CFG_LIBDIR=0;export CFG_COMPILER_TRIPLE=0;cd $(RUSTSRC);pwd; rustfind librustc/rustc.rs
+	firefox $(RUSTSRC)/libstd/iterator.rs.html
 	#todo - make rustfind copy this! or at least make a decent copy script. or make the html ref same.
 	#?? find /some/tree -type d -exec echo cp /your/file '{}'/ \;
-	cp sourcestyle.css $(RUST_SRC)/libstd
-	cp sourcestyle.css $(RUST_SRC)/libstd/rand
-	cp sourcestyle.css $(RUST_SRC)/libstd/task
-	cp sourcestyle.css $(RUST_SRC)/libstd/fmt
-	cp sourcestyle.css $(RUST_SRC)/libstd/num
-	cp sourcestyle.css $(RUST_SRC)/libstd/rt
-	cp sourcestyle.css $(RUST_SRC)/libstd/unstable
-	cp sourcestyle.css $(RUST_SRC)/libstd/str
-	cp sourcestyle.css $(RUST_SRC)/libsyntax
-	cp sourcestyle.css $(RUST_SRC)/libsyntax/ext
-	cp sourcestyle.css $(RUST_SRC)/libsyntax/parse
-	cp sourcestyle.css $(RUST_SRC)/libsyntax/print
-	cp sourcestyle.css $(RUST_SRC)/libsyntax/util
-	cp sourcestyle.css $(RUST_SRC)/libsyntax/ext
-	cp sourcestyle.css $(RUST_SRC)/libextra
-	cp sourcestyle.css $(RUST_SRC)/libextra/num
-	cp sourcestyle.css $(RUST_SRC)/libextra/terminfo
-	cp sourcestyle.css $(RUST_SRC)/libextra/crypto
-	cp sourcestyle.css $(RUST_SRC)/librustc
-	cp sourcestyle.css $(RUST_SRC)/librustc/metadata
-	cp sourcestyle.css $(RUST_SRC)/librustc/back
-	cp sourcestyle.css $(RUST_SRC)/librustc/front
-	cp sourcestyle.css $(RUST_SRC)/librustc/middle
-	cp sourcestyle.css $(RUST_SRC)/librustc/driver
-	cp sourcestyle.css $(RUST_SRC)/librustc/lib
-	cp sourcestyle.css $(RUST_SRC)/librustc/util
+	cp sourcestyle.css $(RUSTSRC)/libstd
+	cp sourcestyle.css $(RUSTSRC)/libstd/rand
+	cp sourcestyle.css $(RUSTSRC)/libstd/task
+	cp sourcestyle.css $(RUSTSRC)/libstd/fmt
+	cp sourcestyle.css $(RUSTSRC)/libstd/num
+	cp sourcestyle.css $(RUSTSRC)/libstd/rt
+	cp sourcestyle.css $(RUSTSRC)/libstd/unstable
+	cp sourcestyle.css $(RUSTSRC)/libstd/str
+	cp sourcestyle.css $(RUSTSRC)/libsyntax
+	cp sourcestyle.css $(RUSTSRC)/libsyntax/ext
+	cp sourcestyle.css $(RUSTSRC)/libsyntax/parse
+	cp sourcestyle.css $(RUSTSRC)/libsyntax/print
+	cp sourcestyle.css $(RUSTSRC)/libsyntax/util
+	cp sourcestyle.css $(RUSTSRC)/libsyntax/ext
+	cp sourcestyle.css $(RUSTSRC)/libextra
+	cp sourcestyle.css $(RUSTSRC)/libextra/num
+	cp sourcestyle.css $(RUSTSRC)/libextra/terminfo
+	cp sourcestyle.css $(RUSTSRC)/libextra/crypto
+	cp sourcestyle.css $(RUSTSRC)/librustc
+	cp sourcestyle.css $(RUSTSRC)/librustc/metadata
+	cp sourcestyle.css $(RUSTSRC)/librustc/back
+	cp sourcestyle.css $(RUSTSRC)/librustc/front
+	cp sourcestyle.css $(RUSTSRC)/librustc/middle
+	cp sourcestyle.css $(RUSTSRC)/librustc/driver
+	cp sourcestyle.css $(RUSTSRC)/librustc/lib
+	cp sourcestyle.css $(RUSTSRC)/librustc/util
 
 #Compile the main executable
 rustfind: rustfind.rs $(SRC) tags
