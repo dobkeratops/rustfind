@@ -144,11 +144,11 @@ pub fn fileLoad(filename:&str)->~[u8] {
 #[fixed_stack_segment]
 pub unsafe fn fileWriteRange<T>(fp:*FILE, array:&[T],start:uint,end:uint) {
 	printStr(&sizeofArray(array));
-	fwrite(as_void_ptr(&array[start]),sizeofArrayElem(array)*(end-start).to_u64(),1,fp);
+	fwrite(as_void_ptr(&array[start]),sizeofArrayElem(array)*(end-start).to_u64().unwrap(),1,fp);
 }
 
-pub fn sizeofArray<T>(a:&[T])->Size_t { (size_of::<T>() * a.len()).to_u64() }
-pub fn sizeofArrayElem<T>(_:&[T])->Size_t { size_of::<T>().to_u64() }
+pub fn sizeofArray<T>(a:&[T])->Size_t { (size_of::<T>() * a.len()).to_u64().unwrap() }
+pub fn sizeofArrayElem<T>(_:&[T])->Size_t { size_of::<T>().to_u64().unwrap() }
 
 #[fixed_stack_segment]
 pub fn fileSaveArray<T>(buffer:&[T],filename:&str) {

@@ -5,7 +5,8 @@ use rsfind::ShowDefMode;
 
 use std::hashmap::HashMap;
 use find_ast_node::*;
-use rfindctx::{RFindCtx,ZTextFilePos,get_source_loc};
+use rfindctx::{RFindCtx,get_source_loc};
+use codemaput::ZTextFilePos;
 use rf_ast_ut::*;
 use util::flatten_to_str; //todo - why is qualifying manually not working?!
 //use super::rf_use_ast;

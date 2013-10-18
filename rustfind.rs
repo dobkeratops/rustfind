@@ -1,6 +1,10 @@
+#[feature(macro_rules)];
+#[feature(globs)];
+
 extern mod syntax;
 extern mod rustc;
 extern mod extra;
+
 
 use rustc::{front, metadata, driver, middle};
 use rustc::middle::{ty,typeck};
@@ -15,13 +19,17 @@ use syntax::parse::token;
 use syntax::visit::{Visitor, fn_kind};
 use find_ast_node::{FNodeInfoMap,safe_node_id_to_type,get_node_info_str,build_node_info_map,AstNode,find_node_tree_loc_at_byte_pos,NodeTreeLoc,astnode_expr,FNodeInfo,ToJsonStr,ToJsonStrFc,AstNodeAccessors,KindToStr,build_node_def_node_table,get_node_source};
 use jumptodefmap::*;
-
+    
 use syntax::abi::AbiSet;
 
 use rfindctx::{RFindCtx,ctxtkey};
 pub use codemaput::{ZTextFilePos,ZTextFilePosLen,get_span_str,ToZTextFilePos,ZIndexFilePos,ToZIndexFilePos};
 use rsfind::{ShowDefMode,SDM_LineCol,SDM_Line,SDM_Source,SDM_GeditCmd,MyOption};
-use crosscratemap::{CrossCrateMap,CrossCrateMapItem};
+use crosscratemap::CrossCrateMap;
+use crosscratemap::CrossCrateMapItem;
+use std::path::PosixPath;
+use std::path::posix;
+
 
 pub mod find_ast_node;
 pub mod text_formatting;
@@ -96,10 +104,10 @@ fn main() {
     ];
 
 	let matches = getopts(args.tail(), opts).unwrap();
-    let libs1 = matches.opt_strs("L").map(|s| Path(*s));
+    let libs1 = matches.opt_strs("L").map(|s| std::path::posix::Path::new(s.clone ()));
 	let libs=if libs1.len()>0 {libs1} else {
 		match (os::getenv(&"RUST_LIBS")) {
-			Some(x)=>~[Path(x)],
+			Some(x)=>~[ posix::Path::new(x)],
 			None=>~[]
 		}
 	};
@@ -123,7 +131,7 @@ fn main() {
 	if matches.free.len()>0 {
 		let mut done=false;
 		let filename=util::get_filename_only(matches.free[0]);
-		let dc = @get_ast_and_resolve(&Path(filename), libs);
+		let dc = @get_ast_and_resolve(&posix::Path::new(filename), libs);
 		local_data::set(ctxtkey, dc);
 
 		if (matches.opt_present("d")) {
@@ -179,7 +187,8 @@ fn get_ast_and_resolve(
     let parsesess = parse::new_parse_sess(None);
     let sessopts = @driver::session::options {
         binary: @"rustdoc",
-        maybe_sysroot: Some(@std::os::self_exe_path().unwrap().pop()),
+        maybe_sysroot: Some(@std::os::self_exe_path().unwrap()),
+//        maybe_sysroot: Some(@std::os::self_exe_path().unwrap().pop()),
         addl_lib_search_paths: @mut libs,
         ..  (*rustc::driver::session::basic_options()).clone()
     };
@@ -198,7 +207,7 @@ fn get_ast_and_resolve(
 	let cfg= driver::driver::build_configuration(sess); //was, @"", &input);
 
 	let crate1=driver::driver::phase_1_parse_input(sess,cfg.clone(),&input);
-	let crate2=driver::driver::phase_2_configure_and_expand(sess,cfg,crate1);
+	let crate2=@driver::driver::phase_2_configure_and_expand(sess,cfg,crate1);
 
 	let ca=driver::driver::phase_3_run_analysis_passes(sess,crate2);
     RFindCtx { crate: crate2, tycx: ca.ty_cx, sess: sess, ca:ca }

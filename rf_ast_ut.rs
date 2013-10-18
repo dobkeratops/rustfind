@@ -21,8 +21,8 @@ pub fn dump_ctxt_def_map(tycx:ty::ctxt) {
 	}
 }
 
-
-pub fn dump_methods_of_t(tycx:&ty::ctxt_, t:*ty::t_opaque) {
+/*
+pub fn dump_methods_of_t(tycx:ty::ctxt, t:*ty::t_opaque) {
 	for (&k,&method) in tycx.methods.iter() {
 		dump!(method.transformed_self_ty, t);
 		if method.transformed_self_ty==Some(t) {
@@ -32,7 +32,7 @@ pub fn dump_methods_of_t(tycx:&ty::ctxt_, t:*ty::t_opaque) {
 
 }
 
-pub fn dump_methods_of_type(tycx:&ty::ctxt_, type_node_id:ast::NodeId) {
+pub fn dump_methods_of_type(tycx:ty::ctxt, type_node_id:ast::NodeId) {
 	let ot = tycx.node_types.find(&(type_node_id as uint));
 	match ot {
 		None=> {},
@@ -46,9 +46,9 @@ pub fn dump_methods_of_type(tycx:&ty::ctxt_, type_node_id:ast::NodeId) {
 		}
 	}
 }
+*/
 
-
-pub fn get_struct_def<'a,'b>(tc:&'a ty::ctxt_, struct_node_id:ast::NodeId)->Option<(@ast::item,@ast::struct_def,ast::Generics)> {
+pub fn get_struct_def<'a,'b>(tc:ty::ctxt, struct_node_id:ast::NodeId)->Option<(@ast::item,@ast::struct_def,ast::Generics)> {
 	match tc.items.find(&struct_node_id) {
 		None=>{None},
 		Some(node)=>match *node {
@@ -63,7 +63,7 @@ pub fn get_struct_def<'a,'b>(tc:&'a ty::ctxt_, struct_node_id:ast::NodeId)->Opti
 	}
 }
 
-pub fn find_named_struct_field(tc:&ty::ctxt_, struct_node_id:ast::NodeId, field_ident:&ast::Ident)->Option<ast::DefId> {
+pub fn find_named_struct_field(tc:ty::ctxt, struct_node_id:ast::NodeId, field_ident:&ast::Ident)->Option<ast::DefId> {
 	match get_struct_def(tc,struct_node_id) {
 		None=>None,
 		Some((it,sd,ge))=>{
