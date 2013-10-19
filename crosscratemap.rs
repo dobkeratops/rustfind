@@ -1,10 +1,7 @@
+use rf_common::*;
 use syntax::ast;
-use std::num;
-use std::num::*;
-use std::str;
 use std::int;
 use std::uint;
-use std::hashmap::HashMap;
 use rustc::metadata::cstore;
 use rfindctx::{str_of_opt_ident};
 use find_ast_node::FNodeInfoMap;

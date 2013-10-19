@@ -1,4 +1,4 @@
-use std::str;
+use rf_common::*;
 use syntax::{ast,ast_map};
 use rustc::middle::ty;
 

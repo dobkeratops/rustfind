@@ -1,7 +1,4 @@
-use std::num;
-use std::num::*;
-
-use syntax::parse;
+use rf_common::*;
 use syntax::ast;
 use syntax::ast_map;
 use syntax::visit;
@@ -13,8 +10,6 @@ use rustc::{front, metadata, driver, middle};
 use rustc::middle::mem_categorization::ast_node;
 use rustc::middle::ty;
 use rfindctx::{RFindCtx,};
-use std::hashmap;
-use std::hashmap::HashMap;
 use codemaput::{ZTextFilePos,ToZIndexFilePos,dump_span,get_span_str};
 
 /*

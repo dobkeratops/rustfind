@@ -1,5 +1,4 @@
-use std::str;
-use std::hashmap::HashMap;
+use rf_common::*;
 use std::iter::range_inclusive;
 
 pub struct HtmlWriter {

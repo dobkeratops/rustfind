@@ -1,12 +1,11 @@
-use std::num;
-use std::num::*;
+use rf_common::*;
+
 use std::local_data;
 
 use syntax::parse;
 use syntax::ast;
 use syntax::ast_map;
 use syntax::visit;
-// use syntax::visit;
 use syntax::visit::*;
 use syntax::visit::{Visitor, fn_kind};
 use syntax::codemap;
@@ -14,7 +13,6 @@ use rustc::{front, metadata, driver, middle};
 use rustc::middle::mem_categorization::ast_node;
 use rustc::middle::ty;
 
-use std::hashmap::HashMap;
 //use codemaput::*;
 
 pub struct RFindCtx {

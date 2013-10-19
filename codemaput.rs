@@ -1,5 +1,4 @@
-use std::str;
-use std::uint;
+use rf_common::*;
 use syntax::ast;
 use syntax::codemap;
 use rustc::middle::ty;

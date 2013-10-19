@@ -1,9 +1,9 @@
+use rf_common::*;
 use syntax::ast;
 use rustc::middle::{ty,typeck};
 use syntax::codemap::BytePos;
 use rsfind::ShowDefMode;
 
-use std::hashmap::HashMap;
 use find_ast_node::*;
 use rfindctx::{RFindCtx,get_source_loc};
 use codemaput::ZTextFilePos;

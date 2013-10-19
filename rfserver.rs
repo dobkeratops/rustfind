@@ -1,3 +1,4 @@
+use rf_common::*;
 use rfindctx::{RFindCtx,find_file_name_in,first_file_name};
 use find_ast_node::{build_node_info_map,build_node_def_node_table};
 use jumptodefmap::{dump_json,lookup_def_at_text_file_pos,lookup_def_at_text_file_pos_str};

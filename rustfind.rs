@@ -7,18 +7,20 @@ extern mod extra;
 
 
 use rustc::{front, metadata, driver, middle};
-use rustc::middle::{ty,typeck};
+//use rustc::middle::{ty,typeck};
 use rustc::metadata::cstore;
 
-use std::num::*;
-use std::{num,str,io,os,local_data};
-use std::hashmap::HashMap;
+//use std::num::*;
+use std::{io,os,local_data};
+//use std::hashmap::HashMap;
+use rf_common::*;
 
 use syntax::{parse,ast,ast_map,codemap,diagnostic};
 use syntax::parse::token;
 use syntax::visit::{Visitor, fn_kind};
 use find_ast_node::{FNodeInfoMap,safe_node_id_to_type,get_node_info_str,build_node_info_map,AstNode,find_node_tree_loc_at_byte_pos,NodeTreeLoc,astnode_expr,FNodeInfo,ToJsonStr,ToJsonStrFc,AstNodeAccessors,KindToStr,build_node_def_node_table,get_node_source};
 use jumptodefmap::*;
+//pub use std::hashmap::HashMap;
     
 use syntax::abi::AbiSet;
 
@@ -30,7 +32,7 @@ use crosscratemap::CrossCrateMapItem;
 use std::path::PosixPath;
 use std::path::posix;
 
-
+pub mod rf_common;
 pub mod find_ast_node;
 pub mod text_formatting;
 pub mod ioutil;
