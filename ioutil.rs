@@ -4,13 +4,10 @@ pub use std::io::*;
 pub use std::c_str::*;
 pub use std::libc::*;
 pub use std::ptr::*;
-pub use std::sys::*;	// for size_of
+pub use std::mem::size_of;	// for size_of
 pub use std::vec::*;
 pub use std::num::*;
-use std::rt::io::{buffered, file};
-use std::rt::io;
-use std::rt::io::extensions::ReaderUtil;
-use std::rt::io::support::PathLike;
+use std::io::buffered::BufferedReader;
 use std::path::PosixPath;
 
 pub type Size_t=u64;	// todo - we're not sure this should be u64
@@ -26,7 +23,7 @@ fn newline_if_over(a:~str,l:uint)->~str{if a.len()>l {a+~"\n"}else{a}}
 macro_rules! dump{ ($($a:expr),*)=>
 	(	{	let mut txt=~"";
 			$( txt=txt.append(
-				fmt!("%s=%?",stringify!($a),$a)+~",")
+				format!("{:s}={:?}",stringify!($a),$a)+~",")
 			);*;
 			logi!(txt);
 		}
@@ -54,7 +51,8 @@ impl<T:ToStr> Dbprint for T {
 }
 
 pub fn promptInput(prompt:&str)->~str {
-	stdout().write(prompt.as_bytes()); stdin().read_line()
+	stdout().write(prompt.as_bytes());
+	BufferedReader::new(stdin()).read_line().expect("read_line failure")
 }
 
 pub fn as_void_ptr<T>(a:&T)->*c_void { to_unsafe_ptr(a) as *c_void}
@@ -144,11 +142,11 @@ pub fn fileLoad(filename:&str)->~[u8] {
 #[fixed_stack_segment]
 pub unsafe fn fileWriteRange<T>(fp:*FILE, array:&[T],start:uint,end:uint) {
 	printStr(&sizeofArray(array));
-	fwrite(as_void_ptr(&array[start]),sizeofArrayElem(array)*(end-start).to_u64().unwrap(),1,fp);
+	fwrite(as_void_ptr(&array[start]),sizeofArrayElem(array)*(end-start) as Size_t,1,fp);
 }
 
-pub fn sizeofArray<T>(a:&[T])->Size_t { (size_of::<T>() * a.len()).to_u64().unwrap() }
-pub fn sizeofArrayElem<T>(_:&[T])->Size_t { size_of::<T>().to_u64().unwrap() }
+pub fn sizeofArray<T>(a:&[T])->Size_t { (size_of::<T>() * a.len()) as Size_t }
+pub fn sizeofArrayElem<T>(_:&[T])->Size_t { size_of::<T>() as Size_t }
 
 #[fixed_stack_segment]
 pub fn fileSaveArray<T>(buffer:&[T],filename:&str) {

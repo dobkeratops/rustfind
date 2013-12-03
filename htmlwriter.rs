@@ -77,7 +77,7 @@ impl<'self> HtmlWriter {
 		self
 	}
 	pub fn write(&'self mut self,t:&str)->&'self mut HtmlWriter {
-		for x in t.iter() {
+		for x in t.chars() {
 			self.doc.push_str(self.xlat.get(&x).clone());
 		};
 		self

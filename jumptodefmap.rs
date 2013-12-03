@@ -66,7 +66,7 @@ pub fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, nodeinfomap:&FNodeInf
 				let tydef=/*rf_ast_ut::*/auto_deref_ty(ty::get(*obj_ty.unwrap()));
 				match tydef.sty {
 					ty::ty_struct(def,_)=> {
-						let node_to_show=/*rf_ast_ut::*/find_named_struct_field(dc.tycx, def.node, ident).unwrap_or(def);
+						let node_to_show=/*rf_ast_ut::*/find_named_struct_field(&dc.tycx, def.node, ident).unwrap_or(def);
 						return Some(node_to_show);//mk_result(dc,m,node_spans,node_to_show,"(struct_field)");
 					},
 					_=>return None
@@ -130,10 +130,10 @@ pub fn def_info_from_node_id<'a,'b>(dc:&'a RFindCtx, node_info:&'b FNodeInfoMap,
 //					0=>(b.node,node_info.find(&b.node)),
 //					_ => (id as int, None)
 //				},
-				None=>(ast::DefId{crate:0,node:id as int},None)
+				None=>(ast::DefId{crate:0,node:id},None)
 			}
 		},
-		None=>(ast::DefId{crate:0,node:id as int},None)
+		None=>(ast::DefId{crate:0,node:id},None)
 	}
 }
 
@@ -170,12 +170,12 @@ pub fn dump_json(dc:&RFindCtx) {
 
 fn lookup_def_at_file_line_pos_old(dc:&RFindCtx,filepos:&str, show_all:ShowDefMode)->Option<~str> {
 
-	let toks:~[&str]=filepos.split_iter(':').collect();
+	let toks:~[&str]=filepos.split(':').collect();
 	if toks.len()<3 { return None }
 
 //	let line:Option<uint> = FromStr::from_str(toks[1]);
-	if_some!(line in from_str::<uint>(toks[1]) then {
-		if_some!(col in from_str::<uint>(toks[2]) then {
+	if_some!(line in from_str::<u32>(toks[1]) then {
+		if_some!(col in from_str::<u32>(toks[2]) then {
 			//todo - if no column specified, just lookup everything on that line!
 
 			match ZTextFilePos::new(toks[0],line-1,col-1).to_byte_pos(dc.tycx) {

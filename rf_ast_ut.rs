@@ -48,7 +48,8 @@ pub fn dump_methods_of_type(tycx:ty::ctxt, type_node_id:ast::NodeId) {
 }
 */
 
-pub fn get_struct_def<'a,'b>(tc:ty::ctxt, struct_node_id:ast::NodeId)->Option<(@ast::item,@ast::struct_def,ast::Generics)> {
+
+pub fn get_struct_def<'a,'b>(tc:&'a ty::ctxt, struct_node_id:ast::NodeId)->Option<(@ast::item,@ast::struct_def,ast::Generics)> {
 	match tc.items.find(&struct_node_id) {
 		None=>{None},
 		Some(node)=>match *node {
@@ -63,7 +64,7 @@ pub fn get_struct_def<'a,'b>(tc:ty::ctxt, struct_node_id:ast::NodeId)->Option<(@
 	}
 }
 
-pub fn find_named_struct_field(tc:ty::ctxt, struct_node_id:ast::NodeId, field_ident:&ast::Ident)->Option<ast::DefId> {
+pub fn find_named_struct_field(tc:&ty::ctxt, struct_node_id:ast::NodeId, field_ident:&ast::Ident)->Option<ast::DefId> {
 	match get_struct_def(tc,struct_node_id) {
 		None=>None,
 		Some((it,sd,ge))=>{

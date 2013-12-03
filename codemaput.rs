@@ -30,8 +30,8 @@ pub macro_rules! if_some {
 //pub type ZeroBasedIndex=uint;
 pub struct ZTextFilePos {
 	name:~str,
-	line:uint,
-	col:uint
+	line: u32,
+	col: u32
 }
 pub trait ToZTextFilePos {
 	fn to_text_file_pos(self,cx:ty::ctxt)->Option<ZTextFilePos>;
@@ -58,7 +58,7 @@ impl ToZTextFilePos for codemap::BytePos {
 			i-=1;
 			let fm=&cx.sess.codemap.files[i];
 			if *fm.start_pos <= *self {
-				let mut line=fm.lines.len();
+				let mut line=fm.lines.len() as u32;
 				while line>0 {
 					line-=1;
 					let line_start=*fm.lines[line];
@@ -74,13 +74,13 @@ impl ToZTextFilePos for codemap::BytePos {
 
 impl FromStr for ZTextFilePos {
 	fn from_str(file_pos_str:&str)->Option<ZTextFilePos> {
-		let toks:~[&str]=file_pos_str.split_iter(':').collect();
+		let toks:~[&str]=file_pos_str.split(':').collect();
 		if toks.len()<=0 {
 			None
 		} else if toks.len()==1 {
 			Some(ZTextFilePos::new(toks[0],0,0))
 		} else {
-			match from_str::<uint>(toks[1]) {
+			match from_str::<u32>(toks[1]) {
 				None=>None,
 				Some(editor_line_number)=>match FromStr::from_str(toks[2]) {
 					None=>Some(ZTextFilePos::new(toks[0],editor_line_number-1,0)),
@@ -92,7 +92,7 @@ impl FromStr for ZTextFilePos {
 }
 
 impl ZTextFilePos {
-	pub fn new(filename:&str,_line:uint,_col:uint)->ZTextFilePos { ZTextFilePos{name:filename.to_owned(),line:_line,col:_col}}
+	pub fn new(filename:&str, _line: u32, _col: u32)->ZTextFilePos { ZTextFilePos{name:filename.to_owned(),line:_line,col:_col}}
 
 	pub fn to_str(&self)->~str {
 		self.name+":"+(self.line+1).to_str()+":"+self.col.to_str()+":"
@@ -105,13 +105,13 @@ impl ZTextFilePos {
 			let fm=&cx.sess.codemap.files[i];
 			let filemap_filename:&str=fm.name;
 			if filemap_filename==self.name {
-				if self.line>=fm.lines.len() { return None;}
+				if self.line as uint >= fm.lines.len() { return None;}
 				return Some(codemap::BytePos(*fm.lines[self.line]+self.col));
 			}
 		}
 		return None;
 	}
-	pub fn to_byte_pos_len(&self, cx:ty::ctxt,len:uint)->Option<(codemap::BytePos,codemap::BytePos)> {
+	pub fn to_byte_pos_len(&self, cx:ty::ctxt,len: u32)->Option<(codemap::BytePos,codemap::BytePos)> {
 		match self.to_byte_pos(cx) {
 			None=>None,
 			Some(lo)=>{
@@ -123,7 +123,7 @@ impl ZTextFilePos {
 	}
 
 
-	pub fn get_str_at(&self, cx:ty::ctxt, len:uint)->~str {
+	pub fn get_str_at(&self, cx:ty::ctxt, len: u32)->~str {
 		let a=//text_file_pos_len_to_byte_pos(cx, self,len);
 				self.to_byte_pos_len(cx,len);
 		match  a  {
@@ -137,10 +137,10 @@ impl ZTextFilePos {
 
 pub struct ZTextFilePosLen {
 	tfp:ZTextFilePos,
-	len:uint
+	len: u32
 }
 impl ZTextFilePosLen {
-	pub fn new(file_name:&str,_line:uint,_col:uint, _len:uint)->ZTextFilePosLen {
+	pub fn new(file_name:&str, _line: u32, _col: u32, _len: u32)->ZTextFilePosLen {
 		ZTextFilePosLen{ tfp:ZTextFilePos::new(file_name,_line,_col), len:_len }
 	}
 
@@ -158,7 +158,7 @@ pub fn get_span_str(c:ty::ctxt, sp:&codemap::Span)->~str {
 	let loc_hi=c.sess.codemap.lookup_char_pos(sp.hi);
 	// TODO-assert both in same file!
 	let file_org=*loc_lo.file.start_pos;
-	let slice=loc_lo.file.src.slice(*sp.lo-file_org, *sp.hi-file_org );
+	let slice = loc_lo.file.src.slice((*sp.lo-file_org) as uint, (*sp.hi-file_org) as uint);
 	slice.to_str()
 }
 
@@ -217,9 +217,9 @@ pub fn byte_pos_to_text_file_pos(c:ty::ctxt, pos:codemap::BytePos)->Option<ZText
 */
 
 pub struct ZIndexFilePos {
-	file_index:uint,
-	line:uint,
-	col:uint
+	file_index: u32,
+	line: u32,
+	col: u32
 }
 pub trait ToZIndexFilePos {
 	fn to_index_file_pos(&self,c:ty::ctxt)->Option<ZIndexFilePos>;
@@ -229,14 +229,14 @@ impl ToZIndexFilePos for codemap::BytePos {
 	fn to_index_file_pos(&self, c:ty::ctxt)->Option<ZIndexFilePos> {
 		// TODO: cleanup with byte_pos_to_text_file_pos, one in terms of the other.
 		// TODO - functional, and with binary search or something ..
-		let mut i=c.sess.codemap.files.len();
+		let mut i=c.sess.codemap.files.len() as u32;
 		while i>0 {
 				// caution, need loop because we return, wait for new foreach ..in..
 			i-=1;
 			let fm=&c.sess.codemap.files[i];
 			let filemap_filename:&str=fm.name;
-			if **self >= *fm.start_pos && **self < *fm.start_pos+fm.src.len(){
-				let mut line=fm.lines.len();
+			if **self >= *fm.start_pos && **self < *fm.start_pos+fm.src.len() as u32{
+				let mut line=fm.lines.len() as u32;
 				while line>0 {
 					line-=1;
 					let lstart=*fm.lines[line];
@@ -260,7 +260,7 @@ pub fn get_crate_name(tc:ty::ctxt, i:ast::CrateNum)->~str {
 }
 
 pub fn text_span<'a,'b>(text:&'a [u8],s:&'b codemap::Span)->&'a[u8] {
-	text.slice(*s.lo,*s.hi)
+	text.slice(*s.lo as uint, *s.hi as uint)
 }
 
 
@@ -287,7 +287,7 @@ pub fn dump_cstore_info(tc:ty::ctxt) {
 //}
 
 	println("crate files");
-	let ucf=cstore::get_used_crate_files(tc.cstore);
+	let ucf=cstore::get_used_crate_sources(tc.cstore);
 	let num_crates=ucf.len();
 	for x in ucf.iter() {
 		dump!(x);
@@ -321,7 +321,7 @@ pub fn loc_to_str(loc:codemap::Loc)->~str {
 	loc.file.name+":"+loc.line.to_str()+":"+loc.col.to_str()+":"
 }
 
-pub fn zget_file_line_str(cx:ty::ctxt, filename:&str, src_line:uint)->~str {
+pub fn zget_file_line_str(cx: ty::ctxt, filename: &str, src_line: u32) -> ~str {
 //	for c.sess.codemap.files.rev_iter().advance |fm:&codemap::FileMap| {
 	let mut i=cx.sess.codemap.files.len();
 	while i>0 {	// caution, need loop because we return, wait for new foreach ..in..
@@ -330,8 +330,8 @@ pub fn zget_file_line_str(cx:ty::ctxt, filename:&str, src_line:uint)->~str {
 		let filemap_filename:&str=fm.name;
 		if filename==filemap_filename {
 			let s=*fm.lines[src_line];
-			let e=if (src_line+1)>=fm.lines.len() {
-				*fm.start_pos+fm.src.len()
+			let e = if (src_line+1) as uint >= fm.lines.len() {
+				*fm.start_pos+fm.src.len() as u32
 			} else {
 				*fm.lines[src_line+1]
 			};

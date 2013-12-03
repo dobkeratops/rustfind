@@ -43,20 +43,20 @@ pub macro_rules! if_some {
 		}
 	);
 }
-pub macro_rules! tlogi{ 
+pub macro_rules! tlogi{
 	($($a:expr),*)=>(println((file!()+":"+line!().to_str()+": " $(+$a.to_str())*) ))
 }
-pub macro_rules! logi{ 
+pub macro_rules! logi{
 	($($a:expr),*)=>(println(""$(+$a.to_str())*) )
 }
 //macro_rules! dump{ ($a:expr)=>(logi!(fmt!("%s=%?",stringify!($a),$a).indent(2,160));)}
 macro_rules! dump{ ($($a:expr),*)=>
-	(	{	let mut txt=~""; 
+	(	{	let mut txt=~"";
 			$( { txt=txt.append(
-				 fmt!("%s=%?",stringify!($a),$a)+",") 
+				 format!("{:s}={:?}",stringify!($a),$a)+",")
 				}
-			);*; 
-			logi!(txt); 
+			);*;
+			logi!(txt);
 		}
 	)
 }
@@ -87,17 +87,17 @@ pub enum ShowDefMode {
 
 
 pub trait MyOption<T> {
-	fn for_some(&self, f:&fn(t:&T));
-	fn do_some<R>(&self, f:&fn(t:&T)->R)->Option<R>;
+	fn for_some(&self, f: |&T|);
+	fn do_some<R>(&self, f: |&T| -> R) -> Option<R>;
 }
 impl<T> MyOption<T> for Option<T>{
-	fn for_some(&self, f:&fn(t:&T)) {
+	fn for_some(&self, f: |&T|) {
 		match self {
 			&None=>{},
 			&Some(ref t)=>f(t)
 		}
 	}
-	fn do_some<R>(&self, f:&fn(t:&T)->R)->Option<R> {
+	fn do_some<R>(&self, f: |&T| -> R)->Option<R> {
 		match self {
 			&None=>None,
 			&Some(ref t)=>Some(f(t))

@@ -156,11 +156,11 @@ pub fn node_spans_table_to_json_sub(dc:&RFindCtx,ns:&FNodeInfoMap)->~str {
 			let ifpe=oifpe.unwrap();
 			// local node:-
 			//assert!(ifps.file_index==ifpe.file_index);
-			r.push_str(fmt!("\t{node_id:%i,\tkind:\"%s\",\tlspan:{ lo:{file:%u,line:%u ,ofs:%u},\thi:{file:%u,line:%u, ofs:%u}}},\n",*k,v.kind,
+			r.push_str(format!("\t\\{node_id:{:u},\tkind:\"{:s}\",\tlspan:\\{ lo:\\{file:{:u},line:{:u} ,ofs:{:u}\\},\thi:\\{file:{:u},line:{:u}, ofs:{:u}\\}\\}\\},\n",*k,v.kind,
 				ifps.file_index, ifps.line, ifps.col,ifpe.file_index, ifpe.line, ifpe.col));
 		} else {
 			// external node:-
-			r.push_str(fmt!("\t{node_id:%i,\tkind:\"%s\"\trspan{lo:%u,hi:%u}}\n",*k,v.kind, *v.span.lo,*v.span.hi));
+			r.push_str(format!("\t\\{node_id:{:u},\tkind:\"{:s}\"\trspan\\{lo:{:u},hi:{:u}\\}\\}\n",*k,v.kind, *v.span.lo,*v.span.hi));
 		}
 	}
 	r
@@ -177,7 +177,7 @@ impl ToJsonStr for hashmap::HashMap<ast::NodeId,ast::DefId> {
 		let mut r=~"[\n";
 //		for self.iter().advance|(&key,&value)| {
 		for (&key,&value) in self.iter() {
-			r.push_str(fmt!("\t{node_id:%?,\tdef_id:{crate:%?,node:%?}},\n", key, value.crate,value.node));
+			r.push_str(format!("\t\\{node_id:{:?},\tdef_id:\\{crate:{:?},node:{:?}\\}\\},\n", key, value.crate,value.node));
 		}
 		r.push_str("]\n");
 		r
@@ -208,16 +208,16 @@ impl KindToStr for ast::Decl {
 impl KindToStr for ast::item {
 	fn kind_to_str(&self)->&'static str {
 		match (self.node) {
-		ast::item_static(*)=>"static",
-		ast::item_fn(*)=>"fn",
-		ast::item_mod(*)=>"mod",
-		ast::item_foreign_mod(*)=>"foreign_mod",
-		ast::item_ty(*)=>"ty",
-		ast::item_enum(*)=>"enum",
-		ast::item_struct(*)=>"struct",
-		ast::item_trait(*)=>"trait",
-		ast::item_impl(*)=>"impl",
-		ast::item_mac(*)=>"mac",
+		ast::item_static(..)=>"static",
+		ast::item_fn(..)=>"fn",
+		ast::item_mod(_)=>"mod",
+		ast::item_foreign_mod(_)=>"foreign_mod",
+		ast::item_ty(..)=>"ty",
+		ast::item_enum(..)=>"enum",
+		ast::item_struct(..)=>"struct",
+		ast::item_trait(..)=>"trait",
+		ast::item_impl(..)=>"impl",
+		ast::item_mac(_)=>"mac",
 		}
 	}
 }
@@ -267,6 +267,7 @@ impl KindToStr for ast::Expr {
 		ast::ExprLoop(_, _)=>"loop",
 		ast::ExprMatch(_, _)=>"match",
 		ast::ExprFnBlock(_, _)=>"fn_blk",
+		ast::ExprProc(..) => "proc",
 		ast::ExprDoBody(_)=>"do_body",
 		ast::ExprBlock(_)=>"blk",
 		ast::ExprAssign(_,_)=>"assign",
@@ -598,7 +599,7 @@ fn expr_get_ident(a:&ast::Expr)->Option<ast::Ident> {
 
 struct FindAstNodeSt {
 	result: NodeTreeLoc,		// todo - full tree path, all the parent nodes.
-	location: uint,
+	location: u32,
 	stop: bool,
 //	node_spans: HashMap<ast::node_id,codemap::span>
 }
@@ -621,7 +622,7 @@ pub fn push_spanned<T:AstNodeAccessors>(spt:&mut FNodeInfoMap,k:&str,s:&codemap:
 	}
 }
 
-pub fn span_contains(x:uint,s:codemap::Span)->bool {
+pub fn span_contains(x: u32, s: codemap::Span)->bool {
 	x>=*s.lo && x<*s.hi
 }
 
@@ -681,7 +682,7 @@ impl Visitor<FncsState> for FncsThing {
 			}
 			ast::item_enum(ref ed, ref g) => {
 				for v in ed.variants.iter() {
-					self.variant(v, (s,p));
+					self.variant(*v, (s,p));
 				}
 			}
 			ast::item_trait(ref g, ref tr, ref tm) => {
@@ -701,7 +702,7 @@ impl Visitor<FncsState> for FncsThing {
 		visit::walk_local(self, a, (s, a.id));
 	}
 
-	fn visit_block(&mut self, a:&ast::Block, (s, p): FncsState) {
+	fn visit_block(&mut self, a: @ast::Block, (s, p): FncsState) {
 		push_span(s, a.id, p, None, "block", a.span, astnode_none);
 
 		visit::walk_block(self, a, (s, a.id));
@@ -716,8 +717,8 @@ impl Visitor<FncsState> for FncsThing {
 	// we do nothing yet, use default impl
 //	 fn visit_arm(&mut self, a:&ast::Arm, (s, p):FncsState) {}
 
-	fn visit_pat(&mut self, a:@ast::Pat, (s, p):FncsState) {
-		push_span(s, a.id, p, None, "pat", a.span, astnode_pat(a));
+	fn visit_pat(&mut self, a: &ast::Pat, (s, p):FncsState) {
+		push_span(s, a.id, p, None, "pat", a.span, astnode_pat(@a.clone()));
 
 		visit::walk_pat(self, a, (s, a.id));
 	}
@@ -748,8 +749,8 @@ impl Visitor<FncsState> for FncsThing {
 	// default, we do nothing
 //	 fn visit_fn()
 
-	fn visit_struct_field(&mut self, a:@ast::struct_field, (s, p):FncsState) {
-		push_spanned(s, "struct_field", a, astnode_struct_field(a), p);
+	fn visit_struct_field(&mut self, a: &ast::struct_field, (s, p):FncsState) {
+		push_spanned(s, "struct_field", a, astnode_struct_field(@a.clone()), p);
 
 		visit::walk_struct_field(self, a, (s, p));
 	}
@@ -786,9 +787,9 @@ impl Visitor<@mut FindAstNodeSt> for Finder {
 		visit::walk_local(self, a, s);
 	}
 
-	fn visit_block(&mut self, a:&ast::Block, s:@mut FindAstNodeSt) {
+	fn visit_block(&mut self, a:@ast::Block, s:@mut FindAstNodeSt) {
 		if span_contains(s.location, a.span) {
-			s.result.push(astnode_block(@a.clone()));
+			s.result.push(astnode_block(a));
 		}
 
 		visit::walk_block(self, a, s);
@@ -810,9 +811,9 @@ impl Visitor<@mut FindAstNodeSt> for Finder {
 		visit::walk_arm(self, a, s);
 	}
 
-	fn visit_pat(&mut self, a:@ast::Pat, s:@mut FindAstNodeSt) {
+	fn visit_pat(&mut self, a: &ast::Pat, s:@mut FindAstNodeSt) {
 		if span_contains(s.location, a.span) {
-			s.result.push(astnode_pat(a));
+			s.result.push(astnode_pat(@a.clone()));
 		}
 
 		visit::walk_pat(self, a, s);
@@ -846,9 +847,9 @@ impl Visitor<@mut FindAstNodeSt> for Finder {
 //	 fn visit_fn(fk:&vist::fn_kind, fd:&as::fn_decl, body:&ast::Block,
 //		 sp:codemap::Span, nid:ast::NodeId, s: @mut FindAstNodeSt) {}
 
-	fn visit_struct_field(&mut self, a:@ast::struct_field, s:@mut FindAstNodeSt) {
+	fn visit_struct_field(&mut self, a: &ast::struct_field, s:@mut FindAstNodeSt) {
 		if span_contains(s.location, a.span) {
-			s.result.push(astnode_struct_field(a));
+			s.result.push(astnode_struct_field(@a.clone()));
 		}
 
 		visit::walk_struct_field(self, a, s);
@@ -894,7 +895,7 @@ pub fn get_node_info_str(dc:&RFindCtx,node:&NodeTreeLoc)->~str
 			ast::ty_fixed_length_vec(ref mt,ref expr)=>~"[T,..N]",
 			ast::ty_ptr(ref mt)=>~"*",
 			ast::ty_rptr(ref lifetime,ref mt)=>~"&",
-			ast::ty_tup(ref types)=>~"("+types.map(|x|ty_to_str(dc,x)).to_str()+")", //todo: factor this out, map..
+			ast::ty_tup(ref types)=>~"("+types.map(|x|ty_to_str(dc,*x)).to_str()+")", //todo: factor this out, map..
 			ast::ty_path(ref path,ref params,node_id)=>~"path:id="+node_id.to_str()+" "+path_to_str(dc,path)
 			,
 
@@ -906,7 +907,7 @@ pub fn get_node_info_str(dc:&RFindCtx,node:&NodeTreeLoc)->~str
 		match *x {
 			ast::ExprStruct(ref p,_,_)=>~"(expr_struct "+ path_to_str(dc,p) +")",
 			ast::ExprCall(ref e,ref args,_)=>~"(expr_call("+expr_to_str(dc,&e.node)+args.map(|x|expr_to_str(dc,&x.node)).to_str()+~")",
-			ast::ExprField(ref e, ref i, ref tys)=>~"(expr_field("+expr_to_str(dc,&e.node)+")"+dc.sess.str_of(*i)+tys.map(|x|ty_to_str(dc,x)).to_str()+~")",
+			ast::ExprField(ref e, ref i, ref tys)=>~"(expr_field("+expr_to_str(dc,&e.node)+")"+dc.sess.str_of(*i)+tys.map(|x|ty_to_str(dc,*x)).to_str()+~")",
 			_=>~"expr"
 		}
 	}
@@ -938,7 +939,7 @@ pub fn get_node_info_str(dc:&RFindCtx,node:&NodeTreeLoc)->~str
 				ast::named_field(nf,vis)=>"struct named_field: "+dc.sess.str_of(nf)+" ",
 				_=>~"struct anon_field"
 			}+
-			~":"+ty_to_str(dc,&sf.node.ty)/*sf.node.ty ..parse it.. */,
+			~":"+ty_to_str(dc, sf.node.ty)/*sf.node.ty ..parse it.. */,
 		&astnode_pat(p)=>~"pattern: "+
 			~"id="+p.id.to_str()+~" "+
 			pat_to_str(dc,p)
@@ -965,7 +966,7 @@ pub fn get_def_id(curr_crate:ast::CrateNum,src_def:ast::Def)->Option<ast::DefId>
 	match (src_def) {
 		ast::DefFn(d,_)=>Some(d),
 		ast::DefStaticMethod(d,_,_)=>Some(d),
-		ast::DefSelf(id)=>mk(id),
+		ast::DefSelf(id, _)=>mk(id),
 		ast::DefSelfTy(id)=>mk(id),
 		ast::DefMod(d)=>Some(d),
 		ast::DefForeignMod(d)=>Some(d),
@@ -1001,15 +1002,15 @@ impl ToJsonStr for JumpToDefMap {
 */
 
 pub fn byte_pos_from_text_file_pos_str(dc:&RFindCtx,filepos:&str)->Option<codemap::BytePos> {
-	let toks=filepos.split_iter(':').to_owned_vec();
+	let toks=filepos.split(':').to_owned_vec();
 	if toks.len()<3 { return None; }
 //	let t0:()=toks[0];
 
 //	let line:Option<uint> = FromStr::from_str(toks[1]);
 //	if_some!(line in FromStr::from_str(toks[1]) then {
 //		if_some!(col in FromStr::from_str(toks[2]) then {
-	let line:Option<uint> =FromStr::from_str(toks[1]);
-	let col:Option<uint> =FromStr::from_str(toks[2]);
+	let line: Option<u32> = from_str(toks[1]);
+	let col:Option<u32> = from_str(toks[2]);
 	if line.is_some() && col.is_some() {
 		//todo - if no column specified, just lookup everything on that line!
 		let l0 = line.unwrap()-1;
@@ -1026,10 +1027,10 @@ pub fn build_node_def_node_table(dc:&RFindCtx)->~HashMap<ast::NodeId, ast::DefId
 	let mut r=~HashMap::new();
 	let curr_crate_id_hack=0;	// TODO WHAT IS CRATE ID REALLY?!
 	// todo .. for range(0,c.next_id) || ??
-	let mut id:ast::NodeId=0;
+	let mut id: ast::NodeId=0;
 	while id<*(dc.tycx.next_id) as ast::NodeId {
-		if_some!(t in safe_node_id_to_type(dc.tycx,id as int) then {
-			if_some!(def in dc.tycx.def_map.find(&(id as int)) then { // finds a def..
+		if_some!(t in safe_node_id_to_type(dc.tycx,id) then {
+			if_some!(def in dc.tycx.def_map.find(&(id)) then { // finds a def..
 				if_some!(did in get_def_id(curr_crate_id_hack,*def) then {
 					r.insert(id as ast::NodeId,did);
 				})
@@ -1047,10 +1048,10 @@ pub fn def_node_id_from_node_id(dc:&RFindCtx, id:ast::NodeId)->ast::NodeId {
 		Some(a)=>{
 			match get_def_id(crate_num,*a) {
 				Some(b)=>b.node,
-				None=>id as int
+				None=>id
 			}
 		},
-		None=>(id as int)	// no definition? say its its own definition
+		None=>(id)	// no definition? say its its own definition
 	}
 }
 
