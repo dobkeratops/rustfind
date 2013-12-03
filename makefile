@@ -41,7 +41,7 @@ test0 : rustfind
 #make emacs ctags for this project
 tags:
 	ctags -e -f TAGS.emacs --options=$(RUSTSRC)/etc/ctags.rust -R .
-	
+
 
 # Make the HTML view of the main rust sourcetree
 rustsrc: rustfind
