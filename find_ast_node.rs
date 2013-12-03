@@ -267,6 +267,7 @@ impl KindToStr for ast::Expr {
 		ast::ExprLoop(_, _)=>"loop",
 		ast::ExprMatch(_, _)=>"match",
 		ast::ExprFnBlock(_, _)=>"fn_blk",
+		ast::ExprProc(..) => "proc",
 		ast::ExprDoBody(_)=>"do_body",
 		ast::ExprBlock(_)=>"blk",
 		ast::ExprAssign(_,_)=>"assign",
@@ -717,7 +718,7 @@ impl Visitor<FncsState> for FncsThing {
 //	 fn visit_arm(&mut self, a:&ast::Arm, (s, p):FncsState) {}
 
 	fn visit_pat(&mut self, a: &ast::Pat, (s, p):FncsState) {
-		push_span(s, a.id, p, None, "pat", a.span, astnode_pat(@*a));
+		push_span(s, a.id, p, None, "pat", a.span, astnode_pat(@a.clone()));
 
 		visit::walk_pat(self, a, (s, a.id));
 	}
@@ -749,7 +750,7 @@ impl Visitor<FncsState> for FncsThing {
 //	 fn visit_fn()
 
 	fn visit_struct_field(&mut self, a: &ast::struct_field, (s, p):FncsState) {
-		push_spanned(s, "struct_field", a, astnode_struct_field(@*a), p);
+		push_spanned(s, "struct_field", a, astnode_struct_field(@a.clone()), p);
 
 		visit::walk_struct_field(self, a, (s, p));
 	}
@@ -848,7 +849,7 @@ impl Visitor<@mut FindAstNodeSt> for Finder {
 
 	fn visit_struct_field(&mut self, a: &ast::struct_field, s:@mut FindAstNodeSt) {
 		if span_contains(s.location, a.span) {
-			s.result.push(astnode_struct_field(@*a));
+			s.result.push(astnode_struct_field(@a.clone()));
 		}
 
 		visit::walk_struct_field(self, a, s);

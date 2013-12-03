@@ -107,7 +107,7 @@ fn main() {
     ];
 
 	let matches = getopts(args.tail(), opts).unwrap();
-    let libs1 = matches.opt_strs("L").map(|s| std::path::posix::Path::new(s.clone ()));
+    let libs1 = matches.opt_strs("L").map(|s| Path::init(s.as_slice()));
 	let libs=if libs1.len()>0 {libs1} else {
 		match (os::getenv(&"RUST_LIBS")) {
 			Some(x)=>~[ posix::Path::new(x)],

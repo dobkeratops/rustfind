@@ -66,7 +66,7 @@ pub fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, nodeinfomap:&FNodeInf
 				let tydef=/*rf_ast_ut::*/auto_deref_ty(ty::get(*obj_ty.unwrap()));
 				match tydef.sty {
 					ty::ty_struct(def,_)=> {
-						let node_to_show=/*rf_ast_ut::*/find_named_struct_field(dc.tycx, def.node, ident).unwrap_or(def);
+						let node_to_show=/*rf_ast_ut::*/find_named_struct_field(&dc.tycx, def.node, ident).unwrap_or(def);
 						return Some(node_to_show);//mk_result(dc,m,node_spans,node_to_show,"(struct_field)");
 					},
 					_=>return None

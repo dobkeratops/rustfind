@@ -324,15 +324,9 @@ fn sub_match(mut line:&str,x:uint,opts:&[&str])->Option<(uint,uint)>{
 	let mut opti=0;
 	if line.is_char_boundary(x)==false { return None; }
 	for o in opts.iter() {
-<<<<<<< HEAD
-		if (o.len()+x)>line.len() {continue;} // not enough chars in line
-		if (o.len()+x+1)<line.len() {
-			if is_alphanumeric_u8(line[o.len()+x]) {continue;}// not word boundary for this one
-=======
 		if (o.len()+x)>line.len() { continue; } // not enough chars in line
 		if (o.len()+x+1)<line.len() {
 			if is_alphanumeric_u8(line[o.len()+x]) { continue; }// not word boundary for this one
->>>>>>> dd41cbe... Fixed a lot of problems, now working on API changes
 		}
 
 		let ex=o.len()+x;
@@ -522,11 +516,7 @@ fn write_line_with_links(dst:&mut SourceCodeWriter<htmlwriter::HtmlWriter>,dc:&R
 				Some((ix,len))=>{
 					let me=x+len;
 					while x<me { color[x]=21; link[x]=0;x+=1; }
-<<<<<<< HEAD
-					continue
-=======
 					continue;
->>>>>>> dd41cbe... Fixed a lot of problems, now working on API changes
 					}
 				}
 			}
@@ -792,11 +782,7 @@ fn write_references(doc:&mut htmlwriter::HtmlWriter,dc:&RFindCtx, fm:&codemap::F
 		let opt_def_info = nmaps.nim.find(&dn);
 		if !opt_def_info.is_some() {continue;}
 		let def_info = opt_def_info.unwrap();
-<<<<<<< HEAD
-		if !(def_info.kind==~"fn" || def_info.kind==~"struct" || def_info.kind==~"trait" || def_info.kind==~"enum" || def_info.kind==~"ty") {continue}
-=======
 		if !(def_info.kind==~"fn" || def_info.kind==~"struct" || def_info.kind==~"trait" || def_info.kind==~"enum" || def_info.kind==~"ty") { continue; }
->>>>>>> dd41cbe... Fixed a lot of problems, now working on API changes
 
 		let refs = nmaps.jrm.find(dn);
 		let max_links=30;	// todo - sort..
@@ -836,7 +822,7 @@ fn write_references(doc:&mut htmlwriter::HtmlWriter,dc:&RFindCtx, fm:&codemap::F
 			let l=refs2.len();
 			fn pri_of(x:&FNodeInfo)->uint{ if &"impl"==x.kind{0} else {0x8000} }
 			// todo: we want to sort based on node type to find impls, but we dont quite find what we want..
-			sort::quick_sort(refs2, /*0,l-1,*/ |&(ni1,ref ifp1,_),&( ni2,ref ifp2,_)|{ ((ifp1.file_index-curr_file)&0x7fff)+pri_of(ni1)<=((ifp2.file_index-curr_file)&0x7fff)+pri_of(ni2) });
+			sort::quick_sort(refs2.mut_slice_to(l - 1), |&(ni1,ref ifp1,_),&( ni2,ref ifp2,_)|{ ((ifp1.file_index-curr_file)&0x7fff) as uint +pri_of(ni1)<=((ifp2.file_index-curr_file)&0x7fff) as uint +pri_of(ni2) });
 			let mut newline=true;
 			for &(ref ref_info,ref ref_ifp,ref id) in refs2.iter() {
 				if *id!=dn {
