@@ -1,12 +1,10 @@
 use rf_common::*;
 use syntax::ast;
-use syntax::ast_map;
 use syntax::visit;
 // use syntax::oldvisit;
 // use syntax::visit::*;
-use syntax::visit::{Visitor, fn_kind};
+use syntax::visit::{Visitor};
 use syntax::codemap;
-use rustc::{front, metadata, driver, middle};
 use rustc::middle::mem_categorization::ast_node;
 use rustc::middle::ty;
 use rfindctx::{RFindCtx,};
@@ -112,7 +110,7 @@ pub fn find_node_tree_loc_at_byte_pos(c:@ast::Crate,_location:codemap::BytePos)-
 	// would it be more efficient to use that?
 	// if we encoded hrc information in the node-spans-table,
 	// we wouldn't need all this iterator malarchy again.
-	let mut s= @mut FindAstNodeSt{
+	let s = @mut FindAstNodeSt{
 		result:~[astnode_root], location:*_location, stop:false
 
 	};
@@ -168,7 +166,7 @@ pub fn node_spans_table_to_json_sub(dc:&RFindCtx,ns:&FNodeInfoMap)->~str {
 
 impl ToJsonStrFc for FNodeInfoMap {
 	fn to_json_str(&self,dc:&RFindCtx)->~str {
-		~"[\n"+node_spans_table_to_json_sub(dc,self)+~"]\n"
+		~"[\n"+node_spans_table_to_json_sub(dc,self)+"]\n"
 	}
 }
 
@@ -200,7 +198,7 @@ impl ToJsonStr for hashmap::HashMap<ast::NodeId,ast::DefId> {
 impl KindToStr for ast::Decl {
 	fn kind_to_str(&self)->&'static str {
 		match self.node {
-		ast::DeclLocal(l)=>"decl_local",
+		ast::DeclLocal(_)=>"decl_local",
 		ast::DeclItem(x)=>x.kind_to_str(),
 		}
 	}
@@ -252,7 +250,7 @@ impl KindToStr for ast::Expr {
 
 		},
 		ast::ExprUnary(_, unop, _)=>match unop {
-			ast::UnBox(mt)=>"box",
+			ast::UnBox(_)=>"box",
 			ast::UnUniq=>"uniq",
 			ast::UnDeref=>"deref",
 			ast::UnNot=>"not",
@@ -298,7 +296,7 @@ impl KindToStr for ast::Expr {
 		ast::ExprAddrOf(_, _)=>"addr_of",
 		ast::ExprBreak(_)=>"break",
 		ast::ExprAgain(_)=>"again",
-		ast::ExprRet(ret)=>"ret",
+		ast::ExprRet(_)=>"ret",
 		ast::ExprLogLevel => "log",
 		ast::ExprInlineAsm(_)=>"inline_asm",
 		ast::ExprMac(_)=>"mac",
@@ -355,7 +353,7 @@ impl AstNodeAccessors for ast::item_ {
 	fn get_id(&self)->Option<ast::NodeId> {
 		match *self {
 		ast::item_static(_,_,ref e) => Some(e.id),
-		ast::item_fn(ref decl,_,_,_,ref b)=>Some(b.id),
+		ast::item_fn(_, _, _, _, ref b)=>Some(b.id),
 		ast::item_mod(_)=>None,
 		ast::item_foreign_mod(_)=>None,
 		ast::item_ty(ref ty,_)=>Some(ty.id),
@@ -517,7 +515,7 @@ impl AstNodeAccessors for ast::trait_method {
 	fn get_id(&self)->Option<ast::NodeId> {
 		match(*self) {
 			ast::required(ref m)=>Some(m.id),
-			ast::provided(ref m)=>None
+			ast::provided(_)=>None
 		}
 	}
 	fn get_ident(&self)->Option<ast::Ident> {
@@ -536,13 +534,13 @@ impl AstNodeAccessors for AstNode {
 	fn get_id(&self)->Option<ast::NodeId> {
 		// todo - should be option<node_id> really..
 		match *self {
-			astnode_mod(ref x) => None,
+			astnode_mod(_) => None,
 			astnode_view_item(ref x) =>x.node.get_id(),
 			astnode_item(ref x) =>Some(x.id),
 			astnode_local(ref x) =>Some(x.id),
-			astnode_block(ref x)=>None,
-			astnode_stmt(ref x)=>None,
-			astnode_arm(ref x)=>None,
+			astnode_block(_)=>None,
+			astnode_stmt(_)=>None,
+			astnode_arm(_)=>None,
 			astnode_pat(ref x)=>Some(x.id),
 			astnode_decl(ref x)=>x.get_id(),
 			astnode_expr(ref x)=>Some(x.id),
@@ -551,7 +549,7 @@ impl AstNodeAccessors for AstNode {
 			astnode_ty_method(ref x)=>Some(x.id),
 			astnode_trait_method(ref x)=>x.get_id(),
 			astnode_method(ref m)=>Some(m.id),
-			astnode_struct_def(ref x)=>None,
+			astnode_struct_def(_)=>None,
 			astnode_struct_field(ref x)=>Some(x.node.id),
 			astnode_trait_ref(ref x)=>Some(x.ref_id),
 			astnode_variant(ref x)=>Some(x.node.id),
@@ -565,9 +563,9 @@ impl AstNodeAccessors for AstNode {
 			astnode_view_item(ref x) =>x.get_ident(),
 			astnode_item(ref x) =>x.get_ident(),
 			astnode_local(ref x) =>x.get_ident(),
-			astnode_block(ref x)=>None,
-			astnode_stmt(ref x)=>None,
-			astnode_arm(ref x)=>None,
+			astnode_block(_)=>None,
+			astnode_stmt(_)=>None,
+			astnode_arm(_)=>None,
 			astnode_pat(ref x)=>x.get_ident(),
 			astnode_decl(ref x)=>x.get_ident(),
 			astnode_expr(ref x)=>x.get_ident(),
@@ -588,11 +586,11 @@ fn item_get_ident(a:&ast::item)->Option<ast::Ident> { Some(a.ident) }
 
 fn decl_get_ident(a:&ast::Decl)->Option<ast::Ident> {
 	match a.node {
-		ast::DeclLocal(ref l)=> None, // todo - will we need the ident ?a local isn't always 1, due to tuples
+		ast::DeclLocal(_)=> None, // todo - will we need the ident ?a local isn't always 1, due to tuples
 		ast::DeclItem(i)=> item_get_ident(i)
 	}
 }
-fn expr_get_ident(a:&ast::Expr)->Option<ast::Ident> {
+fn expr_get_ident(_ :&ast::Expr)->Option<ast::Ident> {
 	None
 }
 
@@ -611,7 +609,7 @@ pub fn get_ast_node_of_node_id(info:&FNodeInfoMap,id:ast::NodeId)->Option<AstNod
 	}
 }
 
-pub fn push_span(spt:&mut FNodeInfoMap,n:ast::NodeId,p:ast::NodeId,idt:Option<ast::Ident>,k:&str, s:codemap::Span,nd:AstNode) {
+pub fn push_span(spt:&mut FNodeInfoMap,n:ast::NodeId,p:ast::NodeId, _:Option<ast::Ident>,k:&str, s:codemap::Span,nd:AstNode) {
 	spt.insert(n,FNodeInfo{ident:nd.get_ident(), kind:k.to_str(),span:s,node:nd, parent_id:p});
 }
 
@@ -669,7 +667,7 @@ impl Visitor<FncsState> for FncsThing {
 
 		// TODO: Push nodes for type-params... since we want to click on their defs...
 		match a.node {
-			ast::item_impl(ref g, ref o_traitref, ref self_ty, ref methods) => {
+			ast::item_impl(_, ref o_traitref, _, ref methods) => {
 //				 self.visit_generics(g, (s, p));
 				match *o_traitref {
 					None => {}
@@ -680,12 +678,12 @@ impl Visitor<FncsState> for FncsThing {
 					push_span(s, m.id, p, Some(a.ident), "method", m.span, astnode_method(*m));
 				}
 			}
-			ast::item_enum(ref ed, ref g) => {
+			ast::item_enum(ref ed, _) => {
 				for v in ed.variants.iter() {
 					self.variant(*v, (s,p));
 				}
 			}
-			ast::item_trait(ref g, ref tr, ref tm) => {
+			ast::item_trait(_, ref tr, _) => {
 				for t in tr.iter() {
 					self.trait_ref(t, (s, p));
 				}
@@ -863,7 +861,7 @@ pub fn get_node_info_str(dc:&RFindCtx,node:&NodeTreeLoc)->~str
 		let mut first=true;
 //		for path.idents.iter().advance |x|{
 		for x in path.segments.iter() {
-			if !first {acc=acc.append(~"::");}
+			if !first {acc=acc.append("::");}
 			acc=acc.append(dc.sess.str_of(x.identifier));
 			first=false
 		}
@@ -873,15 +871,15 @@ pub fn get_node_info_str(dc:&RFindCtx,node:&NodeTreeLoc)->~str
 	fn pat_to_str(dc:&RFindCtx,p:&ast::Pat)->~str{
 		// todo -factor out and recurse
 		match p.node {
-			ast::PatIdent(bind_mode,ref path, opt)=>~"pat_ident:"+path_to_str(dc,path),
-			ast::PatEnum(ref path,ref efields)=>~"pat_enum:"+path_to_str(dc,path),//	`todo-fields..
-			ast::PatStruct(ref path,ref sfields,b)=>~"pat_struct:"+path_to_str(dc,path)+~"{"+sfields.map(|x|pat_to_str(dc,x.pat)+~",").to_str()+~"}",
+			ast::PatIdent(_, ref path, _)=>~"pat_ident:"+path_to_str(dc,path),
+			ast::PatEnum(ref path, _)=>~"pat_enum:"+path_to_str(dc,path),//	`todo-fields..
+			ast::PatStruct(ref path,ref sfields,_)=>~"pat_struct:"+path_to_str(dc,path)+"{"+sfields.map(|x|pat_to_str(dc,x.pat)+",").to_str()+"}",
 			ast::PatTup(ref elems)=>~"pat_tupl:"+elems.map(|&x|pat_to_str(dc,x)).to_str(),
 			//ast::pat_box(ref box)=>~"box",
-			ast::PatUniq(ref u)=>~"uniq",
-			ast::PatRegion(ref p)=>~"rgn",
-			ast::PatLit(ref e)=>~"literal",
-			ast::PatRange(ref e_start,ref e_end)=>~"range",
+			ast::PatUniq(..)=>~"uniq",
+			ast::PatRegion(..)=>~"rgn",
+			ast::PatLit(..)=>~"literal",
+			ast::PatRange(..)=>~"range",
 
 			_=>~"?"
 		}
@@ -890,13 +888,13 @@ pub fn get_node_info_str(dc:&RFindCtx,node:&NodeTreeLoc)->~str
 		match t.node{
 			ast::ty_nil=> ~"nil",
 			ast::ty_bot=>~"bottomtype",
-			ast::ty_box(ref mt)=>~"box",
-			ast::ty_vec(ref mt)=>~"vec",
-			ast::ty_fixed_length_vec(ref mt,ref expr)=>~"[T,..N]",
-			ast::ty_ptr(ref mt)=>~"*",
-			ast::ty_rptr(ref lifetime,ref mt)=>~"&",
+			ast::ty_box(..)=>~"box",
+			ast::ty_vec(..)=>~"vec",
+			ast::ty_fixed_length_vec(..)=>~"[T,..N]",
+			ast::ty_ptr(..)=>~"*",
+			ast::ty_rptr(..)=>~"&",
 			ast::ty_tup(ref types)=>~"("+types.map(|x|ty_to_str(dc,*x)).to_str()+")", //todo: factor this out, map..
-			ast::ty_path(ref path,ref params,node_id)=>~"path:id="+node_id.to_str()+" "+path_to_str(dc,path)
+			ast::ty_path(ref path, _, node_id)=>~"path:id="+node_id.to_str()+" "+path_to_str(dc,path)
 			,
 
 			ast::ty_infer=>~"infered",
@@ -906,8 +904,8 @@ pub fn get_node_info_str(dc:&RFindCtx,node:&NodeTreeLoc)->~str
 	fn expr_to_str(dc:&RFindCtx, x:&ast::Expr_)->~str {
 		match *x {
 			ast::ExprStruct(ref p,_,_)=>~"(expr_struct "+ path_to_str(dc,p) +")",
-			ast::ExprCall(ref e,ref args,_)=>~"(expr_call("+expr_to_str(dc,&e.node)+args.map(|x|expr_to_str(dc,&x.node)).to_str()+~")",
-			ast::ExprField(ref e, ref i, ref tys)=>~"(expr_field("+expr_to_str(dc,&e.node)+")"+dc.sess.str_of(*i)+tys.map(|x|ty_to_str(dc,*x)).to_str()+~")",
+			ast::ExprCall(ref e,ref args,_)=>~"(expr_call("+expr_to_str(dc,&e.node)+args.map(|x|expr_to_str(dc,&x.node)).to_str()+")",
+			ast::ExprField(ref e, ref i, ref tys)=>~"(expr_field("+expr_to_str(dc,&e.node)+")"+dc.sess.str_of(*i)+tys.map(|x|ty_to_str(dc,*x)).to_str()+")",
 			_=>~"expr"
 		}
 	}
@@ -919,34 +917,34 @@ pub fn get_node_info_str(dc:&RFindCtx,node:&NodeTreeLoc)->~str
 //			fn path_to_str(&astnode_pat(x))->~str
 //			fn expr_to_str(&astnode_pat(x))->~str
 
-		&astnode_view_item(x)=>~"view_item: ?",
+		&astnode_view_item(_)=>~"view_item: ?",
 		&astnode_item(x)=>~"item: "+
-			~"id="+x.id.to_str()+~" "+
+			"id="+x.id.to_str()+" "+
 			dc.sess.str_of(x.ident)+
 			match x.node {
-				ast::item_fn(ref fn_decl,_,_,_,_) =>~" fn_decl",
-				ast::item_struct(ref struct_def,_) =>~" struct_def",
+				ast::item_fn(_,_,_,_,_) =>~" fn_decl",
+				ast::item_struct(_, _) =>~" struct_def",
 				_=>~"item_unknown"
 			},
 
-		&astnode_local(x)=>~"local: ?",
-		&astnode_block(x)=>~"block: ?",
-		&astnode_stmt(x)=>~"stmt: ?",
-		&astnode_arm(x)=>~"arm: ?",
+		&astnode_local(_)=>~"local: ?",
+		&astnode_block(_)=>~"block: ?",
+		&astnode_stmt(_)=>~"stmt: ?",
+		&astnode_arm(_)=>~"arm: ?",
 		&astnode_struct_field(sf)=>
-			~"id="+sf.node.id.to_str()+~" "+
+			"id="+sf.node.id.to_str()+" "+
 			match(sf.node.kind){
-				ast::named_field(nf,vis)=>"struct named_field: "+dc.sess.str_of(nf)+" ",
+				ast::named_field(nf, _)=>"struct named_field: "+dc.sess.str_of(nf)+" ",
 				_=>~"struct anon_field"
 			}+
-			~":"+ty_to_str(dc, sf.node.ty)/*sf.node.ty ..parse it.. */,
-		&astnode_pat(p)=>~"pattern: "+
-			~"id="+p.id.to_str()+~" "+
+			":"+ty_to_str(dc, sf.node.ty)/*sf.node.ty ..parse it.. */,
+		&astnode_pat(p)=>"pattern: "+
+			"id="+p.id.to_str()+" "+
 			pat_to_str(dc,p)
 		,
-		&astnode_decl(x)=>~"decl: ?",
+		&astnode_decl(_)=>~"decl: ?",
 		&astnode_ty(x)=>~"type: "+ty_to_str(dc,x),
-		&astnode_struct_def(sf)=>~"struct def",
+		&astnode_struct_def(_)=>~"struct def",
 		&astnode_expr(x)=>expr_to_str(dc,&x.node),
 		_=>	~"unknown"
 	}
@@ -973,10 +971,10 @@ pub fn get_def_id(curr_crate:ast::CrateNum,src_def:ast::Def)->Option<ast::DefId>
 		ast::DefStatic(d,_)=>Some(d),
 		ast::DefArg(id,_)=>mk(id),
 		ast::DefLocal(id,_)=>mk(id),
-		ast::DefVariant(d1,d2, _)=>Some(d2),
+		ast::DefVariant(_, d2, _)=>Some(d2),
 		ast::DefTy(d)=>Some(d),
 		ast::DefTrait(d)=>Some(d),
-		ast::DefPrimTy(pt)=>None,
+		ast::DefPrimTy(_)=>None,
 		ast::DefTyParam(d,_)=>Some(d),
 		ast::DefBinding(d,_)=>mk(d),
 		ast::DefUse(d)=>Some(d),
@@ -1016,7 +1014,7 @@ pub fn byte_pos_from_text_file_pos_str(dc:&RFindCtx,filepos:&str)->Option<codema
 		let l0 = line.unwrap()-1;
 		let c0= col.unwrap()-1;
 		let foo= ZTextFilePos::new(toks[0],l0,c0).to_byte_pos(dc.tycx);
-		foo;
+		return foo;
 	}
 	return None;
 }
@@ -1056,7 +1054,7 @@ pub fn def_node_id_from_node_id(dc:&RFindCtx, id:ast::NodeId)->ast::NodeId {
 }
 
 
-pub fn def_of_symbol_to_str(dc:&RFindCtx, ns:&FNodeInfoMap,ds:&HashMap<ast::NodeId, ast::DefId>,s:&str)->~str {
+pub fn def_of_symbol_to_str(_:&RFindCtx, _:&FNodeInfoMap, _:&HashMap<ast::NodeId, ast::DefId>, _:&str)->~str {
 	~"TODO"
 }
 

@@ -2,33 +2,6 @@ extern mod syntax;
 extern mod rustc;
 extern mod extra;
 
-use rustc::{front, metadata, driver, middle};
-use rustc::middle::*;
-use rustc::middle::typeck;
-
-use std::num;
-use std::num::*;
-
-use syntax::parse;
-use syntax::ast;
-use syntax::ast_map;
-use syntax::visit;
-use syntax::parse::token;
-use syntax::visit::*;
-use syntax::visit::{Visitor, fn_kind};
-use syntax::diagnostic;
-use syntax::codemap::BytePos;
-use std::io;
-
-use syntax::abi::AbiSet;
-use syntax::ast;
-use syntax::codemap;
-
-use std::hashmap::*;
-use std::os;
-use std::local_data;
-use extra::json::ToJson;
-
 //use rust2html::*;
 //use rsfind::*;
 

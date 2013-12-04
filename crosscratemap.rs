@@ -1,9 +1,6 @@
 use rf_common::*;
 use syntax::ast;
-use std::int;
-use std::uint;
 use rustc::metadata::cstore;
-use rfindctx::{str_of_opt_ident};
 use find_ast_node::FNodeInfoMap;
 use jumptodefmap::*;
 use ioutil;
@@ -28,7 +25,7 @@ pub struct CrossCrateMapItem {
 pub type CrossCrateMap = HashMap<ast::DefId,CrossCrateMapItem>;
 
 
-pub fn read_cross_crate_map(dc:&RFindCtx, crate_num:int, crate_name:&str,lib_path:&str)->~CrossCrateMap {
+pub fn read_cross_crate_map(_:&RFindCtx, crate_num:int, crate_name:&str,lib_path:&str)->~CrossCrateMap {
 	let mut raw_bytes=ioutil::fileLoad(crate_name);
 	if (raw_bytes.len()==0) {
 		println("loading lib crosscratemap "+lib_path+"/"+crate_name);
@@ -85,7 +82,7 @@ pub fn read_cross_crate_map(dc:&RFindCtx, crate_num:int, crate_name:&str,lib_pat
 
 
 
-pub fn write_cross_crate_map(dc:&RFindCtx,lib_html_path:&str,nim:&FNodeInfoMap, ndm:&HashMap<ast::NodeId, ast::DefId>, jdm:&JumpToDefMap) {
+pub fn write_cross_crate_map(dc:&RFindCtx, _:&str,nim:&FNodeInfoMap, _:&HashMap<ast::NodeId, ast::DefId>, jdm:&JumpToDefMap) {
 	// write inter-crate node map
 	let crate_rel_path_name= dc.sess.codemap.files[0].name;
 	let new_format:bool=true;
@@ -129,7 +126,7 @@ pub fn write_cross_crate_map(dc:&RFindCtx,lib_html_path:&str,nim:&FNodeInfoMap, 
 //	}
 
 
-	{	let x=curr_crate_name_only+~".rfx";
+	{	let x=curr_crate_name_only+ ".rfx";
 		println("writing "+x);
 		ioutil::fileSaveStr(outp, x);
 	}

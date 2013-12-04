@@ -8,7 +8,6 @@ pub use std::mem::size_of;	// for size_of
 pub use std::vec::*;
 pub use std::num::*;
 use std::io::buffered::BufferedReader;
-use std::path::PosixPath;
 
 pub type Size_t=u64;	// todo - we're not sure this should be u64
 						// as the libc stuff seems to want.
@@ -19,11 +18,11 @@ macro_rules! logi{
 	($($a:expr),*)=>(println(file!()+":"+line!().to_str()+": " $(+$a.to_str())* ))
 }
 //macro_rules! dump{ ($a:expr)=>(logi!(fmt!("%s=%?",stringify!($a),$a).indent(2,160));)}
-fn newline_if_over(a:~str,l:uint)->~str{if a.len()>l {a+~"\n"}else{a}}
+fn newline_if_over(a:~str,l:uint)->~str{if a.len()>l {a+"\n"}else{a}}
 macro_rules! dump{ ($($a:expr),*)=>
 	(	{	let mut txt=~"";
 			$( txt=txt.append(
-				format!("{:s}={:?}",stringify!($a),$a)+~",")
+				format!("{:s}={:?}",stringify!($a),$a) + ",")
 			);*;
 			logi!(txt);
 		}
@@ -77,7 +76,7 @@ pub fn c_str(rustStr:&str)->*c_char {
 	}
 }
 
-#[fixed_stack_segment]
+
 pub unsafe fn fileOpen(filename:&str,mode:&str)-> *FILE {
 	fopen(c_str(filename),c_str(mode))
 }
@@ -89,25 +88,25 @@ pub fn fileLoadArray<T>(filename:&str)->~[T] {
 }
 */
 
-#[fixed_stack_segment]
+
 pub unsafe fn fileWrite<T>(fp:*FILE, array:&[T]) {
 	printStr(&sizeofArray(array));
 	fwrite(as_void_ptr(&array[0]),sizeofArray(array),1,fp);
 }
 
-#[fixed_stack_segment]
+
 pub unsafe fn fileWriteStruct<T>(fp:*FILE, s:&T) {
 	fwrite(as_void_ptr(s),size_of::<T>() as Size_t,1,fp);
 }
 
-#[fixed_stack_segment]
+
 pub unsafe fn fileRead<T:Zero+Clone>(fp:*FILE,numElems:Size_t)->~[T] {
 	let buffer=from_elem(numElems as uint, Zero::zero());
 	fread(as_mut_void_ptr(&buffer[0]),numElems,size_of::<T>() as Size_t,fp);
 	buffer
 }
 
-#[fixed_stack_segment]
+
 pub unsafe fn fileReadBytes(fp:*FILE,numBytes:Size_t)->~[u8] {
 	// todo - simply express as the above..
 	let buffer=from_elem(numBytes as uint,0 as u8);
@@ -115,7 +114,7 @@ pub unsafe fn fileReadBytes(fp:*FILE,numBytes:Size_t)->~[u8] {
 	buffer
 }
 
-#[fixed_stack_segment]
+
 pub unsafe fn fileSize(fp:*FILE)->Size_t {
 	fseek(fp,0,SEEK_END);
 	let pos=ftell(fp);
@@ -123,7 +122,7 @@ pub unsafe fn fileSize(fp:*FILE)->Size_t {
 	pos as Size_t
 }
 
-#[fixed_stack_segment]
+
 pub fn fileLoad(filename:&str)->~[u8] {
 	unsafe {
 		// TODO - should do with patter match null, fp?
@@ -139,7 +138,7 @@ pub fn fileLoad(filename:&str)->~[u8] {
 	}
 }
 
-#[fixed_stack_segment]
+
 pub unsafe fn fileWriteRange<T>(fp:*FILE, array:&[T],start:uint,end:uint) {
 	printStr(&sizeofArray(array));
 	fwrite(as_void_ptr(&array[start]),sizeofArrayElem(array)*(end-start) as Size_t,1,fp);
@@ -148,7 +147,7 @@ pub unsafe fn fileWriteRange<T>(fp:*FILE, array:&[T],start:uint,end:uint) {
 pub fn sizeofArray<T>(a:&[T])->Size_t { (size_of::<T>() * a.len()) as Size_t }
 pub fn sizeofArrayElem<T>(_:&[T])->Size_t { size_of::<T>() as Size_t }
 
-#[fixed_stack_segment]
+
 pub fn fileSaveArray<T>(buffer:&[T],filename:&str) {
 	unsafe {
 		let fp=fileOpen(filename,"wb");
@@ -162,7 +161,7 @@ pub fn fileSaveArray<T>(buffer:&[T],filename:&str) {
 	}
 }
 
-#[fixed_stack_segment]
+
 pub fn fileSaveStr(text:&str,filename:&str) {
 	unsafe {
 		let fp=fileOpen(filename,"wb");
