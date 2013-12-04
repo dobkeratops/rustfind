@@ -2,9 +2,9 @@ use rf_common::*;
 use syntax::ast;
 use rustc::metadata::cstore;
 use find_ast_node::FNodeInfoMap;
-use jumptodefmap::*;
+use jumptodefmap::{JumpToDefMap};
 use ioutil;
-use rfindctx::*;
+use rfindctx::{RFindCtx, str_of_opt_ident};
 
 /*new file*/
 

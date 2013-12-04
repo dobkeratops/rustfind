@@ -4,8 +4,6 @@ use syntax::ast;
 use syntax::codemap;
 use rustc::{driver, middle};
 
-//use codemaput::*;
-
 pub struct RFindCtx {
      crate: @ast::Crate,
      tycx: middle::ty::ctxt,

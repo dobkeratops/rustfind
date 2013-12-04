@@ -1,8 +1,6 @@
 use rf_common::*;
 use syntax::ast;
 use syntax::visit;
-// use syntax::oldvisit;
-// use syntax::visit::*;
 use syntax::visit::{Visitor};
 use syntax::codemap;
 use rustc::middle::mem_categorization::ast_node;
@@ -105,7 +103,6 @@ pub fn find_node_at_byte_pos(c:@ast::Crate,_location:codemap::BytePos)->AstNode 
 
 
 pub fn find_node_tree_loc_at_byte_pos(c:@ast::Crate,_location:codemap::BytePos)->NodeTreeLoc {
-	use syntax::visit::*;
 	// TODO: Now that we have a sepereate 'node-spans table'
 	// would it be more efficient to use that?
 	// if we encoded hrc information in the node-spans-table,

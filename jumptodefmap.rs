@@ -4,10 +4,12 @@ use rustc::middle::{ty,typeck};
 use syntax::codemap::BytePos;
 use rsfind::ShowDefMode;
 
-use find_ast_node::*;
+use find_ast_node::{FNodeInfoMap, FNodeInfo, AstNode, NodeTreeLoc, find_node_tree_loc_at_byte_pos,
+	build_node_def_node_table, build_node_info_map, get_node_source, astnode_expr,
+	get_def_id, byte_pos_from_text_file_pos_str};
 use rfindctx::{RFindCtx,get_source_loc};
 use codemaput::ZTextFilePos;
-use rf_ast_ut::*;
+use rf_ast_ut::{auto_deref_ty, find_named_struct_field};
 use util::flatten_to_str; //todo - why is qualifying manually not working?!
 //use super::rf_use_ast;
 

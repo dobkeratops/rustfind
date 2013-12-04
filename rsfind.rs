@@ -2,10 +2,6 @@ extern mod syntax;
 extern mod rustc;
 extern mod extra;
 
-//use rust2html::*;
-//use rsfind::*;
-
-
 //pub static ctxtkey: local_data::Key<@DocContext> = &local_data::Key;
 
 pub macro_rules! if_some {

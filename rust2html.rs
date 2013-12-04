@@ -2,7 +2,6 @@ use syntax::codemap;
 use syntax::ast;
 use rustc::middle::ty;
 use iou=ioutil;
-//use htmlwriter::*;
 use std::hashmap::HashMap;
 use std::vec;
 use extra::sort;
@@ -10,7 +9,7 @@ use codemaput::{ZIndexFilePos,ToZIndexFilePos};
 use find_ast_node::{FNodeInfoMap,FNodeInfo};
 use rfindctx::{RFindCtx};
 use crosscratemap::{CrossCrateMap};
-use jumptodefmap::*;
+use jumptodefmap::{JumpToDefMap};
 //use self::htmlwriter::HtmlWriter;
 mod htmlwriter;
 

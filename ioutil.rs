@@ -1,12 +1,12 @@
 #[macro_escape];
 
-pub use std::io::*;
-pub use std::c_str::*;
-pub use std::libc::*;
-pub use std::ptr::*;
+pub use std::io::{stdout, stdin};
+pub use std::libc::{fwrite, fread, fseek, fopen, ftell, fclose, FILE, c_void, c_char, SEEK_END,
+	SEEK_SET};
+pub use std::ptr::to_unsafe_ptr;
 pub use std::mem::size_of;	// for size_of
-pub use std::vec::*;
-pub use std::num::*;
+pub use std::vec::from_elem;
+pub use std::num::Zero;
 use std::io::buffered::BufferedReader;
 
 pub type Size_t=u64;	// todo - we're not sure this should be u64

@@ -10,14 +10,14 @@ extern mod extra;
 use rustc::{driver};
 use rustc::metadata::cstore;
 
-use std::num::*;
 use std::{os,local_data};
 use std::hashmap::HashMap;
 use std::path::Path;
 
 use syntax::{parse,ast,codemap};
 use find_ast_node::{safe_node_id_to_type,get_node_info_str,find_node_tree_loc_at_byte_pos,ToJsonStr,ToJsonStrFc,AstNodeAccessors,KindToStr,get_node_source};
-use jumptodefmap::*;
+use jumptodefmap::{lookup_def_at_text_file_pos_str, make_jdm, def_info_from_node_id,
+	lookup_def_at_text_file_pos, dump_json};
 
 use rfindctx::{RFindCtx,ctxtkey};
 pub use codemaput::{ZTextFilePos,ZTextFilePosLen,get_span_str,ToZTextFilePos,ZIndexFilePos,ToZIndexFilePos};
