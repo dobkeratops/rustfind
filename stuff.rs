@@ -1,12 +1,10 @@
 extern mod syntax;
 
-use std::io::*;
-use std::hashmap::*;
-use syntax::*;
+use std::hashmap::HashMap;
 
 // Sketching out how this could work
 // but this information is within libsyntax, ast
-// 
+//
 
 //namespace path should include struct,trait,enum
 enum IdentifierType {
@@ -40,12 +38,12 @@ fn namespace_path_at(s:&SourceLocation)->~[NamespacePath]{
 	~[]
 }
 
-fn find_symbol_at(ds:&SymbolDefs,sl:&SourceLocation)->Option<SymbolDef> 
+fn find_symbol_at(ds:&SymbolDefs,sl:&SourceLocation)->Option<SymbolDef>
 {
 	let path=namespace_path_at(sl);
 	let identifier=get_identifier_at(sl);
 	let syms=
-		match identifier{	
+		match identifier{
 			Some(id)=>get_identifier_def(ds,&id),
 			None=>None
 		};

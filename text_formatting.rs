@@ -13,7 +13,7 @@ impl Indent for ~str {
 				'}'|')'|']'=> -1,
 				_ => 0
 			}
-		}			
+		}
 		let mut a:~str=~"";
 		let mut i=0;
 		let mut indent=0;
@@ -28,8 +28,8 @@ impl Indent for ~str {
 			let mut ii=i;
 			let mut inner_brace_level=indent;
 			let mut last_open=len;
-			let mut first_base_delim=len;
-			
+			let first_base_delim=len;
+
 			while inner_brace_level>=indent && ii<len  {
 				let c=self[ii];
 				if c=='\n'as u8 {break};
@@ -40,8 +40,8 @@ impl Indent for ~str {
 				inner_brace_level+=di;
 				if inner_brace_level==indent {
 					if (di<0 ||c==','as u8||c==';'as u8){last_open=ii;};
- 
-					if c==','as u8||c==';'as u8 && first_base_delim==len{	
+
+					if c==','as u8||c==';'as u8 && first_base_delim==len{
 						//first_base_delim=ii;
 					}
 				}
@@ -54,7 +54,7 @@ impl Indent for ~str {
 			indent+=dii;	// the extra one we considered.
 			let init_indent=indent;
 
-			if cur_linesize<linesize 
+			if cur_linesize<linesize
 			{
 				// copy the line. we dont overstep
 				while i<len && self[i]!='\n'as u8 && indent>=init_indent && i<=first_base_delim && i<=last_open{
@@ -63,7 +63,6 @@ impl Indent for ~str {
 					a.push_char(c as char);
 					i+=1;
 				}
-				if self[i]=='\n'as u8 {ii+=1;}
 			}
 			else {
 				// copy the line until the lines' last opening

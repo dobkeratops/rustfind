@@ -4,10 +4,12 @@ use rustc::middle::{ty,typeck};
 use syntax::codemap::BytePos;
 use rsfind::ShowDefMode;
 
-use find_ast_node::*;
+use find_ast_node::{FNodeInfoMap, FNodeInfo, AstNode, NodeTreeLoc, find_node_tree_loc_at_byte_pos,
+	build_node_def_node_table, build_node_info_map, get_node_source, astnode_expr,
+	get_def_id, byte_pos_from_text_file_pos_str};
 use rfindctx::{RFindCtx,get_source_loc};
 use codemaput::ZTextFilePos;
-use rf_ast_ut::*;
+use rf_ast_ut::{auto_deref_ty, find_named_struct_field};
 use util::flatten_to_str; //todo - why is qualifying manually not working?!
 //use super::rf_use_ast;
 
@@ -28,14 +30,15 @@ pub macro_rules! if_some {
 pub type JumpToDefMap = HashMap<ast::NodeId,ast::DefId> ;
 
 
-pub fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, nodeinfomap:&FNodeInfoMap, node_def_node:&HashMap<ast::NodeId,ast::DefId>)->Option<ast::DefId> {
+pub fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, nodeinfomap:&FNodeInfoMap, _: &HashMap<ast::NodeId,ast::DefId>)->Option<ast::DefId> {
 
 	match *node {
 		astnode_expr(e)=>match e.node {
 			// handle methods-calls
-			ast::ExprMethodCall(ref id,ref receiver,ref ident,ref ty_params,ref arg_exprs,ref call_sugar)=>{
-				let rec_ty_node= astnode_expr(*receiver).ty_node_id();
-				let rec_ty_node1= dc.tycx.node_types.find(&(*id as uint));
+			ast::ExprMethodCall(..)=>{
+				// Currently unused
+// 				let rec_ty_node= astnode_expr(*receiver).ty_node_id();
+// 				let rec_ty_node1= dc.tycx.node_types.find(&(*id as uint));
 
 				match dc.ca.maps.method_map.find(&e.id) {
 					None=> {},//logi!("no method map entry for",e.id),
@@ -44,7 +47,7 @@ pub fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, nodeinfomap:&FNodeInf
 						match mme.origin {
 							typeck::method_static(def_id)=>
 								return Some(def_id),
-							typeck::method_object(mp)=>
+							typeck::method_object(_)=>
 // 								return Some(mp.trait_id),
 								return None,
 							typeck::method_param(mp)=>{
@@ -60,7 +63,7 @@ pub fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, nodeinfomap:&FNodeInf
 				}
 			},
 			// handle struct-fields? "object.field"
-			ast::ExprField(ref object_expr,ref ident,ref ty_params)=>{
+			ast::ExprField(ref object_expr, ref ident, _)=>{
 				// we want the type of the object..
 				let obj_ty=dc.tycx.node_types.find(&(object_expr.id as uint));
 				let tydef=/*rf_ast_ut::*/auto_deref_ty(ty::get(*obj_ty.unwrap()));
@@ -81,7 +84,7 @@ pub fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, nodeinfomap:&FNodeInf
 	// handle everything else
 	match node.ty_node_id() {
 		Some(id) =>{
-			let (def_id,opt_info)= def_info_from_node_id(dc,nodeinfomap,id);
+			let (def_id, _)= def_info_from_node_id(dc,nodeinfomap,id);
 			return if def_id != ast::DefId{crate:0,node:id} {Some(def_id)} else {None}
 /*			match opt_info {
 				Some(info)=> {
@@ -241,7 +244,7 @@ pub fn lookup_def_of_node_sub(dc:&RFindCtx,node:&AstNode,m:ShowDefMode,nim:&FNod
 	// TODO - cache outside?
 
 
-	fn mk_result(dc:&RFindCtx,  m:ShowDefMode, nim:&FNodeInfoMap, def_node_id:ast::DefId, extra_str:&str)->Option<~str> {
+	fn mk_result(dc:&RFindCtx,  m:ShowDefMode, nim:&FNodeInfoMap, def_node_id:ast::DefId, _: &str)->Option<~str> {
 		if def_node_id.crate!=0 {
 			Some(~"{cross-crate-def not implemented, "+def_node_id.to_str()+"}")
 		}

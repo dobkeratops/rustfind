@@ -2,16 +2,14 @@ use syntax::codemap;
 use syntax::ast;
 use rustc::middle::ty;
 use iou=ioutil;
-//use htmlwriter::*;
 use std::hashmap::HashMap;
 use std::vec;
-use std::str;
 use extra::sort;
 use codemaput::{ZIndexFilePos,ToZIndexFilePos};
 use find_ast_node::{FNodeInfoMap,FNodeInfo};
 use rfindctx::{RFindCtx};
-use crosscratemap::{CrossCrateMap,CrossCrateMapItem};
-use jumptodefmap::*;
+use crosscratemap::{CrossCrateMap};
+use jumptodefmap::{JumpToDefMap};
 //use self::htmlwriter::HtmlWriter;
 mod htmlwriter;
 
@@ -43,8 +41,8 @@ pub fn make_html(dc:&RFindCtx, fm:&codemap::FileMap,nmaps:&NodeMaps,xcm:&CrossCr
 	write_head(&mut doc);
 
 	let hash=get_str_hash(fm.name);
-	let bg=(~[~"383838",~"34383c",~"3c3834",~"383c34",~"343c38",~"38343c",~"3a343a",
-			~"3a343a",~"36363a",~"363a36",~"3a3636",~"3a3a34",~"3a333a",~"343a3a",~"343a3c",~"343838"])[hash&15];
+// 	let bg=(~[~"383838",~"34383c",~"3c3834",~"383c34",~"343c38",~"38343c",~"3a343a",
+// 			~"3a343a",~"36363a",~"363a36",~"3a3636",~"3a3a34",~"3a333a",~"343a3a",~"343a3c",~"343838"])[hash&15];
 	// write the doc lines..
 	doc.begin_tag("body");//,&[(~"style",~"background-color:#"+bg+";")]);
 	doc.begin_tag("div");//,&[(~"style",~"background-color:#"+bg+";")]);
@@ -76,7 +74,7 @@ pub fn make_html(dc:&RFindCtx, fm:&codemap::FileMap,nmaps:&NodeMaps,xcm:&CrossCr
 				scw.doc.begin_tag_anchor("n"+nl.to_str());
 			}
 			scw.doc.write(" "); // TODO, It should be ok to nest these surely.
-			for nl in fln.def_nodes_per_line[line].iter() {
+			for _ in fln.def_nodes_per_line[line].iter() {
 				scw.doc.end_tag();
 			}
 			write_line_with_links(&mut scw,dc,fm,lib_path, nmaps,xcm, line_str, fln.nodes_per_line[line]);
@@ -219,7 +217,7 @@ impl NodesPerLinePerFile {
 					None=>{	},
 					Some(ifpe)=>{
 
-						let mut f=&mut npl.file[ifp.file_index];
+						let f = &mut npl.file[ifp.file_index];
 						f.def_nodes_per_line[ifp.line].push(*k);
 //						dump!(ifp, f.nodes_per_line.len());
 						for li in range(ifp.line,ifpe.line+1) {
@@ -318,8 +316,8 @@ fn is_text_here(line:&str, pos:uint,reftext:&str, color:ColorIndex)->Option<(Col
 	return Some((color,reftext.len()));
 }
 
-fn sub_match(mut line:&str,x:uint,opts:&[&str])->Option<(uint,uint)>{
-	let mut smp=x;
+fn sub_match(line:&str,x:uint,opts:&[&str])->Option<(uint,uint)>{
+	let smp=x;
 	if is_alphanumeric_u8(line[smp])==false{ return None;} // not alpha
 	let mut opti=0;
 	if line.is_char_boundary(x)==false { return None; }
@@ -376,7 +374,6 @@ fn write_line_with_links(dst:&mut SourceCodeWriter<htmlwriter::HtmlWriter>,dc:&R
 	// todo ... BREAK THIS FUNCTION UP!!!!
 	// and there is a load of messy cut paste too.
 
-	let node_infos=nodes.map(|id|{nmaps.nim.find(id)});
 //	for x in node_infos.iter() { println(fmt!("%?", x));}
 //	dump!(node_infos);
 // todo - sorting node spans, not this "painters-algorithm" approach..
@@ -384,7 +381,6 @@ fn write_line_with_links(dst:&mut SourceCodeWriter<htmlwriter::HtmlWriter>,dc:&R
 	let mut link:~[i64] = vec::from_elem(line.len(),0 as ast::NodeId as i64);
 	let mut color:~[int] = vec::from_elem(line.len(),0 as int);
 	let mut depth:~[uint]= vec::from_elem(line.len(),0x7fffffff as uint);
-	let mut rndcolor=0;
 
 	for n in nodes.iter() {
 
@@ -436,7 +432,6 @@ fn write_line_with_links(dst:&mut SourceCodeWriter<htmlwriter::HtmlWriter>,dc:&R
 						}
 						if link[x]==0 { link[x]=link_id;}
 					}
-					rndcolor+=1;
 				}
 			}
 		}
@@ -449,14 +444,14 @@ fn write_line_with_links(dst:&mut SourceCodeWriter<htmlwriter::HtmlWriter>,dc:&R
 
 	{
 		// handle decls, todo - combine with keywords..
-		let mut x=0; let mut wb=true;
+		let mut x;
+		let mut wb;
 		//attributes/"preprocessor"
-		x=0;
 		if line[0]as char =='#' {
 			for x in range(0,line.len()) { color[x]=50 }
 		}
 		// delimiters/whitespace/special chars characters - disable links & override some coloring
-		x=0; wb=false;
+		x=0;
 		while x < line.len() {
 			let c0=line[x] as char;
 
@@ -513,7 +508,7 @@ fn write_line_with_links(dst:&mut SourceCodeWriter<htmlwriter::HtmlWriter>,dc:&R
 			if wb {
 				match sub_match(line,x,&[&"let",&"mut", &"const", &"use", &"mod", &"match",&"if",&"else",&"break",&"return",&"while",&"loop",&"for",&"do",&"ref",&"pub",&"priv",&"unsafe",&"extern",&"in",&"as"]) {
 				None=>{},
-				Some((ix,len))=>{
+				Some((_, len))=>{
 					let me=x+len;
 					while x<me { color[x]=21; link[x]=0;x+=1; }
 					continue;
@@ -552,7 +547,6 @@ fn write_line_with_links(dst:&mut SourceCodeWriter<htmlwriter::HtmlWriter>,dc:&R
 }
 
 fn resolve_link(link:i64, dc:&RFindCtx,fm:&codemap::FileMap,lib_path:&str, nmaps:&NodeMaps,xcm:&CrossCrateMap)->~str {
-	let nim=nmaps.nim;
 /*
 	if link_debug==false {
 		if link!=no_link {
@@ -696,7 +690,7 @@ fn get_source_line(fm:&codemap::FileMap, i: u32) -> ~str {
 
 	let le=if (i as uint) < (fm.lines.len()-1) { *fm.lines[i+1] } else {fm.src.len() as u32 + *fm.start_pos};
 //	dump!(fm.lines[i-1],*fm.start_pos, fm.lines[i-1]-le);
-	if i>=0 {
+	if i > 0 {
 		fm.src.slice( (*fm.lines[i]-*fm.start_pos) as uint, (le - *fm.start_pos) as uint).to_owned()
 	} else {
 		~""
@@ -754,8 +748,6 @@ struct Window {
 	name:~str,x:int,y:int,w:int,h:int,child:~[Window],
 }
 
-fn CreateWindow(parent:&Window,mname:&str, opt:CwOpts) {
-}
 struct Foo {
 	i:int
 }
@@ -768,10 +760,10 @@ impl<'self> Draw for  (&'self Window,&'self str) {
 }
 
 
-fn write_references(doc:&mut htmlwriter::HtmlWriter,dc:&RFindCtx, fm:&codemap::FileMap,lib_path:&str,  nmaps:&NodeMaps, nodes_per_line:&[~[ast::NodeId]]) {
+fn write_references(doc:&mut htmlwriter::HtmlWriter,dc:&RFindCtx, fm:&codemap::FileMap, _:&str,  nmaps:&NodeMaps, _: &[~[ast::NodeId]]) {
 
 
-	doc.begin_tag_ext("div",~[(~"class",~"refblock")]);
+	doc.begin_tag_ext("div",[(~"class",~"refblock")]);
 
 //	let (nim,jdm,jrm)=(nmaps.nim, nmaps.jdm, nmaps.jrm);
 	let file_def_nodes = find_defs_in_file(fm,nmaps.nim);
@@ -824,7 +816,7 @@ fn write_references(doc:&mut htmlwriter::HtmlWriter,dc:&RFindCtx, fm:&codemap::F
 			// todo: we want to sort based on node type to find impls, but we dont quite find what we want..
 			sort::quick_sort(refs2.mut_slice_to(l - 1), |&(ni1,ref ifp1,_),&( ni2,ref ifp2,_)|{ ((ifp1.file_index-curr_file)&0x7fff) as uint +pri_of(ni1)<=((ifp2.file_index-curr_file)&0x7fff) as uint +pri_of(ni2) });
 			let mut newline=true;
-			for &(ref ref_info,ref ref_ifp,ref id) in refs2.iter() {
+			for &(_, ref ref_ifp,ref id) in refs2.iter() {
 				if *id!=dn {
 					//let opt_ref_info = nim.find(r);
 					//if !opt_ref_info.is_some() {loop;}
@@ -849,7 +841,9 @@ fn write_references(doc:&mut htmlwriter::HtmlWriter,dc:&RFindCtx, fm:&codemap::F
 
 					if links_written<(max_short_links+max_links) {
 						if  links_written<max_links {
-							if newline==false {doc.writeln("");newline=true;}
+							if newline==false {
+								doc.writeln("");
+							}
 						}
 						let rfm=&dc.sess.codemap.files[ref_ifp.file_index];
 						doc.begin_tag_link( make_html_name_rel(rfm.name,fm.name)+"#"+(ref_ifp.line+1).to_str());
@@ -923,7 +917,7 @@ impl htmlwriter::HtmlWriter{
 		let mut link_target=~"./";
 
 
-		for x in range(0,num_dirs) {link_target.push_str("../");}
+		for _ in range(0,num_dirs) {link_target.push_str("../");}
 		self.write("    ");
 		self.begin_tag_link(link_target+"index.html").write("(index<- )").end_tag().write("    ");
 		self.begin_tag_link(link_target).write("    ./").end_tag();
@@ -976,7 +970,7 @@ fn make_html_name_reloc(f:&str, origin:&str, reloc:&str)->~str {
 		acc=reloc.to_owned();
 		if acc.chars().last().unwrap()!='/' { acc.push_char('/');}
 	}else {
-		for x in range(0,count_chars_in(origin,'/')) {
+		for _ in range(0,count_chars_in(origin,'/')) {
 			acc.push_str("../");
 		}
 	}

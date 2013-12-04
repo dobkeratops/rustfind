@@ -1,8 +1,5 @@
-use rf_common::*;
 use rfindctx::{RFindCtx,find_file_name_in,first_file_name};
-use find_ast_node::{build_node_info_map,build_node_def_node_table};
-use jumptodefmap::{dump_json,lookup_def_at_text_file_pos,lookup_def_at_text_file_pos_str};
-use super::jumptodefmap;
+use jumptodefmap::{dump_json,lookup_def_at_text_file_pos_str};
 use std::io;
 use std::io::buffered::BufferedReader;
 use rsfind::{SDM_Source};
@@ -13,7 +10,9 @@ interactive mode, also server for IDE integration with command interface
 pub fn run_server(dc:&RFindCtx) {
 	// TODO - check if RUSTI can already do this.. it would be better there IMO
     // todo _ why is super needed here?!
-	let (node_spans,node_def_node,_)=jumptodefmap::make_jdm(dc);
+
+    // Currently unused
+// 	let (node_spans,node_def_node,_)=jumptodefmap::make_jdm(dc);
 
 	let mut curr_file=first_file_name(dc);
 

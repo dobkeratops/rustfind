@@ -7,31 +7,23 @@ extern mod rustc;
 extern mod extra;
 
 
-use rustc::{front, metadata, driver, middle};
-//use rustc::middle::{ty,typeck};
+use rustc::{driver};
 use rustc::metadata::cstore;
 
-use std::num::*;
-use std::{num,str,io,os,local_data};
+use std::{os,local_data};
 use std::hashmap::HashMap;
 use std::path::Path;
 
-use syntax::{parse,ast,ast_map,codemap,diagnostic};
-use syntax::parse::token;
-use syntax::visit::{Visitor, fn_kind};
-use find_ast_node::{FNodeInfoMap,safe_node_id_to_type,get_node_info_str,build_node_info_map,AstNode,find_node_tree_loc_at_byte_pos,NodeTreeLoc,astnode_expr,FNodeInfo,ToJsonStr,ToJsonStrFc,AstNodeAccessors,KindToStr,build_node_def_node_table,get_node_source};
-use jumptodefmap::*;
-//pub use std::hashmap::HashMap;
-
-use syntax::abi::AbiSet;
+use syntax::{parse,ast,codemap};
+use find_ast_node::{safe_node_id_to_type,get_node_info_str,find_node_tree_loc_at_byte_pos,ToJsonStr,ToJsonStrFc,AstNodeAccessors,KindToStr,get_node_source};
+use jumptodefmap::{lookup_def_at_text_file_pos_str, make_jdm, def_info_from_node_id,
+	lookup_def_at_text_file_pos, dump_json};
 
 use rfindctx::{RFindCtx,ctxtkey};
 pub use codemaput::{ZTextFilePos,ZTextFilePosLen,get_span_str,ToZTextFilePos,ZIndexFilePos,ToZIndexFilePos};
-use rsfind::{ShowDefMode,SDM_LineCol,SDM_Line,SDM_Source,SDM_GeditCmd,MyOption};
+use rsfind::{SDM_LineCol,SDM_Source,SDM_GeditCmd,MyOption};
 use crosscratemap::CrossCrateMap;
-use crosscratemap::CrossCrateMapItem;
 use std::path::PosixPath;
-use std::path::posix;
 
 pub mod rf_common;
 pub mod find_ast_node;
@@ -94,8 +86,6 @@ pub macro_rules! if_some {
 fn main() {
 
     use extra::getopts::*;
-    use std::hashmap::HashMap;
-
 
 	//test_default_arg(1,(2,3));
 	//test_default_arg(1);
@@ -110,7 +100,7 @@ fn main() {
     let libs1 = matches.opt_strs("L").map(|s| Path::init(s.as_slice()));
 	let libs=if libs1.len()>0 {libs1} else {
 		match (os::getenv(&"RUST_LIBS")) {
-			Some(x)=>~[ posix::Path::new(x)],
+			Some(x)=>~[ Path::init(x)],
 			None=>~[]
 		}
 	};
@@ -194,7 +184,8 @@ fn get_ast_and_resolve(
         addl_lib_search_paths: @mut libs.move_iter().collect(),
         ..  (*rustc::driver::session::basic_options()).clone()
     };
-	let quiet=true;
+    // Currently unused
+// 	let quiet = true;
 
 
     let diagnostic_handler = syntax::diagnostic::mk_handler(None);
@@ -202,7 +193,7 @@ fn get_ast_and_resolve(
         syntax::diagnostic::mk_span_handler(diagnostic_handler, parsesess.cm);
 
 
-    let mut sess = driver::driver::build_session_(sessopts, parsesess.cm,
+    let sess = driver::driver::build_session_(sessopts, parsesess.cm,
                                                   @BlankEmitter as @syntax::diagnostic::Emitter,
                                                   span_diagnostic_handler);
 	let input=driver::driver::file_input(cpath.clone());
@@ -211,8 +202,8 @@ fn get_ast_and_resolve(
 	let crate1=driver::driver::phase_1_parse_input(sess,cfg.clone(),&input);
 	let crate2=@driver::driver::phase_2_configure_and_expand(sess,cfg,crate1);
 
-	let ca=driver::driver::phase_3_run_analysis_passes(sess,&crate2);
-    RFindCtx { crate: @crate2, tycx: ca.ty_cx, sess: sess, ca:ca }
+	let ca=driver::driver::phase_3_run_analysis_passes(sess,crate2);
+    RFindCtx { crate: crate2, tycx: ca.ty_cx, sess: sess, ca:ca }
 }
 
 fn debug_test(dc:&RFindCtx) {
