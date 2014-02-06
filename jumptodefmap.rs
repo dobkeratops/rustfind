@@ -1,3 +1,4 @@
+use std::io::println;
 use rf_common::*;
 use syntax::ast;
 use rustc::middle::{ty,typeck};
@@ -105,7 +106,7 @@ pub fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, nodeinfomap:&FNodeInf
 	return None;
 }
 
-pub fn build_jump_to_def_map(dc:&RFindCtx, nim:@mut FNodeInfoMap,nd:&HashMap<ast::NodeId,ast::DefId>)->~JumpToDefMap{
+pub fn build_jump_to_def_map(dc:&RFindCtx, nim: FNodeInfoMap,nd:&HashMap<ast::NodeId,ast::DefId>)->~JumpToDefMap{
 // todo: NodeId->AStNode  .. lookup_def_ inner functionality extracted
 	let mut jdm=~HashMap::new();
 	for (k,node_info) in nim.iter() {
@@ -149,11 +150,12 @@ pub fn dump_json(dc:&RFindCtx) {
 	println("\tcode_map:[");
 //	for dc.sess.codemap.files.iter().advance |f| {
 	for f in dc.sess.codemap.files.iter() {
-		print("\t\t{ name:\""+f.name+"\",\tglobal_start_pos:"+f.start_pos.to_str()+
-			",\tlength:"+(f.src.len()).to_str()+
-			",\tnum_lines:"+f.lines.len().to_str()+
-			",\tlines:[\n"+ flatten_to_str(*f.lines, |&x|{*x-*f.start_pos} ,",") +
-			"\n\t\t]\n\t},\n");
+		print!("\t\t\\{ name:\"{}\"", f.name);
+        print!("\tglobal_start_pos:{},", f.start_pos.to_str());
+        print!("\tlength:{},", (f.src.len()).to_str());
+		print!("\tnum_lines:{},", f.lines.len().to_str());
+		print!("\tlines:[\n{},", flatten_to_str(*f.lines, |&x|{*x-*f.start_pos} ,","));
+	    print!("\n\t\t]\n\t\\},\n");
 	}
 	println("\t]");
 	println("\tnode_spans:");
@@ -272,7 +274,7 @@ pub fn lookup_def_of_node_sub(dc:&RFindCtx,node:&AstNode,m:ShowDefMode,nim:&FNod
 	}
 }
 
-pub fn make_jdm(dc:&RFindCtx)->(@mut FNodeInfoMap, ~HashMap<ast::NodeId,ast::DefId>,~JumpToDefMap)
+pub fn make_jdm(dc:&RFindCtx)->( FNodeInfoMap, ~HashMap<ast::NodeId,ast::DefId>,~JumpToDefMap)
 {
     let nim=build_node_info_map(dc.crate);
     let ndm=build_node_def_node_table(dc);

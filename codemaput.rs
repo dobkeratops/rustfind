@@ -270,7 +270,7 @@ impl ToZIndexFilePos for codemap::BytePos {
 
 pub fn get_crate_name(tc: ty::ctxt, i: ast::CrateNum) -> ~str {
 	if i > 0 {
-		let cd = cstore::get_crate_data(tc.cstore, i);
+		let cd = tc.cstore.get_crate_data(i);
 		cd.name.to_owned()
 	} else {
 		~""
@@ -304,20 +304,20 @@ pub fn dump_cstore_info(tc: ty::ctxt) {
 //    cnum: ast::CrateNum
 //}
 
-	println("crate files");
-	let ucf = cstore::get_used_crate_sources(tc.cstore);
+	println!("crate files");
+	let ucf = tc.cstore.get_used_crate_sources();
 	for x in ucf.iter() {
 		dump!(x);
 	}
-/*	println("crate metadata");
+/*	println!("crate metadata");
 	for i in range(1,num_crates) {
 		let cd= cstore::get_crate_data(tc.cstore, i as int);
 
 		dump!(i, cd.name, cd.data.len(), cd.cnum_map, cd.cnum);
 	}
 */
-	println("crate metadata");
-	cstore::iter_crate_data(tc.cstore, |i,md| {
+	println!("crate metadata");
+	tc.cstore.iter_crate_data(|i,md| {
 		dump!(i, md.name, md.data.len(), md.cnum);
 	});
 }

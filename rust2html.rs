@@ -1,10 +1,10 @@
+use std::io::println;
 use syntax::codemap;
 use syntax::ast;
 use rustc::middle::ty;
 use iou=ioutil;
 use std::hashmap::HashMap;
 use std::vec;
-use extra::sort;
 use codemaput::{ZIndexFilePos,ToZIndexFilePos};
 use find_ast_node::{FNodeInfoMap,FNodeInfo};
 use rfindctx::{RFindCtx};
@@ -235,16 +235,15 @@ impl NodesPerLinePerFile {
 	}
 	fn dump(&self) {
 		for f in self.file.iter() {
-			print("file {");
+			print!("file \\{");
 			for l in f.nodes_per_line.iter() {
-				print("line {" + l.len().to_str());
+				print!("line \\{{}", l.len().to_str());
 				for n in l.iter() {
-					print(n.to_str()+",");
+					print!("{},", n.to_str());
 				}
-				print("");
-				print("line {");
+				print!("\\} line");
 			}
-			print("}file");
+			print!("\\}file");
 		}
 	}
 }
@@ -339,16 +338,16 @@ fn sub_match(line:&str,x:uint,opts:&[&str])->Option<(uint,uint)>{
 	return None;
 }
 
-struct NodeMaps<'self>  {
-	nim:&'self FNodeInfoMap,
-	jdm:&'self JumpToDefMap,
-	jrm:&'self JumpToRefMap
+struct NodeMaps<'a>  {
+	nim:&'a FNodeInfoMap,
+	jdm:&'a JumpToDefMap,
+	jrm:&'a JumpToRefMap
 }
 
 /// interface for emitting source code serially
 /// carries state between emitting lines
-struct SourceCodeWriter<'self, T> {
-	doc: &'self mut T,
+struct SourceCodeWriter<'a, T> {
+	doc: &'a mut T,
 	multiline_comment_depth:int,
 	brace_depth:int,
 	bracket_depth:int,
@@ -357,8 +356,8 @@ struct SourceCodeWriter<'self, T> {
 	line_index:uint
 }
 
-impl<'self, T> SourceCodeWriter<'self,T> {
-	fn new(d:&'self mut T)->SourceCodeWriter<'self, T> {
+impl<'a, T> SourceCodeWriter<'a,T> {
+	fn new(d:&'a mut T)->SourceCodeWriter<'a, T> {
 		SourceCodeWriter{
 			doc:d, multiline_comment_depth:0, brace_depth:0,bracket_depth:0, angle_bracket_depth:0, in_string:0, line_index:0
 		}
@@ -374,7 +373,7 @@ fn write_line_with_links(dst:&mut SourceCodeWriter<htmlwriter::HtmlWriter>,dc:&R
 	// todo ... BREAK THIS FUNCTION UP!!!!
 	// and there is a load of messy cut paste too.
 
-//	for x in node_infos.iter() { println(fmt!("%?", x));}
+//	for x in node_infos.iter() { println!(fmt!("%?", x));}
 //	dump!(node_infos);
 // todo - sorting node spans, not this "painters-algorithm" approach..
 
@@ -659,18 +658,18 @@ pub struct MultiMap<K,V> {
 	items:~[~[V]],
 	empty:~[V]
 }
-impl<'self,K:IterBytes+Eq,V> MultiMap<K,V> {
+impl<'a,K:IterBytes+Eq,V> MultiMap<K,V> {
 	pub fn new()->MultiMap<K,V> {
 		MultiMap{ next_index:0, indices:HashMap::new(), items:~[], empty:~[] }
 	}
-	pub fn find(&'self self, k:K)->&'self~[V] {
+	pub fn find(&'a self, k:K)->&'a~[V] {
 		// TODO - return iterator, not collection
 		match self.indices.find(&k) {
 			None=>&self.empty,
 			Some(&ix)=>&self.items[ix]
 		}
 	}
-	pub fn insert(&'self mut self, k:K,v:V) {
+	pub fn insert(&'a mut self, k:K,v:V) {
 		let ix=match self.indices.find(&k) {
 			None=>{ self.indices.insert(k,self.next_index); self.next_index+=1; self.items.push(~[]); self.next_index-1},
 			Some(&ix)=> ix
@@ -754,7 +753,7 @@ struct Foo {
 trait Draw {
 	fn draw(self);
 }
-impl<'self> Draw for  (&'self Window,&'self str) {
+impl<'a> Draw for  (&'a Window,&'a str) {
 	fn draw(self) {
 	}
 }
@@ -814,7 +813,7 @@ fn write_references(doc:&mut htmlwriter::HtmlWriter,dc:&RFindCtx, fm:&codemap::F
 			let l=refs2.len();
 			fn pri_of(x:&FNodeInfo)->uint{ if &"impl"==x.kind{0} else {0x8000} }
 			// todo: we want to sort based on node type to find impls, but we dont quite find what we want..
-			sort::quick_sort(refs2.mut_slice_to(l - 1), |&(ni1,ref ifp1,_),&( ni2,ref ifp2,_)|{ ((ifp1.file_index-curr_file)&0x7fff) as uint +pri_of(ni1)<=((ifp2.file_index-curr_file)&0x7fff) as uint +pri_of(ni2) });
+			refs2.mut_slice_to(l - 1).sort_by(|&(ni1,ref ifp1,_),&( ni2,ref ifp2,_)|{ ((ifp1.file_index-curr_file)&0x7fff) as uint +pri_of(ni1)<=((ifp2.file_index-curr_file)&0x7fff) as uint +pri_of(ni2) });
 			let mut newline=true;
 			for &(_, ref ref_ifp,ref id) in refs2.iter() {
 				if *id!=dn {
@@ -942,7 +941,7 @@ impl htmlwriter::HtmlWriter{
 // things that are robust when some source changes, etc.
 // file_index:line_index:col_index:length
 
-impl<'self> ToZIndexFilePos for (&'self FNodeInfoMap,ast::NodeId) {
+impl<'a> ToZIndexFilePos for (&'a FNodeInfoMap,ast::NodeId) {
 	fn to_index_file_pos(&self,tc:ty::ctxt)->Option<ZIndexFilePos> {
 		let (ref nim,nid)=*self;
 		let oni=nim.find(&nid);

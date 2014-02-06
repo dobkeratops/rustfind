@@ -6,6 +6,7 @@ extern mod syntax;
 extern mod rustc;
 extern mod extra;
 
+use std::io::println;
 
 use rustc::{driver};
 use rustc::metadata::cstore;
@@ -49,7 +50,7 @@ pub macro_rules! if_some {
 	);
 }
 pub macro_rules! tlogi{
-	($($a:expr),*)=>(println((file!()+":"+line!().to_str()+": " $(+$a.to_str())*) ))
+	($($a:expr),*)=>(println!((file!()+":"+line!().to_str()+": " $(+$a.to_str())*) ))
 }
 pub macro_rules! logi{
 	($($a:expr),*)=>(println(""$(+$a.to_str())*) )
@@ -97,34 +98,34 @@ fn main() {
     ];
 
 	let matches = getopts(args.tail(), opts).unwrap();
-    let libs1 = matches.opt_strs("L").map(|s| Path::init(s.as_slice()));
+    let libs1 = matches.opt_strs("L").map(|s| Path::new(s.as_slice()));
 	let libs=if libs1.len()>0 {libs1} else {
 		match (os::getenv(&"RUST_LIBS")) {
-			Some(x)=>~[ Path::init(x)],
+			Some(x)=>~[ Path::new(x)],
 			None=>~[]
 		}
 	};
 
 	if matches.opt_present("h") {
-		println("rustfind: args/useage:-");
-		println(" filename.rs [-L<lib path>] : create linked html pages for sources in crate");
-		println(" -r filename.rs [-L<library path>]  : dump .rfx 'crosscratemap'  containing ast nodes and jump definitions");
-		println(" -x where to look for html of external crates -  :eg rustfind filename mysource.rs -x ~/rust/src\n");
-		println(" cratename.rs anotherfile.rs:line:col:");
-		println("    - load cratename.rs; look for definition at anotherfile.rs:line:col");
-		println("    - where anotherfile.rs is assumed to be a module of the crate");
-		println(" -f filename.rs:line:col : return definition reference of symbol at given position");
-		println(" -i filename.rs [-L<lib path>] : interactive mode");
-		println(" -g format output as gedit filepos +line filename");
-		println(" debug opts:-\n");
-		println(" -j filename.rs [-L<library path>]  : dump JSON map of the ast nodes & defintions");
-		println(" -d filename.rs [-L<lib path>] : debug for this tool");
-		println(" set RUST_LIBS for a default library search path");
+		println!("rustfind: args/useage:-");
+		println!(" filename.rs [-L<lib path>] : create linked html pages for sources in crate");
+		println!(" -r filename.rs [-L<library path>]  : dump .rfx 'crosscratemap'  containing ast nodes and jump definitions");
+		println!(" -x where to look for html of external crates -  :eg rustfind filename mysource.rs -x ~/rust/src\n");
+		println!(" cratename.rs anotherfile.rs:line:col:");
+		println!("    - load cratename.rs; look for definition at anotherfile.rs:line:col");
+		println!("    - where anotherfile.rs is assumed to be a module of the crate");
+		println!(" -f filename.rs:line:col : return definition reference of symbol at given position");
+		println!(" -i filename.rs [-L<lib path>] : interactive mode");
+		println!(" -g format output as gedit filepos +line filename");
+		println!(" debug opts:-\n");
+		println!(" -j filename.rs [-L<library path>]  : dump JSON map of the ast nodes & defintions");
+		println!(" -d filename.rs [-L<lib path>] : debug for this tool");
+		println!(" set RUST_LIBS for a default library search path");
 	};
 	if matches.free.len()>0 {
 		let mut done=false;
 		let filename=util::get_filename_only(matches.free[0]);
-		let dc = @get_ast_and_resolve(&Path::init(filename), libs);
+		let dc = @get_ast_and_resolve(&Path::new(filename), libs);
 		local_data::set(ctxtkey, dc);
 
 		if (matches.opt_present("d")) {
@@ -138,7 +139,7 @@ fn main() {
 		if (matches.opt_present("f")) {
 			while i<matches.free.len() {
 				let mode=if matches.opt_present("g"){SDM_GeditCmd} else {SDM_Source};
-				print(lookup_def_at_text_file_pos_str(dc,matches.free[i],mode).unwrap_or(~"no def found\n"));
+				println!("{}", lookup_def_at_text_file_pos_str(dc,matches.free[i],mode).unwrap_or(~"no def found"));
 				i+=1;
 				done=true;
 			}
@@ -148,17 +149,17 @@ fn main() {
 			done=true;
 		}
 		if matches.opt_present("r") {
-			println("Writing .rfx ast nodes/cross-crate-map:-");
+			println!("Writing .rfx ast nodes/cross-crate-map:-");
 			write_source_as_html_and_rfx(dc,lib_html_path, rust2html::DefaultOptions,false);
-			println("Writing .rfx .. done");
+			println!("Writing .rfx .. done");
 			done=true;
 		}
 
 		// Dump as html..
 		if matches.opt_present("w") || !(done) {
-			println("Creating HTML pages from source & .rfx:-");
+			println!("Creating HTML pages from source & .rfx:-");
 			write_source_as_html_and_rfx(dc,lib_html_path, rust2html::DefaultOptions,true);
-			println("Creating HTML pages from source.. done");
+			println!("Creating HTML pages from source.. done");
 		}
 	}
 }
@@ -168,7 +169,7 @@ fn main() {
 
 struct BlankEmitter;
 impl syntax::diagnostic::Emitter for BlankEmitter {
-	fn emit(&self, _: Option<(@codemap::CodeMap, codemap::Span)>, _: &str, _: syntax::diagnostic::level) {
+	fn emit(&self, _: Option<(@codemap::CodeMap, codemap::Span)>, _: &str, _: syntax::diagnostic::Level) {
 	}
 }
 
@@ -178,10 +179,10 @@ fn get_ast_and_resolve(
 	-> RFindCtx {
 
     let parsesess = parse::new_parse_sess(None);
-    let sessopts = @driver::session::options {
+    let sessopts = @driver::session::Options {
         binary: @"rustdoc",
         maybe_sysroot: Some(@std::os::self_exe_path().unwrap()),
-        addl_lib_search_paths: @mut libs.move_iter().collect(),
+        addl_lib_search_paths:  libs.move_iter().collect(),
         ..  (*rustc::driver::session::basic_options()).clone()
     };
     // Currently unused
@@ -196,7 +197,7 @@ fn get_ast_and_resolve(
     let sess = driver::driver::build_session_(sessopts, parsesess.cm,
                                                   @BlankEmitter as @syntax::diagnostic::Emitter,
                                                   span_diagnostic_handler);
-	let input=driver::driver::file_input(cpath.clone());
+	let input=driver::driver::FileInput(cpath.clone());
 	let cfg= driver::driver::build_configuration(sess); //was, @"", &input);
 
 	let crate1=driver::driver::phase_1_parse_input(sess,cfg.clone(),&input);
@@ -243,8 +244,8 @@ fn debug_test(dc:&RFindCtx) {
 		if_some!(id in nodetloc.last().ty_node_id() then {
 			logi!("source=",get_node_source(dc.tycx, node_info_map,ast::DefId{crate:0,node:id}));
 			if_some!(t in safe_node_id_to_type(dc.tycx, id) then {
-				println(format!("typeinfo: {:?}",
-					{let ntt= rustc::middle::ty::get(t); ntt}));
+				println!("typeinfo: {:?}",
+					{let ntt= rustc::middle::ty::get(t); ntt});
 				dump!(id,dc.tycx.def_map.find(&id));
 				});
 			let (def_id,opt_info)= def_info_from_node_id(dc,node_info_map,id);
@@ -273,11 +274,11 @@ fn debug_test(dc:&RFindCtx) {
 	dump!(codemaput::zget_file_line_str(dc.tycx,"test_input.rs",9-1));
 
 	logi!("\n====test full file:pos lookup====");
-	dump!(lookup_def_at_text_file_pos(dc, &ZTextFilePos::new("test_input.rs",8-1,21),SDM_Source));println("");
-	dump!(lookup_def_at_text_file_pos(dc, &ZTextFilePos::new("test_input2.rs",3-1,12),SDM_Source));println("");
-	dump!(lookup_def_at_text_file_pos(dc, &ZTextFilePos::new("test_input.rs",10-1,8),SDM_Source));println("");
-	dump!(lookup_def_at_text_file_pos(dc, &ZTextFilePos::new("test_input.rs",13-1,16),SDM_Source));println("");
-	dump!(lookup_def_at_text_file_pos(dc, &ZTextFilePos::new("test_input.rs",11-1,10),SDM_Source));println("");
+	dump!(lookup_def_at_text_file_pos(dc, &ZTextFilePos::new("test_input.rs",8-1,21),SDM_Source));println!("");
+	dump!(lookup_def_at_text_file_pos(dc, &ZTextFilePos::new("test_input2.rs",3-1,12),SDM_Source));println!("");
+	dump!(lookup_def_at_text_file_pos(dc, &ZTextFilePos::new("test_input.rs",10-1,8),SDM_Source));println!("");
+	dump!(lookup_def_at_text_file_pos(dc, &ZTextFilePos::new("test_input.rs",13-1,16),SDM_Source));println!("");
+	dump!(lookup_def_at_text_file_pos(dc, &ZTextFilePos::new("test_input.rs",11-1,10),SDM_Source));println!("");
 
 }
 
@@ -286,7 +287,7 @@ fn debug_test(dc:&RFindCtx) {
 pub fn write_source_as_html_and_rfx(dc:&RFindCtx,lib_html_path:&str,opts:uint, write_html:bool) {
 
 	let mut xcm:~CrossCrateMap=~HashMap::new();
-	cstore::iter_crate_data(dc.tycx.cstore, |i,md| {
+	dc.tycx.cstore.iter_crate_data(|i,md| {
 //		dump!(i, md.name,md.data.len(),md.cnum);
 		println("loading cross crate data "+i.to_str()+" "+md.name);
 		let xcm_sub=crosscratemap::read_cross_crate_map(dc, i as int, md.name+&".rfx",lib_html_path);

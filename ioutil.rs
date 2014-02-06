@@ -15,7 +15,7 @@ pub type Size_t=u64;	// todo - we're not sure this should be u64
 
 
 macro_rules! logi{
-	($($a:expr),*)=>(println(file!()+":"+line!().to_str()+": " $(+$a.to_str())* ))
+	($($a:expr),*)=>(println!("{}", file!()+":"+line!().to_str()+": " $(+$a.to_str())* ))
 }
 //macro_rules! dump{ ($a:expr)=>(logi!(fmt!("%s=%?",stringify!($a),$a).indent(2,160));)}
 fn newline_if_over(a:~str,l:uint)->~str{if a.len()>l {a+"\n"}else{a}}
@@ -32,7 +32,7 @@ macro_rules! dump{ ($($a:expr),*)=>
 
 macro_rules! trace{
 	()=>(
-		println(file!().to_str()+":"+line!().to_str()+": ");
+		println!("{}", file!().to_str()+":"+line!().to_str()+": ");
 	);
 }
 
@@ -45,7 +45,7 @@ pub trait EndianSwap {
 // dbprint postfix form means we can print tuples?
 impl<T:ToStr> Dbprint for T {
 	fn dbprint(&self) {
-		println(self.to_str());
+		println!("{}", self.to_str());
 	}
 }
 
@@ -67,7 +67,7 @@ impl<T> VoidPtr for T {
 	fn as_mut_void_ptr(&self)->*mut c_void { to_unsafe_ptr(self) as *mut c_void}
 }
 
-pub fn printStr<T:ToStr>(a:&T){println(a.to_str());}
+pub fn printStr<T:ToStr>(a:&T){println!("{}", a.to_str());}
 
 pub fn c_str(rustStr:&str)->*c_char {
 	unsafe {

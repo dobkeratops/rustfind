@@ -17,16 +17,16 @@ pub fn run_server(dc:&RFindCtx) {
 	let mut curr_file=first_file_name(dc);
 
 	loop {
-		print("rustfind "+curr_file+">");
+		print!("rustfind {}>", curr_file);
 		let input_line=BufferedReader::new(io::stdin()).read_line().expect("read_line failed on stdin");
 		let toks:~[&str]=input_line.split(' ').collect();
 		if toks.len()>0 {
 			match toks[0] {
-				"h"|"help"=> print("interactive mode\n - enter file:line:pos or line:pos for current file\n - show location & def of symbol there\n j-dump json q-quit i-info\n"),
+				"h"|"help"=> println!("interactive mode\n - enter file:line:pos or line:pos for current file\n - show location & def of symbol there\n j-dump json q-quit i-info"),
 				"i"=> {
-					println("files in current crate:-\n");
+					println!("files in current crate:-");
 					for x in dc.tycx.sess.codemap.files.iter() {
-						println("\t"+x.name);
+						println!("\t{}", x.name);
 					}
 				}
 				"j"=> dump_json(dc),
@@ -40,7 +40,7 @@ pub fn run_server(dc:&RFindCtx) {
 					curr_file=find_file_name_in(dc, subtoks[0].to_str()).unwrap_or(curr_file);
 					//dump!(cmd1,subtoks,curr_file);
 					let def=lookup_def_at_text_file_pos_str(dc, cmd1,SDM_Source);
-					print(def.unwrap_or(~"no def found\n"));
+					println!("{}", def.unwrap_or(~"no def found"));
 					//println(def_of_symbol_to_str(dc,node_spans,node_def_node,toks[0]));
 				}
 			}
