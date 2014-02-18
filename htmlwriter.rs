@@ -64,10 +64,14 @@ impl<'a> HtmlWriter {
 		self
 	}
 	pub fn end_tag(&'a mut self)->&'a mut HtmlWriter {
-		let tag_name=self.tag_stack.pop();
-		self.doc.push_str("</");
-		self.doc.push_str(tag_name);
-		self.doc.push_str(">");
+		match self.tag_stack.pop() {
+            Some(tag_name) => {
+                self.doc.push_str("</");
+                self.doc.push_str(tag_name);
+                self.doc.push_str(">");
+            },
+            None => ()
+        };
 		self
 	}
 	pub fn end_all_tags(&'a mut self)->&'a mut HtmlWriter {

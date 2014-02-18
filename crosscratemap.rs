@@ -1,9 +1,11 @@
 use std::io::println;
 use rf_common::*;
 use syntax::ast;
+use syntax::codemap::{Pos,BytePos};
 use rustc::metadata::cstore;
 use find_ast_node::FNodeInfoMap;
 use jumptodefmap::{JumpToDefMap};
+use codemaput::ToZTextFilePos;
 use ioutil;
 use rfindctx::{RFindCtx, str_of_opt_ident};
 
@@ -33,11 +35,11 @@ pub fn read_cross_crate_map(_:&RFindCtx, crate_num:int, crate_name:&str,lib_path
 		raw_bytes=ioutil::fileLoad(lib_path+"/"+crate_name);
 	}
 	let rfx=str::from_utf8(raw_bytes);
-	println("loaded cratemap "+rfx.len().to_str()+"bytes"+" as crate "+crate_num.to_str());
+	println("loaded cratemap "+rfx.get_ref().len().to_str()+"bytes"+" as crate "+crate_num.to_str());
 //	for &x in raw_bytes.iter() { rfx.push_char(x as char); }
 
 	let mut xcm=~HashMap::new();
-	for s in rfx.lines() {
+	for s in rfx.get_ref().lines() {
 //		println(s.to_str());
 		let toks=s.split('\t').to_owned_vec();
 		if toks.len()>=6 {
@@ -51,7 +53,7 @@ pub fn read_cross_crate_map(_:&RFindCtx, crate_num:int, crate_name:&str,lib_path
 					// pareent id ignored, we use span information to reconstruct AST
 
 					let node_id: int= from_str::<int>(toks[2]).unwrap_or(0);
-					xcm.insert(ast::DefId{crate:crate_num as u32, node:node_id as u32,},
+					xcm.insert(ast::DefId{krate:crate_num as u32, node:node_id as u32,},
 						CrossCrateMapItem{
 							fname:	toks[4].to_owned(),
 							line:   from_str(toks[5]).unwrap_or(0)-1,
@@ -64,7 +66,7 @@ pub fn read_cross_crate_map(_:&RFindCtx, crate_num:int, crate_name:&str,lib_path
 				_=>{
 
 					let node_id:int=from_str(toks[1]).unwrap_or(0);
-					xcm.insert(ast::DefId{crate:crate_num as u32, node:node_id as u32,},
+					xcm.insert(ast::DefId{krate:crate_num as u32, node:node_id as u32,},
 						CrossCrateMapItem{
 							fname:	toks[2].to_owned(),
 							line:   from_str(toks[3]).unwrap_or(0)-1,
@@ -77,7 +79,7 @@ pub fn read_cross_crate_map(_:&RFindCtx, crate_num:int, crate_name:&str,lib_path
 		}
 	}
 	//dump!(xcm);
-	println("from cratemap "+rfx.len().to_str()+"bytes");
+	println("from cratemap "+rfx.get_ref().len().to_str()+"bytes");
 	xcm
 }
 
@@ -85,7 +87,7 @@ pub fn read_cross_crate_map(_:&RFindCtx, crate_num:int, crate_name:&str,lib_path
 
 pub fn write_cross_crate_map(dc:&RFindCtx, _:&str,nim:&FNodeInfoMap, _:&HashMap<ast::NodeId, ast::DefId>, jdm:&JumpToDefMap) {
 	// write inter-crate node map
-	let crate_rel_path_name= dc.sess.codemap.files[0].name;
+	let crate_rel_path_name= dc.sess.codemap.files.borrow().get()[0].name;
 	let new_format:bool=true;
 
 	let curr_crate_name_only=crate_rel_path_name.split('/').last().unwrap_or("").split('.').nth(0).unwrap_or("");
@@ -101,11 +103,11 @@ pub fn write_cross_crate_map(dc:&RFindCtx, _:&str,nim:&FNodeInfoMap, _:&HashMap<
 				if new_format {
 					outp.push_str(
 							"node\t"+
-							curr_crate_name_only+"\t"+k.to_str()+"\t"+ni.parent_id.to_str()+"\t"+tfp.name+"\t"+(tfp.line+1).to_str()+"\t"+tfp.col.to_str()+"\t"+(*ni.span.hi-*ni.span.lo).to_str() + "\t"+ni.kind+ "\t"+str_of_opt_ident(dc,ni.ident)+"\n");
+							curr_crate_name_only+"\t"+k.to_str()+"\t"+ni.parent_id.to_str()+"\t"+tfp.name+"\t"+(tfp.line+1).to_str()+"\t"+tfp.col.to_str()+"\t"+(ni.span.hi-ni.span.lo).to_uint().to_str() + "\t"+ni.kind+ "\t"+str_of_opt_ident(dc,ni.ident)+"\n");
 				} else 	{
 					// old format, relies on spans to reconstruct AST.
 					// cratename id filename line col len type [ident]
-					outp.push_str(curr_crate_name_only+"\t"+k.to_str()+"\t"+tfp.name+"\t"+(tfp.line+1).to_str()+"\t"+tfp.col.to_str()+"\t"+(*ni.span.hi-*ni.span.lo).to_str() + "\t"+ni.kind+ "\t"+str_of_opt_ident(dc,ni.ident)+"\n");
+					outp.push_str(curr_crate_name_only+"\t"+k.to_str()+"\t"+tfp.name+"\t"+(tfp.line+1).to_str()+"\t"+tfp.col.to_str()+"\t"+(ni.span.hi-ni.span.lo).to_uint().to_str() + "\t"+ni.kind+ "\t"+str_of_opt_ident(dc,ni.ident)+"\n");
 				}
 			},
 			None=>{}
@@ -113,8 +115,8 @@ pub fn write_cross_crate_map(dc:&RFindCtx, _:&str,nim:&FNodeInfoMap, _:&HashMap<
 	}
 
 	for (k,v) in jdm.iter()  {
-		let cname:~str= if v.crate>0 {
-			dc.tycx.cstore.get_crate_data(v.crate).name.to_str()
+		let cname:~str= if v.krate>0 {
+			dc.tycx.cstore.get_crate_data(v.krate).name.to_str()
 		} else {
 			curr_crate_name_only.to_str()
 		};

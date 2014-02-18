@@ -83,7 +83,7 @@ rustsrc: rustfind
 	cp sourcestyle.css $(RUSTSRC)/librustc/util
 
 #Compile the main executable
-rustfind: rustfind.rs $(SRC) tags
+rustfind: rustfind.rs $(SRC) 
 	rustc rustfind.rs
 
 install :rustfind

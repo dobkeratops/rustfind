@@ -1,6 +1,7 @@
 use rf_common::*;
 use syntax::ast;
 use syntax::codemap;
+use syntax::codemap::Pos;
 use rustc::middle::ty;
 use rustc::metadata::{cstore};
 use util::text_offset_to_line_pos;//todo - why is qualifying manually not working?!
@@ -66,18 +67,20 @@ impl Ord for ZIndexFilePos {
 
 impl ToZTextFilePos for codemap::BytePos {
 	fn to_text_file_pos(self, cx: ty::ctxt) -> Option<ZTextFilePos> {
-		let mut i = cx.sess.codemap.files.len();
+        let files = cx.sess.codemap.files.borrow().get();
+		let mut i = files.len();
 
 		while i > 0 {
 			i -= 1;
-			let fm = &cx.sess.codemap.files[i];
-			if *fm.start_pos <= *self {
-				let mut line = fm.lines.len() as u32;
+			let fm = &files[i];
+			if fm.start_pos <= self {
+                let lines = fm.lines.borrow().get();
+				let mut line = lines.len() as u32;
 				while line > 0 {
 					line -= 1;
-					let line_start = *fm.lines[line];
-					if line_start <= *self {
-						return Some(ZTextFilePos::new(fm.name.to_owned(), line,*self-line_start))
+					let line_start = lines[line];
+					if line_start <= self {
+						return Some(ZTextFilePos::new(fm.name.to_owned(), line, (self-line_start).to_uint() as u32))
 					}
 				}
 			}
@@ -116,16 +119,18 @@ impl ZTextFilePos {
 	}
 
 	pub fn to_byte_pos(&self, cx: ty::ctxt) -> Option<codemap::BytePos> {
-		let mut i = cx.sess.codemap.files.len();
+        let files = cx.sess.codemap.files.borrow().get();
+		let mut i = files.len();
 		while i > 0 {	// caution, need loop because we return, wait for new foreach ..in..
 			i -= 1;
-			let fm = &cx.sess.codemap.files[i];
+			let fm = &files[i];
 			let filemap_filename: &str = fm.name;
 			if filemap_filename == self.name {
-				if self.line as uint >= fm.lines.len() {
+                let lines = fm.lines.borrow().get();
+				if self.line as uint >= lines.len() {
 					return None;
 				}
-				return Some(codemap::BytePos(*fm.lines[self.line] + self.col));
+				return Some(codemap::BytePos(lines[self.line].to_uint() as u32 + self.col));
 			}
 		}
 		return None;
@@ -175,8 +180,8 @@ impl ZTextFilePosLen {
 pub fn get_span_str(c :ty::ctxt, sp: &codemap::Span) -> ~str {
 	let loc_lo = c.sess.codemap.lookup_char_pos(sp.lo);
 	// TODO-assert both in same file!
-	let file_org = *loc_lo.file.start_pos;
-	let slice = loc_lo.file.src.slice((*sp.lo - file_org) as uint, (*sp.hi - file_org) as uint);
+	let file_org = loc_lo.file.start_pos;
+	let slice = loc_lo.file.src.slice((sp.lo - file_org).to_uint(), (sp.hi - file_org).to_uint());
 	slice.to_str()
 }
 
@@ -247,19 +252,21 @@ impl ToZIndexFilePos for codemap::BytePos {
 	fn to_index_file_pos(&self, c: ty::ctxt) -> Option<ZIndexFilePos> {
 		// TODO: cleanup with byte_pos_to_text_file_pos, one in terms of the other.
 		// TODO - functional, and with binary search or something ..
-		let mut i = c.sess.codemap.files.len() as u32;
+        let files = c.sess.codemap.files.borrow().get();
+		let mut i = files.len() as u32;
 		while i > 0 {
 				// caution, need loop because we return, wait for new foreach ..in..
 			i -= 1;
-			let fm = &c.sess.codemap.files[i];
-			if **self >= *fm.start_pos && **self < *fm.start_pos + fm.src.len() as u32{
-				let mut line = fm.lines.len() as u32;
+			let fm = &files[i];
+			if *self >= fm.start_pos && self.to_uint() < fm.start_pos.to_uint() + fm.src.len() {
+                let lines = fm.lines.borrow().get();
+				let mut line = lines.len() as u32;
 				while line > 0 {
 					line -= 1;
-					let lstart = *fm.lines[line];
-					if lstart < **self {
+					let lstart = lines[line];
+					if lstart < *self {
 						return Some(
-							ZIndexFilePos{ file_index: i, line: line, col: **self - lstart});
+							ZIndexFilePos{ file_index: i, line: line, col: (*self - lstart).to_uint() as u32});
 					}
 				}
 			}
@@ -278,7 +285,7 @@ pub fn get_crate_name(tc: ty::ctxt, i: ast::CrateNum) -> ~str {
 }
 
 pub fn text_span<'a, 'b>(text: &'a [u8], s: &'b codemap::Span) -> &'a[u8] {
-	text.slice(*s.lo as uint, *s.hi as uint)
+	text.slice(s.lo.to_uint(), s.hi.to_uint())
 }
 
 
@@ -304,11 +311,11 @@ pub fn dump_cstore_info(tc: ty::ctxt) {
 //    cnum: ast::CrateNum
 //}
 
-	println!("crate files");
-	let ucf = tc.cstore.get_used_crate_sources();
-	for x in ucf.iter() {
-		dump!(x);
-	}
+	//println!("crate files");
+	//let ucf = tc.cstore.get_used_crate_source();
+	//for x in ucf.iter() {
+	//	dump!(x);
+	//}
 /*	println!("crate metadata");
 	for i in range(1,num_crates) {
 		let cd= cstore::get_crate_data(tc.cstore, i as int);
@@ -318,7 +325,7 @@ pub fn dump_cstore_info(tc: ty::ctxt) {
 */
 	println!("crate metadata");
 	tc.cstore.iter_crate_data(|i,md| {
-		dump!(i, md.name, md.data.len(), md.cnum);
+		dump!(i, md.name, md.data.as_slice().len(), md.cnum);
 	});
 }
 /*
@@ -335,7 +342,7 @@ pub fn flatten_to_str<T,U:ToStr>(xs:&[T],f:&fn(x:&T)->U, sep:&str)->~str {
 }
 */
 pub fn loc_to_str(loc:codemap::Loc) -> ~str {
-	loc.file.name + ":" + loc.line.to_str() + ":" + loc.col.to_str() + ":"
+	loc.file.name + ":" + loc.line.to_str() + ":" + loc.col.to_uint().to_str() + ":"
 }
 
 pub fn zget_file_line_str(_: ty::ctxt, _: &str, _: u32) -> ~str {
@@ -359,7 +366,7 @@ pub fn zget_file_line_str(_: ty::ctxt, _: &str, _: u32) -> ~str {
 
 pub fn dump_span(text: &[u8], sp: &codemap::Span) {
 
-	let line_col = text_offset_to_line_pos(text, *sp.lo);
+	let line_col = text_offset_to_line_pos(text, sp.lo.to_uint() as u32);
 	logi!(" line,ofs=", line_col.to_str(), " text=\'", str::from_utf8(text_span(text,sp)),"\'");
 }
 

@@ -3,6 +3,7 @@ use jumptodefmap::{dump_json,lookup_def_at_text_file_pos_str};
 use std::io;
 use std::io::buffered::BufferedReader;
 use rsfind::{SDM_Source};
+use ioutil::ResultUtil;
 /*
 interactive mode, also server for IDE integration with command interface
 */
@@ -24,8 +25,9 @@ pub fn run_server(dc:&RFindCtx) {
 			match toks[0] {
 				"h"|"help"=> println!("interactive mode\n - enter file:line:pos or line:pos for current file\n - show location & def of symbol there\n j-dump json q-quit i-info"),
 				"i"=> {
-					println!("files in current crate:-");
-					for x in dc.tycx.sess.codemap.files.iter() {
+					println!("files in current crate_:-");
+                    let files = dc.tycx.sess.codemap.files.borrow().get();
+					for x in files.iter() {
 						println!("\t{}", x.name);
 					}
 				}

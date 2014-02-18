@@ -2,9 +2,11 @@
 #[feature(globs)];
 #[feature(macro_rules)];
 
-extern mod syntax;
-extern mod rustc;
-extern mod extra;
+extern crate syntax;
+extern crate rustc;
+extern crate extra;
+extern crate getopts;
+extern crate serialize;
 
 use std::io::println;
 
@@ -86,7 +88,7 @@ pub macro_rules! if_some {
 
 fn main() {
 
-    use extra::getopts::*;
+    use getopts::*;
 
 	//test_default_arg(1,(2,3));
 	//test_default_arg(1);
@@ -94,7 +96,16 @@ fn main() {
     let args = os::args();
 
     let opts = ~[
-        optmulti("L"),optflag("d"),optflag("r"),optflag("j"),optflag("h"),optflag("i"),optflag("g"),optflag("w"),optflag("f"),optopt("x")
+        optmulti("L", "", "path to search for libraries", "-L<lib path>"),
+        optflag("d", "", ""),
+        optflag("r", "", ""),
+        optflag("j", "", ""),
+        optflag("h", "help", "print this help menu"),
+        optflag("i", "", ""),
+        optflag("g", "", ""),
+        optflag("w", "", ""),
+        optflag("f", "", ""),
+        optopt("x", "", "where to look for html of external crates", "rustfind filename mysource.rs -x ~/rust/src")
     ];
 
 	let matches = getopts(args.tail(), opts).unwrap();
@@ -107,7 +118,6 @@ fn main() {
 	};
 
 	if matches.opt_present("h") {
-		println!("rustfind: args/useage:-");
 		println!(" filename.rs [-L<lib path>] : create linked html pages for sources in crate");
 		println!(" -r filename.rs [-L<library path>]  : dump .rfx 'crosscratemap'  containing ast nodes and jump definitions");
 		println!(" -x where to look for html of external crates -  :eg rustfind filename mysource.rs -x ~/rust/src\n");
@@ -169,8 +179,11 @@ fn main() {
 
 struct BlankEmitter;
 impl syntax::diagnostic::Emitter for BlankEmitter {
-	fn emit(&self, _: Option<(@codemap::CodeMap, codemap::Span)>, _: &str, _: syntax::diagnostic::Level) {
+	fn emit(&self, _: Option<(&codemap::CodeMap, codemap::Span)>, _: &str, _: syntax::diagnostic::Level) {
 	}
+
+    fn custom_emit(&self, _: &codemap::CodeMap, _: codemap::Span, _: &str, _: syntax::diagnostic::Level) {
+    }
 }
 
 fn get_ast_and_resolve(
@@ -178,18 +191,18 @@ fn get_ast_and_resolve(
 	libs: ~[std::path::PosixPath])
 	-> RFindCtx {
 
-    let parsesess = parse::new_parse_sess(None);
+    let libs = libs.move_iter().collect();
+    let parsesess = parse::new_parse_sess();
     let sessopts = @driver::session::Options {
-        binary: @"rustdoc",
         maybe_sysroot: Some(@std::os::self_exe_path().unwrap()),
-        addl_lib_search_paths:  libs.move_iter().collect(),
+        addl_lib_search_paths:  libs,
         ..  (*rustc::driver::session::basic_options()).clone()
     };
     // Currently unused
 // 	let quiet = true;
 
 
-    let diagnostic_handler = syntax::diagnostic::mk_handler(None);
+    let diagnostic_handler = syntax::diagnostic::mk_handler();
     let span_diagnostic_handler =
         syntax::diagnostic::mk_span_handler(diagnostic_handler, parsesess.cm);
 
@@ -198,13 +211,13 @@ fn get_ast_and_resolve(
                                                   @BlankEmitter as @syntax::diagnostic::Emitter,
                                                   span_diagnostic_handler);
 	let input=driver::driver::FileInput(cpath.clone());
-	let cfg= driver::driver::build_configuration(sess); //was, @"", &input);
+	let cfg: () = driver::driver::build_configuration(sess); //was, @"", &input);
 
 	let crate1=driver::driver::phase_1_parse_input(sess,cfg.clone(),&input);
 	let crate2=@driver::driver::phase_2_configure_and_expand(sess,cfg,crate1);
 
 	let ca=driver::driver::phase_3_run_analysis_passes(sess,crate2);
-    RFindCtx { crate: crate2, tycx: ca.ty_cx, sess: sess, ca:ca }
+    RFindCtx { crate_: crate2, tycx: ca.ty_cx, sess: sess, ca:ca }
 }
 
 fn debug_test(dc:&RFindCtx) {
@@ -242,7 +255,7 @@ fn debug_test(dc:&RFindCtx) {
 
 
 		if_some!(id in nodetloc.last().ty_node_id() then {
-			logi!("source=",get_node_source(dc.tycx, node_info_map,ast::DefId{crate:0,node:id}));
+			logi!("source=",get_node_source(dc.tycx, node_info_map,ast::DefId{crate_:0,node:id}));
 			if_some!(t in safe_node_id_to_type(dc.tycx, id) then {
 				println!("typeinfo: {:?}",
 					{let ntt= rustc::middle::ty::get(t); ntt});

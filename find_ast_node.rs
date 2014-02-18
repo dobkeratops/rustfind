@@ -1,6 +1,7 @@
 use rf_common::*;
 use syntax::ast;
 use syntax::visit;
+use syntax::parse::token;
 use syntax::visit::{Visitor};
 use syntax::codemap;
 use syntax::codemap::{BytePos, Pos};
@@ -36,7 +37,7 @@ pub enum AstNode {
 	astnode_trait_method(@ast::TraitMethod),
 	astnode_method(@ast::Method),
 	astnode_struct_def(@ast::StructDef),
-	astnode_struct_field(@ast::StructField_),
+	astnode_struct_field(@ast::StructField),
 	astnode_trait_ref(@ast::TraitRef),
 	astnode_variant(@ast::Variant_),
 	astnode_root,
@@ -177,7 +178,7 @@ impl ToJsonStr for hashmap::HashMap<ast::NodeId,ast::DefId> {
 		let mut r=~"[\n";
 //		for self.iter().advance|(&key,&value)| {
 		for (&key,&value) in self.iter() {
-			r.push_str(format!("\t\\{node_id:{:?},\tdef_id:\\{crate:{:?},node:{:?}\\}\\},\n", key, value.crate,value.node));
+			r.push_str(format!("\t\\{node_id:{:?},\tdef_id:\\{crate_:{:?},node:{:?}\\}\\},\n", key, value.krate,value.node));
 		}
 		r.push_str("]\n");
 		r
@@ -226,8 +227,8 @@ impl KindToStr for ast::Expr {
 		match self.node {
 		ast::ExprVstore(_,_)=>"vstore",
 		ast::ExprVec(_,_)=>"vec",
-		ast::ExprCall(_,_,_)=>"call",
-		ast::ExprMethodCall(_,_,_,_,_)=>"method_call",
+		ast::ExprCall(_,_)=>"call",
+		ast::ExprMethodCall(_,_,_,_)=>"method_call",
 		ast::ExprTup(_)=>"tup",
 		ast::ExprBinary(_, _binop, _,_)=>match _binop {
 //			ast_util::binop_to_*(binop) todo - we donnt use this because of ambiguity
@@ -550,7 +551,7 @@ impl AstNodeAccessors for AstNode {
 			astnode_trait_method(ref x)=>x.get_id(),
 			astnode_method(ref m)=>Some(m.id),
 			astnode_struct_def(_)=>None,
-			astnode_struct_field(ref x)=>Some(x.id),
+			astnode_struct_field(ref x)=>Some(x.node.id),
 			astnode_trait_ref(ref x)=>Some(x.ref_id),
 			astnode_variant(ref x)=>Some(x.id),
 			astnode_none|astnode_root=>None,
@@ -722,8 +723,8 @@ impl Visitor<FncsState> for FncsThing {
 		visit::walk_pat(self, a, (s, a.id));
 	}
 
-	fn visit_decl(&mut self, a:@ast::Decl, (s, p):FncsState) {
-		push_spanned(&mut s, "decl", a, astnode_decl(a), p);
+	fn visit_decl(&mut self, a:&ast::Decl, (s, p):FncsState) {
+		push_spanned(&mut s, "decl", a, astnode_decl(@*a), p);
 
 		visit::walk_decl(self, a, (s, p));
 	}
@@ -731,7 +732,7 @@ impl Visitor<FncsState> for FncsThing {
 //	 fn visit_struct_def(&mut self, s)
 
 	fn visit_expr(&mut self, a:&ast::Expr, (s, p):FncsState) {
-		push_span(&mut s, a.id, p, expr_get_ident(a), a.kind_to_str(), a.span, astnode_expr(a));
+		push_span(&mut s, a.id, p, expr_get_ident(a), a.kind_to_str(), a.span, astnode_expr(@a.clone()));
 
 		visit::walk_expr(self, a, (s, a.id));
 	}
@@ -749,7 +750,7 @@ impl Visitor<FncsState> for FncsThing {
 //	 fn visit_fn()
 
 	fn visit_struct_field(&mut self, a: &ast::StructField, (s, p):FncsState) {
-		push_spanned(&mut s, "struct_field", a, astnode_struct_field(@a.node.clone()), p);
+		push_spanned(&mut s, "struct_field", a, astnode_struct_field(@a.clone()), p);
 
 		visit::walk_struct_field(self, a, (s, p));
 	}
@@ -771,32 +772,32 @@ impl Visitor<FindAstNodeSt> for Finder {
 		visit::walk_view_item(self, a, s);
 	}
 
-	fn visit_item(&mut self, a:@ast::Item, s: FindAstNodeSt) {
+	fn visit_item(&mut self, a:&ast::Item, s: FindAstNodeSt) {
 		if span_contains(s.location, a.span) {
-			s.result.push(astnode_item(a));
+			s.result.push(astnode_item(@a.clone()));
 		}
 		visit::walk_item(self, a, s);
 	}
 
-	fn visit_local(&mut self, a:@ast::Local, s: FindAstNodeSt) {
+	fn visit_local(&mut self, a:&ast::Local, s: FindAstNodeSt) {
 		if span_contains(s.location, a.span) {
-			s.result.push(astnode_local(a));
+			s.result.push(astnode_local(@*a.clone()));
 		}
 
 		visit::walk_local(self, a, s);
 	}
 
-	fn visit_block(&mut self, a:@ast::Block, s: FindAstNodeSt) {
+	fn visit_block(&mut self, a:&ast::Block, s: FindAstNodeSt) {
 		if span_contains(s.location, a.span) {
-			s.result.push(astnode_block(a));
+			s.result.push(astnode_block(@a.clone()));
 		}
 
 		visit::walk_block(self, a, s);
 	}
 
-	fn visit_stmt(&mut self, a:@ast::Stmt, s: FindAstNodeSt) {
+	fn visit_stmt(&mut self, a:&ast::Stmt, s: FindAstNodeSt) {
 		if span_contains(s.location, a.span) {
-			s.result.push(astnode_stmt(a));
+			s.result.push(astnode_stmt(@a.clone()));
 		}
 
 		visit::walk_stmt(self, a, s);
@@ -818,17 +819,17 @@ impl Visitor<FindAstNodeSt> for Finder {
 		visit::walk_pat(self, a, s);
 	}
 
-	fn visit_decl(&mut self, a:@ast::Decl, s: FindAstNodeSt) {
+	fn visit_decl(&mut self, a:&ast::Decl, s: FindAstNodeSt) {
 		if span_contains(s.location, a.span) {
-			s.result.push(astnode_decl(a));
+			s.result.push(astnode_decl(@*a));
 		}
 
 		visit::walk_decl(self, a, s);
 	}
 
-	fn visit_expr(&mut self, a:@ast::Expr, s: FindAstNodeSt) {
+	fn visit_expr(&mut self, a:&ast::Expr, s: FindAstNodeSt) {
 		if span_contains(s.location, a.span) {
-			s.result.push(astnode_expr(a));
+			s.result.push(astnode_expr(@a.clone()));
 		}
 
 		visit::walk_expr(self, a, s);
@@ -863,7 +864,7 @@ pub fn get_node_info_str(dc:&RFindCtx,node:&NodeTreeLoc)->~str
 //		for path.idents.iter().advance |x|{
 		for x in path.segments.iter() {
 			if !first {acc=acc.append("::");}
-			acc=acc.append(dc.sess.str_of(x.identifier));
+			acc=acc.append(token::get_ident(x.identifier).get());
 			first=false
 		}
 		acc
@@ -905,14 +906,14 @@ pub fn get_node_info_str(dc:&RFindCtx,node:&NodeTreeLoc)->~str
 	fn expr_to_str(dc:&RFindCtx, x:&ast::Expr_)->~str {
 		match *x {
 			ast::ExprStruct(ref p,_,_)=>~"(expr_struct "+ path_to_str(dc,p) +")",
-			ast::ExprCall(ref e,ref args,_)=>~"(expr_call("+expr_to_str(dc,&e.node)+args.map(|x|expr_to_str(dc,&x.node)).to_str()+")",
-			ast::ExprField(ref e, ref i, ref tys)=>~"(expr_field("+expr_to_str(dc,&e.node)+")"+dc.sess.str_of(*i)+tys.map(|x|ty_to_str(dc,*x)).to_str()+")",
+			ast::ExprCall(ref e,ref args)=>~"(expr_call("+expr_to_str(dc,&e.node)+args.map(|x|expr_to_str(dc,&x.node)).to_str()+")",
+			ast::ExprField(ref e, ref i, ref tys)=>~"(expr_field("+expr_to_str(dc,&e.node)+")"+token::get_ident(*i).get()+tys.map(|x|ty_to_str(dc,*x)).to_str()+")",
 			_=>~"expr"
 		}
 	}
 
 
-	match node.last() {
+	match node.last().expect("No last node available") {
 //			TODO -factor out repeatedly used functions here..
 //			fn astnode_pat_to_str(&astnode_pat(x))->~str
 //			fn path_to_str(&astnode_pat(x))->~str
@@ -921,7 +922,7 @@ pub fn get_node_info_str(dc:&RFindCtx,node:&NodeTreeLoc)->~str
 		&astnode_view_item(_)=>~"view_item: ?",
 		&astnode_item(x)=>~"item: "+
 			"id="+x.id.to_str()+" "+
-			dc.sess.str_of(x.ident)+
+			token::get_ident(x.ident).get()+
 			match x.node {
 				ast::ItemFn(_,_,_,_,_) =>~" fn_decl",
 				ast::ItemStruct(_, _) =>~" struct_def",
@@ -935,7 +936,7 @@ pub fn get_node_info_str(dc:&RFindCtx,node:&NodeTreeLoc)->~str
 		&astnode_struct_field(sf)=>
 			"id="+sf.node.id.to_str()+" "+
 			match(sf.node.kind){
-				ast::NamedField(nf, _)=>"struct named_field: "+dc.sess.str_of(nf)+" ",
+				ast::NamedField(nf, _)=>"struct named_field: "+token::get_ident(nf).get()+" ",
 				_=>~"struct anon_field"
 			}+
 			":"+ty_to_str(dc, sf.node.ty)/*sf.node.ty ..parse it.. */,
@@ -953,14 +954,14 @@ pub fn get_node_info_str(dc:&RFindCtx,node:&NodeTreeLoc)->~str
 
 pub fn safe_node_id_to_type(cx: ty::ctxt, id: ast::NodeId) -> Option<ty::t> {
 	//io::println!(fmt!("%?/%?", id, cx.node_types.len()));
-	match cx.node_types.find(&(id as uint)) {
+	match cx.node_types.get().find(&(id as uint)) {
 	   Some(&t) => Some(t),
 	   None => None
 	}
 }
 
 pub fn get_def_id(curr_crate:ast::CrateNum,src_def:ast::Def)->Option<ast::DefId> {
-	let mk=|x|{Some(ast::DefId{crate:curr_crate, node:x})}; // todo,mmaybe this is best 'None'..
+	let mk=|x|{Some(ast::DefId{krate:curr_crate, node:x})}; // todo,mmaybe this is best 'None'..
 	// todo-'definition' can be at multiple locations. we should return [def_id] really..
 	match (src_def) {
 		ast::DefFn(d,_)=>Some(d),
@@ -1026,9 +1027,9 @@ pub fn build_node_def_node_table(dc:&RFindCtx)->~HashMap<ast::NodeId, ast::DefId
 	let curr_crate_id_hack=0;	// TODO WHAT IS CRATE ID REALLY?!
 	// todo .. for range(0,c.next_id) || ??
 	let mut id: ast::NodeId=0;
-	while id<*(dc.tycx.next_id) as ast::NodeId {
+	while id<dc.tycx.next_id.get() as ast::NodeId {
 		if_some!(t in safe_node_id_to_type(dc.tycx,id) then {
-			if_some!(def in dc.tycx.def_map.find(&(id)) then { // finds a def..
+			if_some!(def in dc.tycx.def_map.get().find(&(id)) then { // finds a def..
 				if_some!(did in get_def_id(curr_crate_id_hack,*def) then {
 					r.insert(id as ast::NodeId,did);
 				})
@@ -1042,7 +1043,7 @@ pub fn build_node_def_node_table(dc:&RFindCtx)->~HashMap<ast::NodeId, ast::DefId
 
 pub fn def_node_id_from_node_id(dc:&RFindCtx, id:ast::NodeId)->ast::NodeId {
 	let crate_num=0;	// TODO - whats crate Id really???
-	match dc.tycx.def_map.find(&id) { // finds a def..
+	match dc.tycx.def_map.get().find(&id) { // finds a def..
 		Some(a)=>{
 			match get_def_id(crate_num,*a) {
 				Some(b)=>b.node,
@@ -1061,7 +1062,7 @@ pub fn def_of_symbol_to_str(_:&RFindCtx, _:&FNodeInfoMap, _:&HashMap<ast::NodeId
 
 // TODO- this should return a slice?
 pub fn get_node_source(c:ty::ctxt, nim:&FNodeInfoMap, did:ast::DefId)->~str {
-	if did.crate==0{
+	if did.krate==0{
 		match (nim.find(&did.node)){
 			None=>~"",
 			Some(info)=>{

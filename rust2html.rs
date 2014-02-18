@@ -1,15 +1,18 @@
 use std::io::println;
 use syntax::codemap;
 use syntax::ast;
+use syntax::codemap::Pos;
 use rustc::middle::ty;
 use iou=ioutil;
 use std::hashmap::HashMap;
 use std::vec;
+use std::cmp;
 use codemaput::{ZIndexFilePos,ToZIndexFilePos};
 use find_ast_node::{FNodeInfoMap,FNodeInfo};
 use rfindctx::{RFindCtx};
 use crosscratemap::{CrossCrateMap};
 use jumptodefmap::{JumpToDefMap};
+use rsfind::MyOption;
 //use self::htmlwriter::HtmlWriter;
 mod htmlwriter;
 
@@ -48,8 +51,8 @@ pub fn make_html(dc:&RFindCtx, fm:&codemap::FileMap,nmaps:&NodeMaps,xcm:&CrossCr
 	doc.begin_tag("div");//,&[(~"style",~"background-color:#"+bg+";")]);
 	doc.begin_tag("bg"+(hash&15).to_str());
 	doc.begin_tag("maintext");
-	let fstart = *fm.start_pos;
-	let max_digits=num_digits(fm.lines.len());
+	let fstart = fm.start_pos;
+	let max_digits=num_digits(fm.lines.get().len());
 
 	if options & WriteFilePath !=0 {
 		doc.begin_tag("div");//,&[(~"style",~"background-color:#"+bg+";")]);
@@ -60,14 +63,14 @@ pub fn make_html(dc:&RFindCtx, fm:&codemap::FileMap,nmaps:&NodeMaps,xcm:&CrossCr
 	}
 	{
 		let mut scw=SourceCodeWriter::new(&mut doc);
-		for line in range(0, fm.lines.len()) {
+		for line in range(0, fm.lines.get().len()) {
 			scw.line_index=line;
 			// todo: line numbers want to go in a seperate column so they're unselectable..
 			scw.doc.write_tagged("ln",pad_to_length((line+1).to_str(),max_digits," "));
 			scw.doc.begin_tag_anchor((line+1).to_str());
-			let lend=if line<(fm.lines.len()-1){(*fm.lines[line+1]-fstart) as uint}else{fm.src.len()};
+			let lend=if line<(fm.lines.get().len()-1){(fm.lines.get()[line+1]-fstart).to_uint()}else{fm.src.len()};
 			scw.doc.write(" ");
-			let line_str=fm.src.slice((*fm.lines[line]-fstart) as uint,lend);
+			let line_str=fm.src.slice((fm.lines.get()[line]-fstart).to_uint(),lend);
 			//doc.writeln(line_str);
 			scw.doc.end_tag();
 			for nl in fln.def_nodes_per_line[line].iter() {
@@ -101,13 +104,14 @@ pub fn write_source_as_html_sub(dc:&RFindCtx, nim:&FNodeInfoMap, jdm:&JumpToDefM
 //	let nspl=~[~[]];
 	let mut def2refs = ~MultiMap::new();
 	for (&nref,&ndef) in jdm.iter() {
-		if ndef.crate==0 {
+		if ndef.krate==0 {
 			def2refs.insert(ndef.node,nref);
 		}
 	};
 
 	let nmaps=NodeMaps { nim:nim, jdm:jdm, jrm:def2refs};
 	let files=&dc.sess.codemap.files;
+    let files = files.borrow().get();
 	for (fi,fm) in files.iter().enumerate() {
 		if is_valid_filename(fm.name) {
 			println("generating "+fi.to_str()+ ": "+make_html_name(fm.name)+"..");
@@ -178,8 +182,9 @@ struct NodesPerLinePerFile {
 pub fn get_file_index(dc:&RFindCtx,fname:&str)->Option<uint> {
 	// todo - functional
 	let mut index=0;
-	while index<dc.sess.codemap.files.len() {
-		if fname==dc.sess.codemap.files[index].name  { return Some(index);}
+    let files = dc.sess.codemap.files.borrow().get();
+	while index<files.len() {
+		if fname==files[index].name  { return Some(index);}
 		index+=1;
 	}
 	None
@@ -199,10 +204,11 @@ impl NodesPerLinePerFile {
 		let mut npl=~NodesPerLinePerFile{file:~[]};
 //		let mut fi=0;
 //		npl.file = vec::from_elem(dc.sess.codemap.files.len(),);
-		for cmfile in dc.sess.codemap.files.iter() {
+        let files = dc.sess.codemap.files.borrow().get();
+		for cmfile in files.iter() {
 //		while fi<dc.sess.codemap.files.len() {
 //			let num_lines=dc.sess.codemap.files[fi].lines.len();
-			let num_lines=cmfile.lines.len();
+			let num_lines=cmfile.lines.borrow().get().len();
 			npl.file.push(FileLineNodes{
 				nodes_per_line: vec::from_elem(num_lines,~[]),
 				def_nodes_per_line: vec::from_elem(num_lines,~[])
@@ -399,10 +405,10 @@ fn write_line_with_links(dst:&mut SourceCodeWriter<htmlwriter::HtmlWriter>,dc:&R
 						}else{
 							no_link
 						},
-					Some(x) => if link_debug{(x.node as i64)|(x.crate as i64<<48)} else {x.node as i64}
+					Some(x) => if link_debug{(x.node as i64)|(x.krate as i64<<48)} else {x.node as i64}
 				};
 
-//				let null_def=ast::def_id{crate:0,node:0};
+//				let null_def=ast::def_id{crate_:0,node:0};
 //				let x=nmaps.jdm.find(n).unwrap_or_default(&null_def);
 //				let link_id=(x.node as i64)|(x.crate as i64<<48);
 //				let link_id=*n as i64 &15;
@@ -411,20 +417,28 @@ fn write_line_with_links(dst:&mut SourceCodeWriter<htmlwriter::HtmlWriter>,dc:&R
 				let oe=ni.span.hi.to_index_file_pos(dc.tycx);
 				if os.is_some() && oe.is_some() {
 					let e=oe.unwrap(); let s=os.unwrap();
-					let d=*ni.span.hi-*ni.span.lo;	// todo - get the actual hrc node depth in here!
-					let xs=if dst.line_index <= s.line as uint {s.col}else{0};
+					let d = ni.span.hi.to_uint() - ni.span.lo.to_uint();	// todo - get the actual hrc node depth in here!
+					let xs = if dst.line_index <= s.line as uint {
+                        s.col
+                    } else {
+                        0
+                    };
 					// TODO: instead of this brute force 'painters-algorithm',
 					// clip spans, or at least have a seperate "buffer" for the line-coherent infill
 					// for multi-line spans
 
 					// 'paint' the nodes we have here.
 					//if (s.line==e.line)
-					let xe = if e.line as uint >dst.line_index{line.len()}else{e.col as uint};
+					let xe = if e.line as uint > dst.line_index {
+                        line.len()
+                    }else{
+                        e.col as uint
+                    };
 					let ci = node_color_index(ni);
-					for x in range(xs as uint, xe.min(&line.len())) {
-						if d as uint <= depth[x] {
+					for x in range(xs as uint, cmp::min(xe, line.len())) {
+						if d <= depth[x] {
 							color[x]=ci;
-							depth[x] = d as uint;
+							depth[x] = d;
 							if link_id!=0 {
 								link[x]=link_id;
 							}
@@ -585,12 +599,15 @@ fn resolve_link(link:i64, dc:&RFindCtx,fm:&codemap::FileMap,lib_path:&str, nmaps
 		{
 			let def_crate = (link>>48) as u32;
 			let def_node=(link&((1<<48)-1)) as u32;
-			match xcm.find(&ast::DefId{crate:def_crate,node:def_node}) {
+			match xcm.find(&ast::DefId{krate:def_crate,node:def_node}) {
 				None=>//"#n"+def_node.to_str(), by node linnk
 				{
 					match (nmaps.nim,def_node).to_index_file_pos(dc.tycx) {
-						Some(ifp)=>make_html_name_rel(dc.sess.codemap.files[ifp.file_index].name,fm.name)+
-							"#"+(ifp.line+1).to_str(),
+						Some(ifp)=>{
+                            let files = dc.sess.codemap.files.borrow().get();
+                            make_html_name_rel(files[ifp.file_index].name,fm.name) +
+                                "#" + (ifp.line + 1).to_str()
+                        },
 						None=>~"c="+def_crate.to_str()+" n="+def_node.to_str()
 					}
 
@@ -687,10 +704,11 @@ type JumpToRefMap = MultiMap<ast::NodeId, ast::NodeId>;
 
 fn get_source_line(fm:&codemap::FileMap, i: u32) -> ~str {
 
-	let le=if (i as uint) < (fm.lines.len()-1) { *fm.lines[i+1] } else {fm.src.len() as u32 + *fm.start_pos};
+    let lines = fm.lines.borrow().get();
+	let le=if (i as uint) < (lines.len()-1) { lines[i+1].to_uint() } else {fm.src.len() as uint + fm.start_pos.to_uint()};
 //	dump!(fm.lines[i-1],*fm.start_pos, fm.lines[i-1]-le);
 	if i > 0 {
-		fm.src.slice( (*fm.lines[i]-*fm.start_pos) as uint, (le - *fm.start_pos) as uint).to_owned()
+		fm.src.slice( (lines[i]-fm.start_pos).to_uint(), (le - fm.start_pos.to_uint()) as uint).to_owned()
 	} else {
 		~""
 	}
@@ -703,7 +721,7 @@ pub struct Extents<T> {
 	lo:T, hi:T
 }
 
-impl<T:Orderable+Clone> Extents<T> {
+impl<T:Ord+Clone> Extents<T> {
 	pub fn new(lo:&T,hi:&T)->Extents<T> { Extents{lo:lo.clone(),hi:hi.clone()} }
 	pub fn new_from_value(v:&T)->Extents<T>{ Extents {lo:v.clone(),hi:v.clone()} }
 	pub fn contains(&self, other:&Extents<T>)->bool {
@@ -711,13 +729,13 @@ impl<T:Orderable+Clone> Extents<T> {
 	}
 	pub fn intersection(&self,other:&Extents<T>)->Option<Extents<T>> {
 		if self.overlaps(other) {
-			Some(Extents{lo:self.lo.max(&other.lo), hi:self.hi.min(&other.hi)})
+			Some(Extents{lo:cmp::max(self.lo, other.lo), hi:cmp::min(self.hi, other.hi)})
 		} else {
 			None
 		}
 	}
 	pub fn include(&self,other:&Extents<T>)->Extents<T> {
-		Extents{lo:self.lo.min(&other.lo),hi:self.hi.max(&other.hi)}
+		Extents{lo:cmp::min(self.lo, other.lo),hi:cmp::max(self.hi, other.hi)}
 	}
 	pub fn overlaps(&self, other:&Extents<T>)->bool {
 		!(other.lo >= self.hi || other.hi <= self.lo)
@@ -726,7 +744,7 @@ impl<T:Orderable+Clone> Extents<T> {
 		*value >= self.lo && *value <= self.hi
 	}
 	pub fn include_val(&self, value:&T)->Extents<T> {
-		Extents { lo: self.lo.min(value), hi: self.hi.max(value) }
+		Extents { lo: cmp::min(self.lo, *value), hi: cmp::max(self.hi, *value) }
 	}
 }
 
@@ -811,9 +829,24 @@ fn write_references(doc:&mut htmlwriter::HtmlWriter,dc:&RFindCtx, fm:&codemap::F
 				.to_owned_vec();
 
 			let l=refs2.len();
-			fn pri_of(x:&FNodeInfo)->uint{ if &"impl"==x.kind{0} else {0x8000} }
+			fn pri_of(x:&FNodeInfo) -> uint { 
+                if &"impl" == x.kind {
+                    0
+                } else {
+                    0x8000
+                }
+            }
 			// todo: we want to sort based on node type to find impls, but we dont quite find what we want..
-			refs2.mut_slice_to(l - 1).sort_by(|&(ni1,ref ifp1,_),&( ni2,ref ifp2,_)|{ ((ifp1.file_index-curr_file)&0x7fff) as uint +pri_of(ni1)<=((ifp2.file_index-curr_file)&0x7fff) as uint +pri_of(ni2) });
+			refs2.mut_slice_to(l - 1).sort_by(|&(ni1, ref ifp1, _), &(ni2, ref ifp2, _)| {
+                use std::cmp::{Less, Greater};
+                if ((ifp1.file_index - curr_file) & 0x7fff) as uint +
+                        pri_of(ni1) <= ((ifp2.file_index - curr_file) & 0x7fff) as uint +
+                        pri_of(ni2) {
+                    Less
+                } else {
+                    Greater
+                }
+            });
 			let mut newline=true;
 			for &(_, ref ref_ifp,ref id) in refs2.iter() {
 				if *id!=dn {
@@ -844,12 +877,13 @@ fn write_references(doc:&mut htmlwriter::HtmlWriter,dc:&RFindCtx, fm:&codemap::F
 								doc.writeln("");
 							}
 						}
-						let rfm=&dc.sess.codemap.files[ref_ifp.file_index];
+                        let files = dc.sess.codemap.files.borrow().get();
+						let rfm=&files[ref_ifp.file_index];
 						doc.begin_tag_link( make_html_name_rel(rfm.name,fm.name)+"#"+(ref_ifp.line+1).to_str());
 
 						if  links_written<max_links {
 							doc.write_tagged("c40",(ref_ifp.line+1).to_str()+&": ");
-							doc.writeln(get_source_line(dc.sess.codemap.files[ref_ifp.file_index],ref_ifp.line));
+							doc.writeln(get_source_line(files[ref_ifp.file_index],ref_ifp.line));
 							newline=true;
 							links_written+=1;
 						} else {
@@ -886,7 +920,7 @@ impl htmlwriter::HtmlWriter{
 				self.begin_tag_anchor((ifp.line+1).to_str()+"_"+ifp.col.to_str() + "_refs" );
 				self.begin_tag_link( "#"+(ifp.line+1).to_str());
 				self.begin_tag("c40");
-				self.writeln(dc.sess.codemap.files[ifp.file_index].name+":"+(ifp.line+1).to_str()+":"+ifp.col.to_str()
+				self.writeln(dc.sess.codemap.files.borrow().get()[ifp.file_index].name+":"+(ifp.line+1).to_str()+":"+ifp.col.to_str()
 							+"-"+(ifpe.line+1).to_str()+":"+ifpe.col.to_str() +" -" +info.kind + "- definition:");
        			self.end_tag();
 				self.begin_tag("pr");
@@ -902,7 +936,7 @@ impl htmlwriter::HtmlWriter{
 
 	fn write_file_ref(&mut self, dc:&RFindCtx,origin_fm:&codemap::FileMap, fi:uint) {
 
-		let fname = dc.tycx.sess.codemap.files[fi].name;
+		let fname = dc.tycx.sess.codemap.files.borrow().get()[fi].name;
 		self.begin_tag_link( make_html_name_rel(fname,origin_fm.name));
 		self.begin_tag("c40").writeln(""+fname + ":").end_tag();
 		self.end_tag();

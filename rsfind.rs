@@ -1,6 +1,6 @@
-extern mod syntax;
-extern mod rustc;
-extern mod extra;
+extern crate syntax;
+extern crate rustc;
+extern crate extra;
 
 //pub static ctxtkey: local_data::Key<@DocContext> = &local_data::Key;
 
