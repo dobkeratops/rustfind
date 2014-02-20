@@ -1,7 +1,7 @@
 use rfindctx::{RFindCtx,find_file_name_in,first_file_name};
 use jumptodefmap::{dump_json,lookup_def_at_text_file_pos_str};
 use std::io;
-use std::io::buffered::BufferedReader;
+use std::io::BufferedReader;
 use rsfind::{SDM_Source};
 use ioutil::ResultUtil;
 /*

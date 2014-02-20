@@ -5,7 +5,7 @@ use syntax::parse::token;
 use syntax::visit::{Visitor};
 use syntax::codemap;
 use syntax::codemap::{BytePos, Pos};
-use rustc::middle::mem_categorization::ast_node;
+//use rustc::middle::mem_categorization::ast_node;
 use rustc::middle::ty;
 use rfindctx::{RFindCtx,};
 use codemaput::{ZTextFilePos,ToZIndexFilePos,dump_span,get_span_str};
@@ -304,6 +304,7 @@ impl KindToStr for ast::Expr {
 		ast::ExprStruct(_,_,_)=>"expr_struct",
 		ast::ExprRepeat(_,_,_)=>"repeat",
 		ast::ExprParen(_)=>"paren",
+        ast::ExprBox(_, _) => "box",
 		}
 	}
 }

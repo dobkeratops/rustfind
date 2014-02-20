@@ -7,7 +7,7 @@ pub use std::libc::{fwrite, fread, fseek, fopen, ftell, fclose, FILE, c_void, c_
 pub use std::mem::size_of;	// for size_of
 pub use std::vec::from_elem;
 pub use std::num::Zero;
-use std::io::buffered::BufferedReader;
+use std::io::BufferedReader;
 
 pub type Size_t=u64;	// todo - we're not sure this should be u64
 						// as the libc stuff seems to want.
@@ -177,7 +177,7 @@ pub fn fileSaveStr(text:&str,filename:&str) {
 }
 
 
-trait ResultUtil<T> {
+pub trait ResultUtil<T> {
     fn expect(&self, error_message: &str) -> T;
 }
 

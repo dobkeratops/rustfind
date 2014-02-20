@@ -12,12 +12,15 @@ use std::io::println;
 
 use rustc::{driver};
 use rustc::metadata::cstore;
+use rustc::metadata::creader::Loader;
 
 use std::{os,local_data};
-use std::hashmap::HashMap;
+use std::cell::RefCell;
+use std::hashmap::{HashMap,HashSet};
 use std::path::Path;
 
 use syntax::{parse,ast,codemap};
+use syntax::codemap::Pos;
 use find_ast_node::{safe_node_id_to_type,get_node_info_str,find_node_tree_loc_at_byte_pos,ToJsonStr,ToJsonStrFc,AstNodeAccessors,KindToStr,get_node_source};
 use jumptodefmap::{lookup_def_at_text_file_pos_str, make_jdm, def_info_from_node_id,
 	lookup_def_at_text_file_pos, dump_json};
@@ -110,10 +113,12 @@ fn main() {
 
 	let matches = getopts(args.tail(), opts).unwrap();
     let libs1 = matches.opt_strs("L").map(|s| Path::new(s.as_slice()));
-	let libs=if libs1.len()>0 {libs1} else {
+	let libs= if libs1.len() > 0 {
+        libs1
+    } else {
 		match (os::getenv(&"RUST_LIBS")) {
-			Some(x)=>~[ Path::new(x)],
-			None=>~[]
+			Some(x) => ~[Path::new(x)],
+			None => ~[]
 		}
 	};
 
@@ -135,7 +140,7 @@ fn main() {
 	if matches.free.len()>0 {
 		let mut done=false;
 		let filename=util::get_filename_only(matches.free[0]);
-		let dc = @get_ast_and_resolve(&Path::new(filename), libs);
+		let dc = @get_ast_and_resolve(&Path::new(filename), libs.move_iter().collect());
 		local_data::set(ctxtkey, dc);
 
 		if (matches.opt_present("d")) {
@@ -187,15 +192,14 @@ impl syntax::diagnostic::Emitter for BlankEmitter {
 }
 
 fn get_ast_and_resolve(
-	cpath: &std::path::PosixPath,
-	libs: ~[std::path::PosixPath])
+	cpath: &std::path::Path,
+	libs: HashSet<std::path::Path>)
 	-> RFindCtx {
 
-    let libs = libs.move_iter().collect();
     let parsesess = parse::new_parse_sess();
     let sessopts = @driver::session::Options {
         maybe_sysroot: Some(@std::os::self_exe_path().unwrap()),
-        addl_lib_search_paths:  libs,
+        addl_lib_search_paths:  @RefCell::new(libs),
         ..  (*rustc::driver::session::basic_options()).clone()
     };
     // Currently unused
@@ -207,17 +211,19 @@ fn get_ast_and_resolve(
         syntax::diagnostic::mk_span_handler(diagnostic_handler, parsesess.cm);
 
 
-    let sess = driver::driver::build_session_(sessopts, parsesess.cm,
-                                                  @BlankEmitter as @syntax::diagnostic::Emitter,
-                                                  span_diagnostic_handler);
+    let sess = driver::driver::build_session_(sessopts, 
+                                              Some(cpath.clone()), 
+                                              parsesess.cm,
+                                              span_diagnostic_handler);
 	let input=driver::driver::FileInput(cpath.clone());
-	let cfg: () = driver::driver::build_configuration(sess); //was, @"", &input);
+	let cfg = driver::driver::build_configuration(sess); //was, @"", &input);
 
-	let crate1=driver::driver::phase_1_parse_input(sess,cfg.clone(),&input);
-	let crate2=@driver::driver::phase_2_configure_and_expand(sess,cfg,crate1);
+	let crate1 = driver::driver::phase_1_parse_input(sess,cfg.clone(),&input);
+    let loader = &mut Loader::new(sess);
+	let (crate2, ast_map) = driver::driver::phase_2_configure_and_expand(sess, loader, crate1);
 
-	let ca=driver::driver::phase_3_run_analysis_passes(sess,crate2);
-    RFindCtx { crate_: crate2, tycx: ca.ty_cx, sess: sess, ca:ca }
+	let ca = driver::driver::phase_3_run_analysis_passes(sess, &crate2, ast_map);
+    RFindCtx { crate_: @crate2, tycx: ca.ty_cx, sess: sess, ca:ca }
 }
 
 fn debug_test(dc:&RFindCtx) {
@@ -246,26 +252,26 @@ fn debug_test(dc:&RFindCtx) {
 	while test_cursor<500 {
 		let loc = rfindctx::get_source_loc(dc,codemap::BytePos(test_cursor as u32));
 
-		logi!(~"\n=====Find AST node at: ",loc.file.name,":",loc.line,":",loc.col,":"," =========");
+		logi!(~"\n=====Find AST node at: ",loc.file.name,":",loc.line,":",loc.col.to_uint().to_str(),":"," =========");
 
-		let nodetloc = find_node_tree_loc_at_byte_pos(dc.crate,codemap::BytePos(test_cursor as u32));
+		let nodetloc = find_node_tree_loc_at_byte_pos(dc.crate_,codemap::BytePos(test_cursor as u32));
 		let node_info =  get_node_info_str(dc,&nodetloc);
 		dump!(node_info);
 		println("node ast loc:"+(nodetloc.map(|x| { x.get_id().to_str() })).to_str());
 
 
-		if_some!(id in nodetloc.last().ty_node_id() then {
-			logi!("source=",get_node_source(dc.tycx, node_info_map,ast::DefId{crate_:0,node:id}));
+		if_some!(id in nodetloc.last().get_ref().ty_node_id() then {
+			logi!("source=",get_node_source(dc.tycx, &node_info_map,ast::DefId{krate:0,node:id}));
 			if_some!(t in safe_node_id_to_type(dc.tycx, id) then {
 				println!("typeinfo: {:?}",
 					{let ntt= rustc::middle::ty::get(t); ntt});
-				dump!(id,dc.tycx.def_map.find(&id));
+				dump!(id,dc.tycx.def_map.borrow().get().find(&id));
 				});
-			let (def_id,opt_info)= def_info_from_node_id(dc,node_info_map,id);
+			let (def_id,opt_info)= def_info_from_node_id(dc,&node_info_map,id);
 			if_some!(info in opt_info then{
 				logi!("src node=",id," def node=",def_id,
 					" span=",format!("{:?}",info.span));
-				logi!("def source=", get_node_source(dc.tycx, node_info_map, def_id));
+				logi!("def source=", get_node_source(dc.tycx, &node_info_map, def_id));
 			})
 		})
 
@@ -309,9 +315,9 @@ pub fn write_source_as_html_and_rfx(dc:&RFindCtx,lib_html_path:&str,opts:uint, w
 
     let (info_map,def_map,jump_map)=make_jdm(dc);
 	crosscratemap::write_cross_crate_map(dc,lib_html_path,
-        info_map,def_map,jump_map);
+        &info_map,def_map,jump_map);
 	if write_html {
-		rust2html::write_source_as_html_sub(dc,info_map,jump_map,xcm,lib_html_path,opts);
+		rust2html::write_source_as_html_sub(dc,&info_map,jump_map,xcm,lib_html_path,opts);
 	}
 }
 
