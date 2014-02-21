@@ -721,6 +721,25 @@ pub struct Extents<T> {
 	lo:T, hi:T
 }
 
+macro_rules! min(
+    ($left:expr, $right:expr) => (
+        if $left < $right {
+            $left.clone()
+        } else {
+            $right.clone()
+        }
+        );
+    )
+macro_rules! max(
+    ($left:expr, $right:expr) => (
+        if $left > $right {
+            $left.clone()
+        } else  {
+            $right.clone()
+        }
+        );
+    )
+
 impl<T:Ord+Clone> Extents<T> {
 	pub fn new(lo:&T,hi:&T)->Extents<T> { Extents{lo:lo.clone(),hi:hi.clone()} }
 	pub fn new_from_value(v:&T)->Extents<T>{ Extents {lo:v.clone(),hi:v.clone()} }
@@ -729,13 +748,13 @@ impl<T:Ord+Clone> Extents<T> {
 	}
 	pub fn intersection(&self,other:&Extents<T>)->Option<Extents<T>> {
 		if self.overlaps(other) {
-			Some(Extents{lo:cmp::max(self.lo, other.lo), hi:cmp::min(self.hi, other.hi)})
+			Some(Extents{lo: min!(self.lo, other.lo), hi: max!(self.hi, other.hi)})
 		} else {
 			None
 		}
 	}
 	pub fn include(&self,other:&Extents<T>)->Extents<T> {
-		Extents{lo:cmp::min(self.lo, other.lo),hi:cmp::max(self.hi, other.hi)}
+		Extents{lo: min!(self.lo, other.lo), hi: max!(self.hi, other.hi)}
 	}
 	pub fn overlaps(&self, other:&Extents<T>)->bool {
 		!(other.lo >= self.hi || other.hi <= self.lo)
@@ -744,7 +763,7 @@ impl<T:Ord+Clone> Extents<T> {
 		*value >= self.lo && *value <= self.hi
 	}
 	pub fn include_val(&self, value:&T)->Extents<T> {
-		Extents { lo: cmp::min(self.lo, *value), hi: cmp::max(self.hi, *value) }
+		Extents { lo: min!(self.lo, *value), hi: max!(self.hi, *value) }
 	}
 }
 

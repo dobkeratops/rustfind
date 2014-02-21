@@ -111,16 +111,16 @@ pub fn find_node_tree_loc_at_byte_pos(c:@ast::Crate,_location:codemap::BytePos)-
 	// if we encoded hrc information in the node-spans-table,
 	// we wouldn't need all this iterator malarchy again.
     let codemap::BytePos(location) = _location;
-	let mut s = FindAstNodeSt{
+	let mut env = FindAstNodeSt{
 		result:~[astnode_root], location:location, stop:false
 
 	};
 
 	let mut vt = Finder;
 
-	visit::walk_crate(&mut vt, c, s);
+	visit::walk_crate(&mut vt, c, env);
 
-	s.result.clone()
+    env.result
 }
 
 

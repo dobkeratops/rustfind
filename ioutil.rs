@@ -178,12 +178,12 @@ pub fn fileSaveStr(text:&str,filename:&str) {
 
 
 pub trait ResultUtil<T> {
-    fn expect(&self, error_message: &str) -> T;
+    fn expect(self, error_message: &'static str) -> T;
 }
 
 impl<T, U> ResultUtil<T> for Result<T, U> {
-    fn expect(&self, error_message: &str) -> T {
-        match *self {
+    fn expect(self, error_message: &'static str) -> T {
+        match self {
             Ok(res) => res,
             Err(_) => fail!(error_message)
         }
