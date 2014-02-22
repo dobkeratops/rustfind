@@ -33,8 +33,8 @@ test1 : rustfind
 test0 : rustfind
 	@if [ ! $(RUST) ] ; then echo "set RUST to point to root of rust sourcetree" ; fi
 	echo $(RUST)
-	./rustfind test_input0.rs -j -x $(RUSTSRC) $RF_LIBS
-	./rustfind test_input0.rs -w -x $(RUSTSRC) $RF_LIBS
+	./rustfind test_input0.rs -j -x $(RUSTSRC) $(RF_LIBS)
+	./rustfind test_input0.rs -w -x $(RUSTSRC) $(RF_LIBS)
 	firefox test_input0.rs.html
 
 
