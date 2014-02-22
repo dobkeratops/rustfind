@@ -3,13 +3,13 @@ OPTS= test_input.rs $(RF_LIBS)
 SRC=$(wildcard *.rs)
 RUSTFIND=$(pwd)/rustfind
 RUSTSRC=$(RUST_PATH)/src
+RUSTFLAGS = -O
 
 # generate HTML browser for the main sourcetree
 html: rustfind
 	@echo "(set RUSTSRC=<rust tree> & do 'make rustsrc' to generate html for rust stdlibs/compiler)"
 	@echo "generting HTML view of this sourcetree .."
 	./rustfind rustfind.rs $(RF_LIBS) -x $(RUSTSRC)
-	firefox rustfind.rs.html &
 
 test1 : rustfind
 	@if [ ! $(RUST) ] ; then echo "set RUST to point to root of rust sourcetree" ; fi
@@ -19,7 +19,7 @@ test1 : rustfind
 #default behaviour, dump json map of spans..
 test2: rustfind
 	./rustfind -j $(OPTS)
-int: rustfind
+interactive: rustfind
 	./rustfind -i $(OPTS)
 
 #run this tool on test sources
@@ -37,11 +37,9 @@ test0 : rustfind
 	./rustfind test_input0.rs -w -x $(RUSTSRC) $(RF_LIBS)
 	firefox test_input0.rs.html
 
-
 #make emacs ctags for this project
 tags:
 	ctags -e -f TAGS.emacs --options=$(RUSTSRC)/etc/ctags.rust -R .
-
 
 # Make the HTML view of the main rust sourcetree
 rustsrc: rustfind
@@ -84,13 +82,13 @@ rustsrc: rustfind
 
 #Compile the main executable
 rustfind: rustfind.rs $(SRC) 
-	rustc rustfind.rs
+	rustc $(RUSTFLAGS) rustfind.rs
 
 install :rustfind
 	cp ./rustfind /usr/local/bin
 
 clean:
-	rm rustfind
-	rm *.html
-	rm *.*~
+	rm -f rustfind
+	rm -f *.html
+	rm -f *.*~
 
