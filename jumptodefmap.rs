@@ -45,9 +45,9 @@ pub fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, nodeinfomap:&FNodeInf
                 let method_map = method_map.get();
 				match method_map.find(&e.id) {
 					None=> {},//logi!("no method map entry for",e.id),
-					Some(mme)=>{
+					Some(origin)=>{
 						//logi!("Method Map entry for",e.id);
-						match mme.origin {
+						match *origin {
 							typeck::method_static(def_id)=>
 								return Some(def_id),
 							typeck::method_object(_)=>
