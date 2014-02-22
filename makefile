@@ -3,7 +3,7 @@ OPTS= test_input.rs $(RF_LIBS)
 SRC=$(wildcard *.rs)
 RUSTFIND=$(pwd)/rustfind
 RUSTSRC=$(RUST_PATH)/src
-RUSTFLAGS = -O
+RUSTFLAGS = -O -A non-camel-case-types
 
 # generate HTML browser for the main sourcetree
 html: rustfind
