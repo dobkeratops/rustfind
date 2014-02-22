@@ -1,22 +1,24 @@
+#[allow(dead_code)];
+#[allow(unused_variable)];
 use test_input2::{foo_bar_test_func};
 mod test_input2;
 
 fn yada(a:int,c:Foo,b:test_input2::fruit::SomeStruct)->~str { a.to_str() }
 fn main() {
 	use test_input2::fruit::{SomeStruct};
-	println(foo_bar_test_func(SomeStruct{red_value:1,green_value:2,blue_value:3},(4,5)).to_str());
+	println!("{}", foo_bar_test_func(SomeStruct{red_value:1,green_value:2,blue_value:3},(4,5)).to_str());
 	let a=Foo{foo_field_1:2};
 	a.my_method(1);
 	let c=a_cat(3);
 	let d=Foo{foo_field_1:a.foo_field_1+2}; a.test();
-	println(a.foo_field_1.to_str());
+	println!("{}", a.foo_field_1.to_str());
 }
 
 struct Foo{foo_field_1:int}
 struct Bar(int);
 struct Baz(int);
 impl Foo {
-	fn my_method(&self,_:int){ print("my_method of foo");}
+	fn my_method(&self,_:int){ print!("{}", "my_method of foo");}
 }
 
 enum Animal {
@@ -37,20 +39,20 @@ trait DoZ {
 
 impl Testable for Foo {
 	fn test(&self) {
-		println(self.foo_field_1.to_str());
+		println!("{}", self.foo_field_1.to_str());
 	}
 	fn test1(&self)
 	{
-		println(self.foo_field_1.to_str());
+		println!("{}", self.foo_field_1.to_str());
 	}	fn test2(&self)
 	{
-		println(self.foo_field_1.to_str());
+		println!("{}", self.foo_field_1.to_str());
 	}
 
 }
 impl DoZ for Foo {
 	fn do_z(&self) {
-		println(self.foo_field_1.to_str());
+		println!("{}", self.foo_field_1.to_str());
 	}
 }
 
@@ -71,8 +73,8 @@ struct TraitedStructTest<X> {
 }
 fn some2(a:Animal) {
 	match a {
-		a_cat(x)=> println("cat"),
-		_ => println("not a cat")
+		a_cat(x)=> println!("{}", "cat"),
+		_ => println!("{}", "not a cat")
 	}
 
 }
