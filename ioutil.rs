@@ -18,7 +18,13 @@ macro_rules! logi{
 	($($a:expr),*)=>(println!("{}", file!()+":"+line!().to_str()+": " $(+$a.to_str())* ))
 }
 //macro_rules! dump{ ($a:expr)=>(logi!(fmt!("%s=%?",stringify!($a),$a).indent(2,160));)}
-fn newline_if_over(a:~str,l:uint)->~str{if a.len()>l {a+"\n"}else{a}}
+/*fn newline_if_over(a:~str,l:uint) -> ~str {
+    if a.len()>l {
+        a+"\n"
+    } else {
+        a
+    }
+}*/
 macro_rules! dump{ ($($a:expr),*)=>
 	(	{	let mut txt=~"";
 			$( txt=txt.append(
@@ -50,7 +56,7 @@ impl<T:ToStr> Dbprint for T {
 }
 
 pub fn promptInput(prompt:&str)->~str {
-	stdout().write(prompt.as_bytes());
+	println!("{}", prompt);
 	BufferedReader::new(stdin()).read_line().unwrap() // TODO add error handling
 }
 

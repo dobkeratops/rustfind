@@ -74,6 +74,7 @@ impl<'a> HtmlWriter {
         };
 		self
 	}
+    #[allow(dead_code)]
 	pub fn end_all_tags(&'a mut self)->&'a mut HtmlWriter {
 		while self.tag_stack.len()>0 {
 			self.end_tag();
@@ -87,6 +88,7 @@ impl<'a> HtmlWriter {
 		self
 	}
 	// todo rename "write_raw?"
+    #[allow(dead_code)]
 	pub fn write_html(&'a mut self,t:&str)->&'a mut HtmlWriter {
 		self.doc.push_str(t);
 		self
@@ -110,6 +112,7 @@ impl<'a> HtmlWriter {
 	pub fn begin_tag_link(&'a mut self, link:&str)->&'a mut HtmlWriter {
 		self.begin_tag_ext("a",[(~"href",link.to_owned())])
 	}
+    #[allow(dead_code)]
 	pub fn write_space(&'a mut self)->&'a mut HtmlWriter {
 		self.doc.push_str("&emsp;");
 		self

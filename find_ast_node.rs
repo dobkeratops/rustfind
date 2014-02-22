@@ -4,7 +4,7 @@ use syntax::visit;
 use syntax::parse::token;
 use syntax::visit::{Visitor};
 use syntax::codemap;
-use syntax::codemap::{BytePos, Pos};
+use syntax::codemap::BytePos;
 //use rustc::middle::mem_categorization::ast_node;
 use rustc::middle::ty;
 use rfindctx::{RFindCtx,};
@@ -203,7 +203,7 @@ impl KindToStr for ast::Decl {
 }
 impl KindToStr for ast::Item {
 	fn kind_to_str(&self)->&'static str {
-		match (self.node) {
+		match self.node {
 		ast::ItemStatic(..)=>"static",
 		ast::ItemFn(..)=>"fn",
 		ast::ItemMod(_)=>"mod",
@@ -310,7 +310,7 @@ impl AstNode {
 	pub fn ty_node_id(&self)->Option<ast::NodeId> {
 		match *self {
 			astnode_ty(ty)=>
-				match(ty.node) {
+				match ty.node {
 					ast::TyPath(_,_,NodeId)=>Some(NodeId),
 					_ => self.get_id()
 				},
@@ -510,7 +510,7 @@ impl AstNodeAccessors for ast::StructField_ {
 
 impl AstNodeAccessors for ast::TraitMethod {
 	fn get_id(&self)->Option<ast::NodeId> {
-		match(*self) {
+		match *self {
 			ast::Required(ref m)=>Some(m.id),
 			ast::Provided(_)=>None
 		}
@@ -581,12 +581,6 @@ impl AstNodeAccessors for AstNode {
 }
 fn item_get_ident(a:&ast::Item)->Option<ast::Ident> { Some(a.ident) }
 
-fn decl_get_ident(a:&ast::Decl)->Option<ast::Ident> {
-	match a.node {
-		ast::DeclLocal(_)=> None, // todo - will we need the ident ?a local isn't always 1, due to tuples
-		ast::DeclItem(i)=> item_get_ident(i)
-	}
-}
 fn expr_get_ident(_ :&ast::Expr)->Option<ast::Ident> {
 	None
 }
@@ -628,7 +622,7 @@ pub struct FncsThing {
 
 impl FncsThing {
     pub fn new() -> FncsThing {
-        let mut node_spans= hashmap::HashMap::new();
+        let node_spans= hashmap::HashMap::new();
         FncsThing {
             node_spans: node_spans
         }
@@ -655,7 +649,7 @@ impl Visitor<ast::NodeId> for FncsThing {
 			// unfortunately no span for type param
 //			 push_span(&mut self.node_spans, g.def_id.id, Some(g.ident), "ty_param_def", g.def_id.span, astnode_ty_param_def(tp))
 			for type_bound in typ.bounds.iter() {
-				match (type_bound) {
+				match type_bound {
 					&ast::TraitTyParamBound(ref tr) => {
 						self.trait_ref(tr, p);
 					}
@@ -771,7 +765,7 @@ pub struct Finder {
 
 impl Finder {
     fn new (location: u32) -> Finder {
-        let mut env = FindAstNodeSt{
+        let env = FindAstNodeSt{
             result:~[astnode_root], location:location, stop:false
 
         };
@@ -877,7 +871,7 @@ impl Visitor<()> for Finder {
 
 pub fn get_node_info_str(dc:&RFindCtx,node:&NodeTreeLoc)->~str
 {
-	fn path_to_str(dc:&RFindCtx, path:&ast::Path)->~str {
+	fn path_to_str(path:&ast::Path)->~str {
 		let mut acc=~"";
 		let mut first=true;
 //		for path.idents.iter().advance |x|{
@@ -892,9 +886,9 @@ pub fn get_node_info_str(dc:&RFindCtx,node:&NodeTreeLoc)->~str
 	fn pat_to_str(dc:&RFindCtx,p:&ast::Pat)->~str{
 		// todo -factor out and recurse
 		match p.node {
-			ast::PatIdent(_, ref path, _)=>~"pat_ident:"+path_to_str(dc,path),
-			ast::PatEnum(ref path, _)=>~"pat_enum:"+path_to_str(dc,path),//	`todo-fields..
-			ast::PatStruct(ref path,ref sfields,_)=>~"pat_struct:"+path_to_str(dc,path)+"{"+sfields.map(|x|pat_to_str(dc,x.pat)+",").to_str()+"}",
+			ast::PatIdent(_, ref path, _)=>~"pat_ident:"+path_to_str(path),
+			ast::PatEnum(ref path, _)=>~"pat_enum:"+path_to_str(path),//	`todo-fields..
+			ast::PatStruct(ref path,ref sfields,_)=>~"pat_struct:"+path_to_str(path)+"{"+sfields.map(|x|pat_to_str(dc,x.pat)+",").to_str()+"}",
 			ast::PatTup(ref elems)=>~"pat_tupl:"+elems.map(|&x|pat_to_str(dc,x)).to_str(),
 			//ast::pat_box(ref box)=>~"box",
 			ast::PatUniq(..)=>~"uniq",
@@ -915,7 +909,7 @@ pub fn get_node_info_str(dc:&RFindCtx,node:&NodeTreeLoc)->~str
 			ast::TyPtr(..)=>~"*",
 			ast::TyRptr(..)=>~"&",
 			ast::TyTup(ref types)=>~"("+types.map(|x|ty_to_str(dc,*x)).to_str()+")", //todo: factor this out, map..
-			ast::TyPath(ref path, _, node_id)=>~"path:id="+node_id.to_str()+" "+path_to_str(dc,path)
+			ast::TyPath(ref path, _, node_id)=>~"path:id="+node_id.to_str()+" "+path_to_str(path)
 			,
 
 			ast::TyInfer=>~"infered",
@@ -924,7 +918,7 @@ pub fn get_node_info_str(dc:&RFindCtx,node:&NodeTreeLoc)->~str
 	}
 	fn expr_to_str(dc:&RFindCtx, x:&ast::Expr_)->~str {
 		match *x {
-			ast::ExprStruct(ref p,_,_)=>~"(expr_struct "+ path_to_str(dc,p) +")",
+			ast::ExprStruct(ref p,_,_)=>~"(expr_struct "+ path_to_str(p) +")",
 			ast::ExprCall(ref e,ref args)=>~"(expr_call("+expr_to_str(dc,&e.node)+args.map(|x|expr_to_str(dc,&x.node)).to_str()+")",
 			ast::ExprField(ref e, ref i, ref tys)=>~"(expr_field("+expr_to_str(dc,&e.node)+")"+token::get_ident(*i).get()+tys.map(|x|ty_to_str(dc,*x)).to_str()+")",
 			_=>~"expr"
@@ -954,7 +948,7 @@ pub fn get_node_info_str(dc:&RFindCtx,node:&NodeTreeLoc)->~str
 		&astnode_arm(_)=>~"arm: ?",
 		&astnode_struct_field(sf)=>
 			"id="+sf.node.id.to_str()+" "+
-			match(sf.node.kind){
+			match sf.node.kind {
 				ast::NamedField(nf, _)=>"struct named_field: "+token::get_ident(nf).get()+" ",
 				_=>~"struct anon_field"
 			}+
@@ -982,7 +976,7 @@ pub fn safe_node_id_to_type(cx: ty::ctxt, id: ast::NodeId) -> Option<ty::t> {
 pub fn get_def_id(curr_crate:ast::CrateNum,src_def:ast::Def)->Option<ast::DefId> {
 	let mk=|x|{Some(ast::DefId{krate:curr_crate, node:x})}; // todo,mmaybe this is best 'None'..
 	// todo-'definition' can be at multiple locations. we should return [def_id] really..
-	match (src_def) {
+	match src_def {
 		ast::DefFn(d,_)=>Some(d),
 		ast::DefStaticMethod(d,_,_)=>Some(d),
 		ast::DefSelfTy(id)=>mk(id),
@@ -1047,7 +1041,7 @@ pub fn build_node_def_node_table(dc:&RFindCtx)->~HashMap<ast::NodeId, ast::DefId
 	// todo .. for range(0,c.next_id) || ??
 	let mut id: ast::NodeId=0;
 	while id<dc.tycx.next_id.get() as ast::NodeId {
-		if_some!(t in safe_node_id_to_type(dc.tycx,id) then {
+		if_some!(_t in safe_node_id_to_type(dc.tycx,id) then {
 			if_some!(def in dc.tycx.def_map.get().find(&(id)) then { // finds a def..
 				if_some!(did in get_def_id(curr_crate_id_hack,*def) then {
 					r.insert(id as ast::NodeId,did);
@@ -1082,7 +1076,7 @@ pub fn def_of_symbol_to_str(_:&RFindCtx, _:&FNodeInfoMap, _:&HashMap<ast::NodeId
 // TODO- this should return a slice?
 pub fn get_node_source(c:ty::ctxt, nim:&FNodeInfoMap, did:ast::DefId)->~str {
 	if did.krate==0{
-		match (nim.find(&did.node)){
+		match nim.find(&did.node) {
 			None=>~"",
 			Some(info)=>{
 				get_span_str(c,&info.span)
@@ -1095,7 +1089,8 @@ pub fn get_node_source(c:ty::ctxt, nim:&FNodeInfoMap, did:ast::DefId)->~str {
 
 
 pub fn dump_node_source_for_single_file_only(text:&[u8], ns:&FNodeInfoMap, id:ast::NodeId) {
-	match(ns.find(&id)) {None=>logi!("()"),
+	match ns.find(&id) {
+        None=>logi!("()"),
 		Some(info)=>{
 			dump_span(text, &info.span);
 		}

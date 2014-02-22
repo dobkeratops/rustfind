@@ -1,8 +1,7 @@
 use std::io::println;
 use rf_common::*;
 use syntax::ast;
-use syntax::codemap::{Pos,BytePos};
-use rustc::metadata::cstore;
+use syntax::codemap::Pos;
 use find_ast_node::FNodeInfoMap;
 use jumptodefmap::{JumpToDefMap};
 use codemaput::ToZTextFilePos;
@@ -30,7 +29,7 @@ pub type CrossCrateMap = HashMap<ast::DefId,CrossCrateMapItem>;
 
 pub fn read_cross_crate_map(_:&RFindCtx, crate_num:int, crate_name:&str,lib_path:&str)->~CrossCrateMap {
 	let mut raw_bytes=ioutil::fileLoad(crate_name);
-	if (raw_bytes.len()==0) {
+	if raw_bytes.len()==0 {
 		println("loading lib crosscratemap "+lib_path+"/"+crate_name);
 		raw_bytes=ioutil::fileLoad(lib_path+"/"+crate_name);
 	}
@@ -104,11 +103,11 @@ pub fn write_cross_crate_map(dc:&RFindCtx, _:&str,nim:&FNodeInfoMap, _:&HashMap<
 				if new_format {
 					outp.push_str(
 							"node\t"+
-							curr_crate_name_only+"\t"+k.to_str()+"\t"+ni.parent_id.to_str()+"\t"+tfp.name+"\t"+(tfp.line+1).to_str()+"\t"+tfp.col.to_str()+"\t"+(ni.span.hi-ni.span.lo).to_uint().to_str() + "\t"+ni.kind+ "\t"+str_of_opt_ident(dc,ni.ident)+"\n");
+							curr_crate_name_only+"\t"+k.to_str()+"\t"+ni.parent_id.to_str()+"\t"+tfp.name+"\t"+(tfp.line+1).to_str()+"\t"+tfp.col.to_str()+"\t"+(ni.span.hi-ni.span.lo).to_uint().to_str() + "\t"+ni.kind+ "\t"+str_of_opt_ident(ni.ident)+"\n");
 				} else 	{
 					// old format, relies on spans to reconstruct AST.
 					// cratename id filename line col len type [ident]
-					outp.push_str(curr_crate_name_only+"\t"+k.to_str()+"\t"+tfp.name+"\t"+(tfp.line+1).to_str()+"\t"+tfp.col.to_str()+"\t"+(ni.span.hi-ni.span.lo).to_uint().to_str() + "\t"+ni.kind+ "\t"+str_of_opt_ident(dc,ni.ident)+"\n");
+					outp.push_str(curr_crate_name_only+"\t"+k.to_str()+"\t"+tfp.name+"\t"+(tfp.line+1).to_str()+"\t"+tfp.col.to_str()+"\t"+(ni.span.hi-ni.span.lo).to_uint().to_str() + "\t"+ni.kind+ "\t"+str_of_opt_ident(ni.ident)+"\n");
 				}
 			},
 			None=>{}

@@ -184,29 +184,6 @@ pub fn dump_json(dc:&RFindCtx) {
 	println("}");
 }
 
-
-fn lookup_def_at_file_line_pos_old(dc:&RFindCtx,filepos:&str, show_all:ShowDefMode)->Option<~str> {
-
-	let toks:~[&str]=filepos.split(':').collect();
-	if toks.len()<3 { return None }
-
-//	let line:Option<uint> = FromStr::from_str(toks[1]);
-	if_some!(line in from_str::<u32>(toks[1]) then {
-		if_some!(col in from_str::<u32>(toks[2]) then {
-			//todo - if no column specified, just lookup everything on that line!
-
-			match ZTextFilePos::new(toks[0],line-1,col-1).to_byte_pos(dc.tycx) {
-				None=>{},
-				Some(bp)=>{
-					return lookup_def_at_byte_pos(dc,bp,show_all)
-				}
-			}
-		})
-	})
-	return None;
-}
-
-
 pub fn lookup_def_at_text_file_pos(dc:&RFindCtx, tfp:&ZTextFilePos, show_mode:ShowDefMode)->Option<~str> {
 	match tfp.to_byte_pos(dc.tycx) {
 		None=>None,

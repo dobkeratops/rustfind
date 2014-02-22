@@ -11,7 +11,6 @@ extern crate serialize;
 use std::io::println;
 
 use rustc::{driver};
-use rustc::metadata::cstore;
 use rustc::metadata::creader::Loader;
 
 use std::{os,local_data};
@@ -21,15 +20,14 @@ use std::path::Path;
 
 use syntax::{parse,ast,codemap};
 use syntax::codemap::Pos;
-use find_ast_node::{safe_node_id_to_type,get_node_info_str,find_node_tree_loc_at_byte_pos,ToJsonStr,ToJsonStrFc,AstNodeAccessors,KindToStr,get_node_source};
+use find_ast_node::{safe_node_id_to_type,get_node_info_str,find_node_tree_loc_at_byte_pos,ToJsonStr,ToJsonStrFc,AstNodeAccessors,get_node_source};
 use jumptodefmap::{lookup_def_at_text_file_pos_str, make_jdm, def_info_from_node_id,
 	lookup_def_at_text_file_pos, dump_json};
 
 use rfindctx::{RFindCtx,ctxtkey};
 pub use codemaput::{ZTextFilePos,ZTextFilePosLen,get_span_str,ToZTextFilePos,ZIndexFilePos,ToZIndexFilePos};
-use rsfind::{SDM_LineCol,SDM_Source,SDM_GeditCmd,MyOption};
+use rsfind::{SDM_LineCol,SDM_Source,SDM_GeditCmd};
 use crosscratemap::CrossCrateMap;
-use std::path::PosixPath;
 
 pub mod rf_common;
 pub mod find_ast_node;
@@ -116,7 +114,7 @@ fn main() {
 	let libs= if libs1.len() > 0 {
         libs1
     } else {
-		match (os::getenv(&"RUST_LIBS")) {
+		match os::getenv(&"RUST_LIBS") {
 			Some(x) => ~[Path::new(x)],
 			None => ~[]
 		}
@@ -143,15 +141,15 @@ fn main() {
 		let dc = @get_ast_and_resolve(&Path::new(filename), libs.move_iter().collect());
 		local_data::set(ctxtkey, dc);
 
-		if (matches.opt_present("d")) {
+		if matches.opt_present("d") {
 			debug_test(dc);
 			done=true;
-		} else if (matches.opt_present("j")){
+		} else if matches.opt_present("j"){
 			dump_json(dc);
 		}
 		let mut i=0;
 		let lib_html_path=if matches.opt_present("x"){ matches.opt_str("x").unwrap()} else {~""};
-		if (matches.opt_present("f")) {
+		if matches.opt_present("f") {
 			while i<matches.free.len() {
 				let mode=if matches.opt_present("g"){SDM_GeditCmd} else {SDM_Source};
 				println!("{}", lookup_def_at_text_file_pos_str(dc,matches.free[i],mode).unwrap_or(~"no def found"));
@@ -181,15 +179,6 @@ fn main() {
 
 /// tags: crate,ast,parse resolve
 /// Parses, resolves the given crate
-
-struct BlankEmitter;
-impl syntax::diagnostic::Emitter for BlankEmitter {
-	fn emit(&self, _: Option<(&codemap::CodeMap, codemap::Span)>, _: &str, _: syntax::diagnostic::Level) {
-	}
-
-    fn custom_emit(&self, _: &codemap::CodeMap, _: codemap::Span, _: &str, _: syntax::diagnostic::Level) {
-    }
-}
 
 fn get_ast_and_resolve(
 	cpath: &std::path::Path,

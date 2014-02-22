@@ -166,11 +166,6 @@ fn pad_to_length(a:&str,l:uint,pad:&str)->~str {
 	acc
 }
 
-fn change_file_name_ext(file_name:&str,new_ext:&str)->~str {
-	let parts:~[&str]=file_name.split('.').collect();
-	parts[0]+"."+new_ext
-}
-
 struct FileLineNodes {
 	nodes_per_line:~[~[ast::NodeId]],
 	def_nodes_per_line:~[~[ast::NodeId]]
@@ -243,6 +238,7 @@ impl NodesPerLinePerFile {
 //		npl.dump();
 		npl
 	}
+    #[allow(dead_code)]
 	fn dump(&self) {
 		for f in self.file.iter() {
 			print!("file \\{");
@@ -480,7 +476,7 @@ fn write_line_with_links(dst:&mut SourceCodeWriter<htmlwriter::HtmlWriter>,dc:&R
 			}
 			if x<(line.len()-1) {
 				let c1=line[x+1] as char;
-				if ((c0=='-' || c0=='=') && c1=='>') {
+				if (c0=='-' || c0=='=') && c1=='>' {
 					color[x]=4;color[x+1]=4; link[x]=0; link[x+1]=0;
 					x+=1;
 				}
@@ -780,6 +776,7 @@ fn get_decl_span(dc:&RFindCtx, fm:&codemap::FileMap, n:ast::NodeId)->Extents<ZIn
 }
 */
 
+/* TODO find out what these are used for and then uncomment / delete them
 enum CwOpts {
 	Rect(int,int,int,int), Pos(int,int), SplitHoriz(int),SplitVert(int),full
 }
@@ -790,9 +787,7 @@ struct Window {
 	name:~str,x:int,y:int,w:int,h:int,child:~[Window],
 }
 
-struct Foo {
-	i:int
-}
+
 trait Draw {
 	fn draw(self);
 }
@@ -800,6 +795,7 @@ impl<'a> Draw for  (&'a Window,&'a str) {
 	fn draw(self) {
 	}
 }
+*/
 
 
 fn write_references(doc:&mut htmlwriter::HtmlWriter,dc:&RFindCtx, fm:&codemap::FileMap, _:&str,  nmaps:&NodeMaps, _: &[~[ast::NodeId]]) {

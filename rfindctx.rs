@@ -37,7 +37,7 @@ pub fn get_source_loc(dc:&RFindCtx, pos:codemap::BytePos)->codemap::Loc {
 }
 
 
-pub fn str_of_opt_ident(dc:&RFindCtx, ident:Option<ast::Ident>)->~str{
+pub fn str_of_opt_ident(ident:Option<ast::Ident>)->~str{
 	match ident {
 		Some(i)=>token::get_ident(i).get().to_owned(), None=>~""
 	}

@@ -3,7 +3,6 @@ use syntax::ast;
 use syntax::codemap;
 use syntax::codemap::Pos;
 use rustc::middle::ty;
-use rustc::metadata::{cstore};
 use util::text_offset_to_line_pos;//todo - why is qualifying manually not working?!
 
 // TODO:
