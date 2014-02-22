@@ -131,6 +131,6 @@ pub fn write_cross_crate_map(dc:&RFindCtx, _:&str,nim:&FNodeInfoMap, _:&HashMap<
 
 	{	let x=curr_crate_name_only+ ".rfx";
 		println("writing "+x);
-		ioutil::fileSaveStr(outp, x);
+		ioutil::fileSaveStr(outp, &Path::new(x));
 	}
 }

@@ -1,4 +1,3 @@
-use std::io::println;
 use syntax::codemap;
 use syntax::ast;
 use syntax::codemap::Pos;
@@ -30,14 +29,26 @@ mod htmlwriter;
 // and link to their *nodes* instead of source-lines? or would the spans still work?
 // we could give the whole generator a root dir to look for crates? ... and assume html is generated in there..
 
-pub static WriteFilePath:uint	=0x0001;
-pub static WriteReferences:uint	=0x0002;
-pub static DefaultOptions:uint 	=WriteFilePath | WriteReferences;
 // todo: options struct.
+pub struct Options {
+    write_file_path: bool,
+    write_references: bool,
+    output_dir: Path
+}
+
+impl Options {
+    pub fn default() -> Options {
+        Options {
+            write_file_path: true,
+            write_references: true,
+            output_dir: Path::new("")
+        }
+    }
+}
 
 
 //nim:&FNodeInfoMap,jdm:&JumpToDefMap, jrm:&JumpToRefMap
-pub fn make_html(dc:&RFindCtx, fm:&codemap::FileMap,nmaps:&NodeMaps,xcm:&CrossCrateMap, fln:&FileLineNodes, lib_path:&str,options:uint)->~str {
+pub fn make_html(dc:&RFindCtx, fm:&codemap::FileMap,nmaps:&NodeMaps,xcm:&CrossCrateMap, fln:&FileLineNodes, lib_path:&str, options: &Options)->~str {
 	// todo - Rust2HtmlCtx { fm,nim,jdm,jrm } .. cleanup common intermediates
 
 	let mut doc= htmlwriter::HtmlWriter::new();
@@ -54,7 +65,7 @@ pub fn make_html(dc:&RFindCtx, fm:&codemap::FileMap,nmaps:&NodeMaps,xcm:&CrossCr
 	let fstart = fm.start_pos;
 	let max_digits=num_digits(fm.lines.get().len());
 
-	if options & WriteFilePath !=0 {
+	if options.write_file_path {
 		doc.begin_tag("div");//,&[(~"style",~"background-color:#"+bg+";")]);
 		doc.begin_tag("fileblock");
 		doc.write_path_links(fm.name);
@@ -85,7 +96,7 @@ pub fn make_html(dc:&RFindCtx, fm:&codemap::FileMap,nmaps:&NodeMaps,xcm:&CrossCr
 	//		doc.writeln(markup_line);
 		}
 	}
-	if options & WriteReferences != 0{
+	if options.write_references {
 		write_references(&mut doc,dc,fm,lib_path,nmaps, fln.nodes_per_line);
 	}
 
@@ -97,7 +108,7 @@ pub fn make_html(dc:&RFindCtx, fm:&codemap::FileMap,nmaps:&NodeMaps,xcm:&CrossCr
 	doc.doc
 }
 
-pub fn write_source_as_html_sub(dc:&RFindCtx, nim:&FNodeInfoMap, jdm:&JumpToDefMap,xcm:&CrossCrateMap,lib_path:&str, options:uint) {
+pub fn write_source_as_html_sub(dc:&RFindCtx, nim:&FNodeInfoMap, jdm:&JumpToDefMap,xcm:&CrossCrateMap,lib_path:&str, options: &Options) {
 
 	let npl=NodesPerLinePerFile::new(dc,nim);
 
@@ -115,9 +126,10 @@ pub fn write_source_as_html_sub(dc:&RFindCtx, nim:&FNodeInfoMap, jdm:&JumpToDefM
     let files = files.get();
 	for (fi,fm) in files.iter().enumerate() {
 		if is_valid_filename(fm.name) {
-			println("generating "+fi.to_str()+ ": "+make_html_name(fm.name)+"..");
+            let html_name = options.output_dir.join(Path::new(make_html_name(fm.name)));
+			println!("generating {}: {}..", fi.to_str(), html_name.display());
 			let doc_str=make_html(dc, *fm, &nmaps,xcm, &npl.file[fi] , lib_path,options);
-			iou::fileSaveStr(doc_str,make_html_name(fm.name));
+			iou::fileSaveStr(doc_str, &html_name);
 		}
 	}
 }
@@ -284,7 +296,7 @@ pub fn node_color_index(ni:&FNodeInfo)->int {
 		~"trait"=>32,
 		~"impl"=>33,
 		~"enum"=>34,
-		~"keyword"|~"while"|~"match"|~"loop"|~"do"|~"cast"|~"if"|~"return"|~"unsafe"|~"extern"|~"as"|~"in"|~"for"=>21,
+		~"keyword"|~"while"|~"match"|~"loop"|~"do"|~"cast"|~"if"|~"return"|~"unsafe"|~"extern"|~"crate"|~"as"|~"in"|~"for"=>21,
 
 		_ =>1
 	}
@@ -519,7 +531,7 @@ fn write_line_with_links(dst:&mut SourceCodeWriter<htmlwriter::HtmlWriter>,dc:&R
 		x=0; wb=true;
 		while x<line.len() {
 			if wb {
-				match sub_match(line,x,&[&"let",&"mut", &"const", &"use", &"mod", &"match",&"if",&"else",&"break",&"return",&"while",&"loop",&"for",&"do",&"ref",&"pub",&"priv",&"unsafe",&"extern",&"in",&"as"]) {
+				match sub_match(line,x,&[&"let",&"mut", &"const", &"use", &"mod", &"match",&"if",&"else",&"break",&"return",&"while",&"loop",&"for",&"do",&"ref",&"pub",&"priv",&"unsafe",&"extern",&"in",&"as",&"crate"]) {
 				None=>{},
 				Some((_, len))=>{
 					let me=x+len;
@@ -1017,7 +1029,9 @@ impl<'a> ToZIndexFilePos for (&'a FNodeInfoMap,ast::NodeId) {
 	}
 }
 
-fn make_html_name(f:&str)->~str { f+".html"}
+fn make_html_name(f: &str) -> ~str { 
+    f + ".html"
+}
 
 fn count_chars_in(f:&str, x:char)->uint{
 	let mut n=0;

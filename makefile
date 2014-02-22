@@ -1,5 +1,5 @@
 RF_LIBS= -L $(RUST_PATH)/x86_64-unknown-linux-gnu/stage2/lib
-OPTS= test_input.rs $(RF_LIBS)
+OPTS= test_input.rs $(RF_LIBS) -o html/
 SRC=$(wildcard *.rs)
 RUSTFIND=$(pwd)/rustfind
 RUSTSRC=$(RUST_PATH)/src
@@ -9,15 +9,15 @@ RUSTFLAGS = -O -A non-camel-case-types
 html: rustfind
 	@echo "(set RUSTSRC=<rust tree> & do 'make rustsrc' to generate html for rust stdlibs/compiler)"
 	@echo "generting HTML view of this sourcetree .."
-	./rustfind rustfind.rs $(RF_LIBS) -x $(RUSTSRC)
+	./rustfind rustfind.rs $(RF_LIBS) -x $(RUSTSRC) -o html/
 
-test1 : rustfind
+test_dump: rustfind
 	@if [ ! $(RUST) ] ; then echo "set RUST to point to root of rust sourcetree" ; fi
 	echo $(RUST)
 
 	./rustfind  -d $(OPTS)
 #default behaviour, dump json map of spans..
-test2: rustfind
+test_json: rustfind
 	./rustfind -j $(OPTS)
 interactive: rustfind
 	./rustfind -i $(OPTS)
@@ -26,16 +26,16 @@ interactive: rustfind
 test1 : rustfind
 	@if [ ! $(RUST) ] ; then echo "set RUST to point to root of rust sourcetree" ; fi
 	echo $(RUST)
-	./rustfind test_input.rs -j $(RF_LIBS)
-	./rustfind test_input.rs -w $(RF_LIBS)
-	firefox test_input.rs.html
+	./rustfind test_input.rs -j $(RF_LIBS) -o html/
+	./rustfind test_input.rs -w $(RF_LIBS) -o html/
+	firefox html/test_input.rs.html
 
 test0 : rustfind
 	@if [ ! $(RUST) ] ; then echo "set RUST to point to root of rust sourcetree" ; fi
 	echo $(RUST)
-	./rustfind test_input0.rs -j -x $(RUSTSRC) $(RF_LIBS)
-	./rustfind test_input0.rs -w -x $(RUSTSRC) $(RF_LIBS)
-	firefox test_input0.rs.html
+	./rustfind test_input0.rs -j -x $(RUSTSRC) $(RF_LIBS) -o html/
+	./rustfind test_input0.rs -w -x $(RUSTSRC) $(RF_LIBS) -o html/
+	firefox html/test_input0.rs.html
 
 #make emacs ctags for this project
 tags:

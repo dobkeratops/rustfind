@@ -1,0 +1,115 @@
+maintext {color:#f0f0f0; font-size:12px; font-family:\"Courier New\"}
+a:link{ color:inherit; font-style:inherit;   text-decoration:none;}
+a:visited{ color:inherit;  font-style:inherit;   text-decoration:none;}
+a:link:hover{ color:inherit;  font-style:inherit; background-color:#606060; }
+pr{font-weight:bold}
+
+/*line numbers*/
+ln{color:#606060; -moz-user-select:-moz-none; -khtml-user-select:none; -webkit-user-select:none; -ms-user-select:none; user-select:none;}
+
+/* main text*/
+c1{color:#f0ffff; } 
+/* lesser text*/
+c2{color:#ffffff; opacity:0.92}
+/* delimeters*/
+c3{color:#f090f0; opacity:0.92}
+/* special delmeters*/
+c4{color:#fff080; }
+/* operators */
+c5{color:#50ff80; } 
+/* Special operators */
+c6{color:; } 
+/* type-params */
+c7{color:#60f0c0}
+/* Types */
+c8{color:#50e0ff}
+/* BuiltInTypes */
+c9{color:#c0d0e0}
+
+/* methodcall*/
+c10{color:#ffffff}
+c11{color:#c0f070}
+/* literals */
+c12{color:#ffd000}
+/* macros */
+c13{color:#ffc0a0}
+/* tuples?*/
+c14{color:#f0ffc0}
+c15{color:#f0f0e0}
+/* local expr */
+c16{color:#c0ffd0}
+c17{color:#90d0f0}
+c18{color:#f0a0d0}
+c19{color:#d0f0a0}
+c20{color:#f0f0ff}
+c21{color:#d0d0d0; font-weight:bold}  /* structural keywords */
+c22{color:#c0ffd0; }
+c23{color:#d0f0ff; }
+/*-field*/
+c24{color:#e0ffe0}
+c25{color:#fff0d0}
+c26{color:#e0d0f0}
+c27{color:#70f0f0}
+c27{color:#e0e0ff}
+
+
+/* declarative keywords*/
+/* todo, how do css mixins work? */
+/* fn */
+c30{color:#ffffff; font-weight:bold }
+/* struct */
+c31{color:##d0ffc0; font-weight:bold }
+/* trait */
+c32{color:#c0f0ff; font-weight:bold }
+/* impl */
+c33{color:#ffd0e0; font-weight:bold }
+/* enum */
+c34{color:#c0ffff; font-weight:bold }
+/* type */
+c35{color:##80c0ff; font-weight:bold }
+/* static */
+c36{color:#f0c0ff; font-weight:bold }
+/* macro */
+c37{color:#ffc0a0; font-weight:bold }
+/* mod/ns */
+c38{color:#f0e0ff; font-weight:bold }
+/* class/if we do c++ */
+c39{color:#f0e0ff; font-weight:bold }
+
+/* comment levels*/
+c40{color:#ffffff; font-style:italic; opacity:0.4}
+c41{color:#ffffff; font-style:italic; opacity:0.5}
+c42{color:#ffffff; font-style:italic; opacity:0.6}
+
+/* preprocessor/attributes*/
+c50{color:#e0a0d0;  }
+
+/* backgrounds*/
+/* todo, how to select body from these */
+
+bg0{background-color:#383838;}
+bg1{background-color:#34383c;}
+bg2{background-color:#3c3834;}
+bg3{background-color:#383c34;}
+bg4{background-color:#343c38;}
+bg5{background-color:#38343c;}
+bg6{background-color:#3a343a;}
+bg7{background-color:#3a343a;}
+bg8{background-color:#36363a;}
+bg9{background-color:#363a36;}
+bg10{background-color:#3a3636;}
+bg11{background-color:#3a3a34;}
+bg12{background-color:#3a333a;}
+bg13{background-color:#343a3a;}
+bg14{background-color:#343a3c;}
+bg15{background-color:#343838;}
+
+body {background-color:#303030;} 
+
+/* non-source */
+fileblock {background-color:#303030;} 
+refblock {background-color:#300030;} 
+
+
+
+
