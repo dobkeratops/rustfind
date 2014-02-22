@@ -20,7 +20,8 @@ pub fn auto_deref_ty<'a> (t: &'a ty::t_box_) -> &'a ty::t_box_ {
 pub fn dump_ctxt_def_map(tycx:ty::ctxt) {
 //	let a:()=ctxt.tycx.node_types
 	logi!("===Test ctxt def-map table..===");
-    let def_map = tycx.def_map.borrow().get();
+    let def_map = tycx.def_map.borrow();
+    let def_map = def_map.get();
 	for (key,value) in def_map.iter(){
 		dump!(key,value);
 	}

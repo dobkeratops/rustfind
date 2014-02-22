@@ -15,14 +15,16 @@ pub struct RFindCtx {
 pub static ctxtkey: local_data::Key<@RFindCtx> = &local_data::Key;
 
 pub fn first_file_name(dc:&RFindCtx)->~str {
-    let files = dc.tycx.sess.codemap.files.borrow().get();
+    let files = dc.tycx.sess.codemap.files.borrow();
+    let files = files.get();
 	files[0].name.to_str() // clone?
 }
 
 pub fn find_file_name_in(dc:&RFindCtx,fname:&str)->Option<~str> {
 	// todo subsequence match..
 	// TODO - is there an existing way of doing this, "index_of.." ..contains()..?
-    let files = dc.tycx.sess.codemap.files.borrow().get();
+    let files = dc.tycx.sess.codemap.files.borrow();
+    let files = files.get();
 	for f in files.iter() {
 		if fname==f.name {return Some(fname.to_owned());}
 	}

@@ -41,7 +41,8 @@ pub fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, nodeinfomap:&FNodeInf
 // 				let rec_ty_node= astnode_expr(*receiver).ty_node_id();
 // 				let rec_ty_node1= dc.tycx.node_types.find(&(*id as uint));
 
-                let method_map = dc.ca.maps.method_map.borrow().get();
+                let method_map = dc.ca.maps.method_map.borrow();
+                let method_map = method_map.get();
 				match method_map.find(&e.id) {
 					None=> {},//logi!("no method map entry for",e.id),
 					Some(mme)=>{
@@ -53,7 +54,8 @@ pub fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, nodeinfomap:&FNodeInf
 // 								return Some(mp.trait_id),
 								return None,
 							typeck::method_param(mp)=>{
-                                let trait_method_def_ids = dc.tycx.trait_method_def_ids.borrow().get();
+                                let trait_method_def_ids = dc.tycx.trait_method_def_ids.borrow();
+                                let trait_method_def_ids = trait_method_def_ids.get();
 								match trait_method_def_ids.find(&mp.trait_id) {
 									None=>{},
 									Some(method_def_ids)=>{
@@ -68,7 +70,8 @@ pub fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, nodeinfomap:&FNodeInf
 			// handle struct-fields? "object.field"
 			ast::ExprField(ref object_expr, ref ident, _)=>{
 				// we want the type of the object..
-                let node_types = dc.tycx.node_types.borrow().get();
+                let node_types = dc.tycx.node_types.borrow();
+                let node_types = node_types.get();
 				let obj_ty=node_types.find(&(object_expr.id as uint));
 				let tydef=/*rf_ast_ut::*/auto_deref_ty(ty::get(*obj_ty.unwrap()));
 				match tydef.sty {
@@ -109,11 +112,11 @@ pub fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, nodeinfomap:&FNodeInf
 	return None;
 }
 
-pub fn build_jump_to_def_map(dc:&RFindCtx, nim: FNodeInfoMap,nd:&HashMap<ast::NodeId,ast::DefId>)->~JumpToDefMap{
+pub fn build_jump_to_def_map(dc:&RFindCtx, nim: &FNodeInfoMap,nd:&HashMap<ast::NodeId,ast::DefId>)->~JumpToDefMap{
 // todo: NodeId->AStNode  .. lookup_def_ inner functionality extracted
 	let mut jdm=~HashMap::new();
 	for (k,node_info) in nim.iter() {
-		match lookup_def_node_of_node(dc,&node_info.node,&nim,nd) {
+		match lookup_def_node_of_node(dc,&node_info.node, nim,nd) {
 			None=>{},
 			Some(def_node_id)=>{
 //				if *k != def_node_id.node && def_node_id.crate==0 || (def_node_id.crate!=0)
@@ -128,7 +131,8 @@ pub fn build_jump_to_def_map(dc:&RFindCtx, nim: FNodeInfoMap,nd:&HashMap<ast::No
 
 pub fn def_info_from_node_id<'a,'b>(dc:&'a RFindCtx, node_info:&'b FNodeInfoMap, id:ast::NodeId)->(ast::DefId,Option<&'b FNodeInfo>) {
 	let crate_num=0;
-    let def_map = dc.tycx.def_map.borrow().get();
+    let def_map = dc.tycx.def_map.borrow();
+    let def_map = def_map.get();
 	match def_map.find(&id) { // finds a def..
 		Some(a)=>{
 			match get_def_id(crate_num,*a){
@@ -153,9 +157,11 @@ pub fn dump_json(dc:&RFindCtx) {
 	println("{");
 	println("\tcode_map:[");
 //	for dc.sess.codemap.files.iter().advance |f| {
-    let files = dc.sess.codemap.files.borrow().get();
+    let files = dc.sess.codemap.files.borrow();
+    let files = files.get();
 	for f in files.iter() {
-        let lines = f.lines.borrow().get();
+        let lines = f.lines.borrow();
+        let lines = lines.get();
 		print!("\t\t\\{ name:\"{}\"", f.name);
         print!("\tglobal_start_pos:{},", f.start_pos.to_uint().to_str());
         print!("\tlength:{},", (f.src.len()).to_str());
@@ -167,7 +173,7 @@ pub fn dump_json(dc:&RFindCtx) {
 	println("\tnode_spans:");
 	let nim=build_node_info_map(dc.crate_);
 	let node_def_node = build_node_def_node_table(dc);
-	let jdm=build_jump_to_def_map(dc,nim,node_def_node);
+	let jdm=build_jump_to_def_map(dc, &nim,node_def_node);
 	println(nim.to_json_str(dc));
 	println(",");
 	println("\tnode_defs [\n");
@@ -284,6 +290,6 @@ pub fn make_jdm(dc:&RFindCtx)->( FNodeInfoMap, ~HashMap<ast::NodeId,ast::DefId>,
 {
     let nim=build_node_info_map(dc.crate_);
     let ndm=build_node_def_node_table(dc);
-    let jdm=build_jump_to_def_map(dc,nim,ndm);
+    let jdm=build_jump_to_def_map(dc, &nim,ndm);
     (nim,ndm,jdm)
 }

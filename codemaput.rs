@@ -67,14 +67,16 @@ impl Ord for ZIndexFilePos {
 
 impl ToZTextFilePos for codemap::BytePos {
 	fn to_text_file_pos(self, cx: ty::ctxt) -> Option<ZTextFilePos> {
-        let files = cx.sess.codemap.files.borrow().get();
+        let files = cx.sess.codemap.files.borrow();
+        let files = files.get();
 		let mut i = files.len();
 
 		while i > 0 {
 			i -= 1;
 			let fm = &files[i];
 			if fm.start_pos <= self {
-                let lines = fm.lines.borrow().get();
+                let lines = fm.lines.borrow();
+                let lines = lines.get();
 				let mut line = lines.len() as u32;
 				while line > 0 {
 					line -= 1;
@@ -119,14 +121,16 @@ impl ZTextFilePos {
 	}
 
 	pub fn to_byte_pos(&self, cx: ty::ctxt) -> Option<codemap::BytePos> {
-        let files = cx.sess.codemap.files.borrow().get();
+        let files = cx.sess.codemap.files.borrow();
+        let files = files.get();
 		let mut i = files.len();
 		while i > 0 {	// caution, need loop because we return, wait for new foreach ..in..
 			i -= 1;
 			let fm = &files[i];
 			let filemap_filename: &str = fm.name;
 			if filemap_filename == self.name {
-                let lines = fm.lines.borrow().get();
+                let lines = fm.lines.borrow();
+                let lines = lines.get();
 				if self.line as uint >= lines.len() {
 					return None;
 				}
@@ -252,14 +256,16 @@ impl ToZIndexFilePos for codemap::BytePos {
 	fn to_index_file_pos(&self, c: ty::ctxt) -> Option<ZIndexFilePos> {
 		// TODO: cleanup with byte_pos_to_text_file_pos, one in terms of the other.
 		// TODO - functional, and with binary search or something ..
-        let files = c.sess.codemap.files.borrow().get();
+        let files = c.sess.codemap.files.borrow();
+        let files = files.get();
 		let mut i = files.len() as u32;
 		while i > 0 {
 				// caution, need loop because we return, wait for new foreach ..in..
 			i -= 1;
 			let fm = &files[i];
 			if *self >= fm.start_pos && self.to_uint() < fm.start_pos.to_uint() + fm.src.len() {
-                let lines = fm.lines.borrow().get();
+                let lines = fm.lines.borrow();
+                let lines = lines.get();
 				let mut line = lines.len() as u32;
 				while line > 0 {
 					line -= 1;
