@@ -1,1 +1,7 @@
 .*.swp
+rustfind
+*.rs.html
+*.rfx
+test_input
+test_input0
+TAGS.emacs
