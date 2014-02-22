@@ -97,16 +97,16 @@ fn main() {
     let args = os::args();
 
     let opts = ~[
-        optmulti("L", "", "path to search for libraries", "-L<lib path>"),
-        optflag("d", "", ""),
-        optflag("r", "", ""),
-        optflag("j", "", ""),
-        optflag("h", "help", "print this help menu"),
-        optflag("i", "", ""),
-        optflag("g", "", ""),
-        optflag("w", "", ""),
-        optflag("f", "", ""),
-        optopt("x", "", "where to look for html of external crates", "rustfind filename mysource.rs -x ~/rust/src")
+        optmulti("L", "", "Path to search for libraries", "<lib path>"),
+        optflag("d", "", "Debug for this tool"),
+        optflag("r", "", "Dump .rfx `crosscratemap` containing ast nods and jump definitions"),
+        optflag("j", "", "Dump json map of the ast nodes & definitions"),
+        optflag("h", "help", "Print this help menu"),
+        optflag("i", "", "Run interactive server"),
+        optflag("g", "", "Format output as gedit `filepos +line filename` (use with -f)"),
+        optflag("w", "", "Dump as html"),
+        optflag("f", "", "Return definition reference of symbol at given position"),
+        optopt("x", "", "Where to look for html of external crates", "RUST_SRC")
     ];
 
 	let matches = getopts(args.tail(), opts).unwrap();
@@ -134,6 +134,8 @@ fn main() {
 		println!(" -j filename.rs [-L<library path>]  : dump JSON map of the ast nodes & defintions");
 		println!(" -d filename.rs [-L<lib path>] : debug for this tool");
 		println!(" set RUST_LIBS for a default library search path");
+
+        println!("{}", getopts::usage("Summary of available options:", opts));
 	};
 	if matches.free.len()>0 {
 		let mut done=false;

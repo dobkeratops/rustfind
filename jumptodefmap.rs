@@ -223,7 +223,7 @@ pub fn lookup_def_of_node_tree_loc(dc:&RFindCtx,node_tree_loc:&NodeTreeLoc,m:Sho
 	lookup_def_of_node(dc,*node_tree_loc.last().get_ref(),m)
 }
 
-pub fn lookup_def_of_node(dc:&RFindCtx,node:&AstNode,m:ShowDefMode)->Option<~str> {
+pub fn lookup_def_of_node(dc: &RFindCtx, node: &AstNode, m: ShowDefMode)->Option<~str> {
 	println("def of node:"+node.get_id().unwrap_or(0).to_str());
 	let node_spans=build_node_info_map(dc.crate_);
 	let node_def_node = build_node_def_node_table(dc);
