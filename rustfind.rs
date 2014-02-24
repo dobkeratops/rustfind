@@ -7,6 +7,7 @@ extern crate rustc;
 extern crate extra;
 extern crate getopts;
 extern crate serialize;
+extern crate collections;
 
 use std::io::println;
 
@@ -15,7 +16,7 @@ use rustc::metadata::creader::Loader;
 
 use std::{os,local_data};
 use std::cell::RefCell;
-use std::hashmap::{HashMap,HashSet};
+use collections::{HashMap,HashSet};
 use std::path::Path;
 
 use syntax::{parse,ast,codemap};

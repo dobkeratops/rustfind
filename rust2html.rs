@@ -3,7 +3,8 @@ use syntax::ast;
 use syntax::codemap::Pos;
 use rustc::middle::ty;
 use iou=ioutil;
-use std::hashmap::HashMap;
+use std::hash::Hash;
+use collections::HashMap;
 use std::vec;
 use std::cmp;
 use codemaput::{ZIndexFilePos,ToZIndexFilePos};
@@ -688,7 +689,7 @@ pub struct MultiMap<K,V> {
 	items:~[~[V]],
 	empty:~[V]
 }
-impl<'a,K:IterBytes+Eq,V> MultiMap<K,V> {
+impl<'a,K:Hash+Eq,V> MultiMap<K,V> {
 	pub fn new()->MultiMap<K,V> {
 		MultiMap{ next_index:0, indices:HashMap::new(), items:~[], empty:~[] }
 	}

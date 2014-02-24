@@ -54,7 +54,7 @@ pub struct FNodeInfo {
 	node:AstNode,
 	parent_id:ast::NodeId,
 }
-pub type FNodeInfoMap= hashmap::HashMap<ast::NodeId,FNodeInfo>;
+pub type FNodeInfoMap= HashMap<ast::NodeId,FNodeInfo>;
 
 pub type NodeTreeLoc = ~[AstNode];
 pub fn dump_node_tree_loc(ndt:&NodeTreeLoc) {
@@ -168,7 +168,7 @@ impl ToJsonStrFc for FNodeInfoMap {
 	}
 }
 
-impl ToJsonStr for hashmap::HashMap<ast::NodeId,ast::DefId> {
+impl ToJsonStr for HashMap<ast::NodeId,ast::DefId> {
 	fn to_json_str(&self)->~str {
 		let mut r=~"[\n";
 //		for self.iter().advance|(&key,&value)| {
@@ -622,7 +622,7 @@ pub struct FncsThing {
 
 impl FncsThing {
     pub fn new() -> FncsThing {
-        let node_spans= hashmap::HashMap::new();
+        let node_spans= HashMap::new();
         FncsThing {
             node_spans: node_spans
         }
