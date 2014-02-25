@@ -44,6 +44,7 @@ pub mod rfserver;
 pub mod util;
 pub mod rf_ast_ut;
 pub mod jumptodefmap;
+pub mod timer;
 
 pub macro_rules! if_some {
 	($b:ident in $a:expr then $c:expr)=>(
@@ -310,15 +311,17 @@ pub fn write_source_as_html_and_rfx(dc:&RFindCtx,lib_html_path:&str,opts: &rust2
 	let mut xcm:~CrossCrateMap=~HashMap::new();
 	dc.tycx.cstore.iter_crate_data(|i,md| {
 //		dump!(i, md.name,md.data.len(),md.cnum);
-		println("loading cross crate data "+i.to_str()+" "+md.name);
+		println!("loading cross crate data {} {}", i, md.name);
 		let xcm_sub=crosscratemap::read_cross_crate_map(dc, i as int, md.name+&".rfx",lib_html_path);
 		for (k,v) in xcm_sub.iter() {xcm.insert(*k,(*v).clone());}
 	});
 
-    let (info_map,def_map,jump_map)=make_jdm(dc);
-	crosscratemap::write_cross_crate_map(dc,lib_html_path,
-        &info_map,def_map,jump_map);
+    println!("make_jdm");
+    let (info_map,def_map,jump_map) = make_jdm(dc);
+    println!("crosscratemap::write_cross_crate_map");
+	crosscratemap::write_cross_crate_map(dc,lib_html_path, &info_map,def_map,jump_map);
 	if write_html {
+        println!("rust2html::write_source_as_html_sub");
 		rust2html::write_source_as_html_sub(dc,&info_map,jump_map,xcm,lib_html_path,opts);
 	}
 }

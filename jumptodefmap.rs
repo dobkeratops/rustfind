@@ -12,6 +12,7 @@ use rfindctx::{RFindCtx,get_source_loc};
 use codemaput::ZTextFilePos;
 use rf_ast_ut::{auto_deref_ty, find_named_struct_field};
 use util::flatten_to_str; //todo - why is qualifying manually not working?!
+use timer::Timer;
 //use super::rf_use_ast;
 
 
@@ -265,8 +266,18 @@ pub fn lookup_def_of_node_sub(dc:&RFindCtx,node:&AstNode,m:ShowDefMode,nim:&FNod
 
 pub fn make_jdm(dc:&RFindCtx)->( FNodeInfoMap, ~HashMap<ast::NodeId,ast::DefId>,~JumpToDefMap)
 {
+    let mut t = Timer::new();
+    t.start();
     let nim=build_node_info_map(dc.crate_);
+    t.end();
+    println!("build_node_info_map: {}", t.get_time_string());
+    t.start();
     let ndm=build_node_def_node_table(dc);
+    t.end();
+    println!("build_node_def_node_table: {}", t.get_time_string());
+    t.start();
     let jdm=build_jump_to_def_map(dc, &nim,ndm);
+    t.end();
+    println!("build_jump_to_def_map: {}", t.get_time_string());
     (nim,ndm,jdm)
 }

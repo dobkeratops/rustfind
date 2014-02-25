@@ -169,10 +169,14 @@ pub fn fileSaveArray<T>(buffer:&[T],filename:&str) {
 
 
 pub fn fileSaveStr(text:&str, file_path: &Path) {
-    use std::io::File;
+    use std::io::{File, UserDir};
+    use std::io::fs::mkdir_recursive;
 
-    let mut file = File::create(file_path);
-    match file.write_str(text) {
+    let res = mkdir_recursive(&file_path.dir_path(), UserDir).and_then(|()| {
+        let mut file = File::create(file_path);
+        file.write_str(text)
+    });
+    match res {
         Ok(()) => (),
         Err(e) => println!("error: could not write to {} - {}", file_path.display(), e)
     };
