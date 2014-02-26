@@ -1,7 +1,7 @@
 RF_LIBS= -L $(RUST_PATH)/x86_64-unknown-linux-gnu/stage2/lib
 OPTS= test_input.rs $(RF_LIBS) -o html/
 SRC=$(wildcard *.rs)
-RUSTFIND=$(pwd)/rustfind
+RUSTFIND=$(shell pwd)/rustfind
 RUSTSRC=$(RUST_PATH)/src
 RUSTFLAGS = --opt-level=3 -A non-camel-case-types
 
@@ -27,7 +27,7 @@ test1 : rustfind
 	@if [ ! $(RUST) ] ; then echo "set RUST to point to root of rust sourcetree" ; fi
 	echo $(RUST)
 	#./rustfind test_input.rs -j $(RF_LIBS) -o html/
-	./rustfind test_input.rs -w $(RF_LIBS) -o html/
+	./rustfind test_input.rs $(RF_LIBS) -o html/
 	#firefox html/test_input.rs.html
 
 test0 : rustfind
@@ -49,7 +49,7 @@ rust_src: rust_libextra rust_libsyntax rust_librustc
 rust_libstd: rustfind
 	@echo "Generating HTML for rust libstd"
 	@echo "Please be patient, this could take quite a long time"
-	cd $(RUSTSRC);pwd; rustfind libstd/lib.rs $(RF_LIBS)
+	cd $(RUSTSRC);pwd; $(RUSTFIND) libstd/lib.rs $(RF_LIBS)
 	#firefox $(RUSTSRC)/libstd/iterator.rs.html
 	#todo - make rustfind copy this! or at least make a decent copy script. or make the html ref same.
 	#?? find /some/tree -type d -exec echo cp /your/file '{}'/ \;
@@ -57,22 +57,22 @@ rust_libstd: rustfind
 rust_libextra: rustfind
 	@echo "Generating HTML for rust libextra"
 	@echo "Please be patient, this could take quite a long time"
-	cd $(RUSTSRC);pwd; rustfind libextra/lib.rs $(RF_LIBS)
+	cd $(RUSTSRC);pwd; $(RUSTFIND) libextra/lib.rs $(RF_LIBS)
 
 rust_libsyntax: rustfind
 	@echo "Generating HTML for rust libsyntax"
 	@echo "Please be patient, this could take quite a long time"
-	cd $(RUSTSRC);pwd; rustfind libsyntax/lib.rs $(RF_LIBS)
+	cd $(RUSTSRC);pwd; $(RUSTFIND) libsyntax/lib.rs $(RF_LIBS)
 
 rust_librustc: rustfind
 	@echo "Generating HTML for rust librustc"
 	@echo "Please be patient, this could take quite a long time"
-	export CFG_VERSION=0;export CFG_PREFIX=0;export CFG_LIBDIR=0;export CFG_COMPILER_TRIPLE=0;cd $(RUSTSRC);pwd; rustfind librustc/lib.rs $(RF_LIBS)
+	export CFG_VERSION=0;export CFG_PREFIX=0;export CFG_RUSTLIBDIR=0;export CFG_COMPILER=0;export CFG_LIBDIR_RELATIVE=0;cd $(RUSTSRC);pwd; $(RUSTFIND) librustc/lib.rs $(RF_LIBS)
 
 rust_libcollections: rustfind
 	@echo "Generating HTML for rust libcollections"
 	@echo "Please be patient, this could take quite a long time"
-	cd $(RUSTSRC);pwd; rustfind libcollections/lib.rs $(RF_LIBS)
+	cd $(RUSTSRC);pwd; $(RUSTFIND) libcollections/lib.rs $(RF_LIBS)
 
 copy:
 	cp sourcestyle.css $(RUSTSRC)/libstd

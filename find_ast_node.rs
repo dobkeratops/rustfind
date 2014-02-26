@@ -1038,9 +1038,10 @@ pub fn build_node_def_node_table(dc:&RFindCtx)->~HashMap<ast::NodeId, ast::DefId
 {
 	let mut r=~HashMap::new();
 	let curr_crate_id_hack=0;	// TODO WHAT IS CRATE ID REALLY?!
-	// todo .. for range(0,c.next_id) || ??
-	let mut id: ast::NodeId=0;
-	while id<dc.tycx.next_id.get() as ast::NodeId {
+
+    println!("Total ids: {}", dc.tycx.next_id.get() as uint);
+	for id in range(0, dc.tycx.next_id.get() as uint) { 
+        let id = id as ast::NodeId;
 		if_some!(_t in safe_node_id_to_type(dc.tycx,id) then {
 			if_some!(def in dc.tycx.def_map.get().find(&(id)) then { // finds a def..
 				if_some!(did in get_def_id(curr_crate_id_hack,*def) then {
@@ -1048,7 +1049,6 @@ pub fn build_node_def_node_table(dc:&RFindCtx)->~HashMap<ast::NodeId, ast::DefId
 				})
 			});
 		});
-		id+=1;
 	}
 	r
 }

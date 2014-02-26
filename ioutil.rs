@@ -7,7 +7,7 @@ pub use std::libc::{fwrite, fread, fseek, fopen, ftell, fclose, FILE, c_void, c_
 pub use std::mem::size_of;	// for size_of
 pub use std::vec::from_elem;
 pub use std::num::Zero;
-use std::io::BufferedReader;
+use std::io::{BufferedReader, IoResult, File};
 
 pub type Size_t=u64;	// todo - we're not sure this should be u64
 						// as the libc stuff seems to want.
@@ -86,6 +86,19 @@ pub fn c_str(rustStr:&str)->*c_char {
 pub unsafe fn fileOpen(filename:&str,mode:&str)-> *FILE {
 	fopen(c_str(filename),c_str(mode))
 }
+
+pub fn file_create_with_dirs(file_path: &Path) -> IoResult<File> {
+    use std::io::{File, UserDir};
+    use std::io::fs::mkdir_recursive;
+
+    mkdir_recursive(&file_path.dir_path(), UserDir).and_then(|()| {
+        File::create(file_path)
+    }).map_err(|e| {
+        println!("error: could not write to {} - {}", file_path.display(), e);
+        e
+    })
+}
+
 /*
 pub fn fileLoadArray<T>(filename:&str)->~[T] {
 	unsafe {

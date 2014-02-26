@@ -1,10 +1,10 @@
 #[feature(managed_boxes)];
 #[feature(globs)];
 #[feature(macro_rules)];
+#[feature(log_syntax)];
 
 extern crate syntax;
 extern crate rustc;
-extern crate extra;
 extern crate getopts;
 extern crate serialize;
 extern crate collections;
@@ -46,21 +46,12 @@ pub mod rf_ast_ut;
 pub mod jumptodefmap;
 pub mod timer;
 
-pub macro_rules! if_some {
-	($b:ident in $a:expr then $c:expr)=>(
-		match $a {
-			Some($b)=>$c,
-			None=>{}
-		}
-	);
-}
 pub macro_rules! tlogi{
 	($($a:expr),*)=>(println!((file!()+":"+line!().to_str()+": " $(+$a.to_str())*) ))
 }
 pub macro_rules! logi{
 	($($a:expr),*)=>(println(""$(+$a.to_str())*) )
 }
-//macro_rules! dump{ ($a:expr)=>(logi!(fmt!("%s=%?",stringify!($a),$a).indent(2,160));)}
 macro_rules! dump{ ($($a:expr),*)=>
 	(	{	let mut txt=~"";
 			$( { txt=txt.append(
@@ -86,8 +77,6 @@ pub macro_rules! if_some {
 		}
 	);
 }
-
-
 
 fn main() {
 
@@ -312,16 +301,13 @@ pub fn write_source_as_html_and_rfx(dc:&RFindCtx,lib_html_path:&str,opts: &rust2
 	dc.tycx.cstore.iter_crate_data(|i,md| {
 //		dump!(i, md.name,md.data.len(),md.cnum);
 		println!("loading cross crate data {} {}", i, md.name);
-		let xcm_sub=crosscratemap::read_cross_crate_map(dc, i as int, md.name+&".rfx",lib_html_path);
+		let xcm_sub=crosscratemap::read_cross_crate_map(dc, i as int, "lib"+md.name+&"/lib.rfx",lib_html_path);
 		for (k,v) in xcm_sub.iter() {xcm.insert(*k,(*v).clone());}
 	});
 
-    println!("make_jdm");
     let (info_map,def_map,jump_map) = make_jdm(dc);
-    println!("crosscratemap::write_cross_crate_map");
 	crosscratemap::write_cross_crate_map(dc,lib_html_path, &info_map,def_map,jump_map);
 	if write_html {
-        println!("rust2html::write_source_as_html_sub");
 		rust2html::write_source_as_html_sub(dc,&info_map,jump_map,xcm,lib_html_path,opts);
 	}
 }

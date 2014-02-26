@@ -34,7 +34,7 @@ pub fn read_cross_crate_map(_:&RFindCtx, crate_num:int, crate_name:&str,lib_path
 		raw_bytes=ioutil::fileLoad(lib_path+"/"+crate_name);
 	}
 	let rfx=str::from_utf8(raw_bytes);
-	println("loaded cratemap "+rfx.get_ref().len().to_str()+"bytes"+" as crate "+crate_num.to_str());
+	println("loaded cratemap "+rfx.get_ref().len().to_str()+" bytes"+" as crate "+crate_num.to_str());
 //	for &x in raw_bytes.iter() { rfx.push_char(x as char); }
 
 	let mut xcm=~HashMap::new();
@@ -47,9 +47,10 @@ pub fn read_cross_crate_map(_:&RFindCtx, crate_num:int, crate_name:&str,lib_path
 					// jimp- to def info, we dont need this here as we already generated it
 					// for the current crate. TODO , genarlized rfx would use it..
 				}
-				"node"=> {// node cratename nodeid parentid sourcefile line col len type [ident]
+				"node"=> {
+                    // node cratename nodeid parentid sourcefile line col len type [ident]
 					//cratename is ignoredd, because we already know it.
-					// pareent id ignored, we use span information to reconstruct AST
+					// parent id ignored, we use span information to reconstruct AST
 
 					let node_id: int= from_str::<int>(toks[2]).unwrap_or(0);
 					xcm.insert(ast::DefId{krate:crate_num as u32, node:node_id as u32,},
@@ -78,7 +79,7 @@ pub fn read_cross_crate_map(_:&RFindCtx, crate_num:int, crate_name:&str,lib_path
 		}
 	}
 	//dump!(xcm);
-	println("from cratemap "+rfx.get_ref().len().to_str()+"bytes");
+	println("from cratemap "+rfx.get_ref().len().to_str()+" bytes");
 	xcm
 }
 
@@ -87,50 +88,56 @@ pub fn read_cross_crate_map(_:&RFindCtx, crate_num:int, crate_name:&str,lib_path
 pub fn write_cross_crate_map(dc:&RFindCtx, _:&str,nim:&FNodeInfoMap, _:&HashMap<ast::NodeId, ast::DefId>, jdm:&JumpToDefMap) {
 	// write inter-crate node map
 	let crate_rel_path_name= dc.sess.codemap.files.borrow();
-    let crate_rel_path_name = crate_rel_path_name.get()[0].name.as_slice();
+    let crate_rel_path_name = Path::new(crate_rel_path_name.get()[0].name.as_slice());
 	let new_format:bool=true;
 
-	let curr_crate_name_only=crate_rel_path_name.split('/').last().unwrap_or("").split('.').nth(0).unwrap_or("");
-	println("writing rustfind cross-crate link info for "+curr_crate_name_only);
-	let mut outp=~"";
-	// todo - idents to a seperate block, they're rare.
-	for (k,ni) in nim.iter() {
-		match ni.span.lo.to_text_file_pos(dc.tycx) {
-			Some(tfp)=>{
-				// new format, a little more verbose,
-				// "node" cratename id parent_id filename line col len type [ident]
-				// and includes parnet id for easier reconstruction of full AST
-				if new_format {
-					outp.push_str(
-							"node\t"+
-							curr_crate_name_only+"\t"+k.to_str()+"\t"+ni.parent_id.to_str()+"\t"+tfp.name+"\t"+(tfp.line+1).to_str()+"\t"+tfp.col.to_str()+"\t"+(ni.span.hi-ni.span.lo).to_uint().to_str() + "\t"+ni.kind+ "\t"+str_of_opt_ident(ni.ident)+"\n");
-				} else 	{
-					// old format, relies on spans to reconstruct AST.
-					// cratename id filename line col len type [ident]
-					outp.push_str(curr_crate_name_only+"\t"+k.to_str()+"\t"+tfp.name+"\t"+(tfp.line+1).to_str()+"\t"+tfp.col.to_str()+"\t"+(ni.span.hi-ni.span.lo).to_uint().to_str() + "\t"+ni.kind+ "\t"+str_of_opt_ident(ni.ident)+"\n");
-				}
-			},
-			None=>{}
-		}
-	}
+	let curr_crate_name_only = crate_rel_path_name.filestem_str().unwrap_or("");
+	println!("Writing rustfind cross-crate link info for {}", curr_crate_name_only);
+    let out_path = crate_rel_path_name.with_extension("rfx");
+	let out = ioutil::file_create_with_dirs(&out_path).map(|out| {
+        let mut out_file = out;
+        // todo - idents to a seperate block, they're rare.
+        for (k,ni) in nim.iter() {
+            match ni.span.lo.to_text_file_pos(dc.tycx) {
+                Some(tfp)=>{
+                    // new format, a little more verbose,
+                    // and includes parent id for easier reconstruction of full AST
+                    // "node" cratename id parent_id filename line col len type [ident]
+                    if new_format {
+                        try!(writeln!(&mut out_file, "node\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+                            curr_crate_name_only, k, ni.parent_id, tfp.name, (tfp.line + 1), tfp.col,
+                            (ni.span.hi - ni.span.lo).to_uint(), ni.kind, str_of_opt_ident(ni.ident)));
+                    } else 	{
+                        // old format, relies on spans to reconstruct AST.
+                        // cratename id filename line col len type [ident]
+                        try!(writeln!(&mut out_file, "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+                            curr_crate_name_only, k, tfp.name, (tfp.line+1), tfp.col,
+                            (ni.span.hi-ni.span.lo).to_uint(), ni.kind, str_of_opt_ident(ni.ident)));
+                    }
+                },
+                None=>{}
+            }
+        }
 
-	for (k,v) in jdm.iter()  {
-		let cname:~str= if v.krate>0 {
-			dc.tycx.cstore.get_crate_data(v.krate).name.to_str()
-		} else {
-			curr_crate_name_only.to_str()
-		};
-		//println(cdata.name);
-		outp.push_str("jdef\t"+k.to_str()+"\t"+cname+"\t" +v.node.to_str()+"\n");
-	}
+        for (k,v) in jdm.iter()  {
+            let cname: ~str = if v.krate > 0 {
+                dc.tycx.cstore.get_crate_data(v.krate).name.to_str()
+            } else {
+                curr_crate_name_only.to_str()
+            };
+            //println(cdata.name);
+            try!(writeln!(&mut out_file, "jdef\t{}\t{}\t{}", k, cname, v.node));
+        }
+
+        Ok(())
+    });
+
+    match out {
+        Err(e) => println!("Error while writing to {}: {}", out_path.display(), e),
+        _ => ()
+    };
 
 //	for (k,v) in ndm.iter()  {
 //		outp.push_str("def\t"+k.to_str()+"\t"+dc.tycx.cstore.crate() +v.node.to_str()+"\n");
 //	}
-
-
-	{	let x=curr_crate_name_only+ ".rfx";
-		println("writing "+x);
-		ioutil::fileSaveStr(outp, &Path::new(x));
-	}
 }
