@@ -223,9 +223,9 @@ impl KindToStr for ast::Expr {
 		ast::ExprVstore(_,_)=>"vstore",
 		ast::ExprVec(_,_)=>"vec",
 		ast::ExprCall(_,_)=>"call",
-		ast::ExprMethodCall(_,_,_,_)=>"method_call",
+		ast::ExprMethodCall(_,_,_)=>"method_call",
 		ast::ExprTup(_)=>"tup",
-		ast::ExprBinary(_, _binop, _,_)=>match _binop {
+		ast::ExprBinary(binop, _,_)=>match binop {
 //			ast_util::binop_to_*(binop) todo - we donnt use this because of ambiguity
 			ast::BiAdd=>"add",
 			ast::BiSub=>"sub",
@@ -247,7 +247,7 @@ impl KindToStr for ast::Expr {
 			ast::BiGt=>"gt",
 
 		},
-		ast::ExprUnary(_, unop, _)=>match unop {
+		ast::ExprUnary(unop, _)=>match unop {
 			ast::UnBox=>"box",
 			ast::UnUniq=>"uniq",
 			ast::UnDeref=>"deref",
@@ -266,7 +266,7 @@ impl KindToStr for ast::Expr {
 		ast::ExprProc(..) => "proc",
 		ast::ExprBlock(_)=>"blk",
 		ast::ExprAssign(_,_)=>"assign",
-		ast::ExprAssignOp(_, binop, _, _)=>match binop {
+		ast::ExprAssignOp(binop, _, _)=>match binop {
 			ast::BiAdd=>"assign_add",
 			ast::BiSub=>"assign_sub",
 			ast::BiMul=>"assign_mul",
@@ -287,7 +287,7 @@ impl KindToStr for ast::Expr {
 			ast::BiGt=>"assign_gt"
 		},
 		ast::ExprField(_, _, _)=>"field",
-		ast::ExprIndex(_,_,_)=>"index",
+		ast::ExprIndex(_,_)=>"index",
 		ast::ExprPath(_)=>"path",
 		ast::ExprAddrOf(_, _)=>"addr_of",
 		ast::ExprBreak(_)=>"break",
@@ -1039,7 +1039,6 @@ pub fn build_node_def_node_table(dc:&RFindCtx)->~HashMap<ast::NodeId, ast::DefId
 	let mut r=~HashMap::new();
 	let curr_crate_id_hack=0;	// TODO WHAT IS CRATE ID REALLY?!
 
-    println!("Total ids: {}", dc.tycx.next_id.get() as uint);
 	for id in range(0, dc.tycx.next_id.get() as uint) { 
         let id = id as ast::NodeId;
 		if_some!(_t in safe_node_id_to_type(dc.tycx,id) then {

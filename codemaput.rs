@@ -1,4 +1,5 @@
 use rf_common::*;
+use std::from_str::FromStr;
 use syntax::ast;
 use syntax::codemap;
 use syntax::codemap::Pos;

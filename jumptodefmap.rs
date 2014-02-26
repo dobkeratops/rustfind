@@ -42,31 +42,23 @@ pub fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, nodeinfomap:&FNodeInf
 // 				let rec_ty_node= astnode_expr(*receiver).ty_node_id();
 // 				let rec_ty_node1= dc.tycx.node_types.find(&(*id as uint));
 
-                let method_map = dc.ca.maps.method_map.borrow();
-                let method_map = method_map.get();
-				match method_map.find(&e.id) {
-					None=> {},//logi!("no method map entry for",e.id),
-					Some(origin)=>{
-						//logi!("Method Map entry for",e.id);
-						match *origin {
-							typeck::method_static(def_id)=>
-								return Some(def_id),
-							typeck::method_object(_)=>
-// 								return Some(mp.trait_id),
-								return None,
-							typeck::method_param(mp)=>{
-                                let trait_method_def_ids = dc.tycx.trait_method_def_ids.borrow();
-                                let trait_method_def_ids = trait_method_def_ids.get();
-								match trait_method_def_ids.find(&mp.trait_id) {
-									None=>{},
-									Some(method_def_ids)=>{
-										return Some(method_def_ids[mp.method_num])
-									}
-								}
-							}
-						}
-					}
-				}
+                let method_map = dc.ca.maps.method_map;
+				match method_map.borrow().get().get(&e.id).origin {
+                    typeck::MethodStatic(def_id)=>
+                        return Some(def_id),
+                    typeck::MethodObject(_)=>
+                            return None,
+                    typeck::MethodParam(mp)=>{
+                        let trait_method_def_ids = dc.tycx.trait_method_def_ids.borrow();
+                        let trait_method_def_ids = trait_method_def_ids.get();
+                        match trait_method_def_ids.find(&mp.trait_id) {
+                            None=>{},
+                            Some(method_def_ids)=>{
+                                return Some(method_def_ids[mp.method_num])
+                            }
+                        }
+                    }
+                }
 			},
 			// handle struct-fields? "object.field"
 			ast::ExprField(ref object_expr, ref ident, _)=>{
