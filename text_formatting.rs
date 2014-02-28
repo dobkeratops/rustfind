@@ -39,9 +39,11 @@ impl Indent for ~str {
 				if di>0 && inner_brace_level==indent {last_open=ii;};
 				inner_brace_level+=di;
 				if inner_brace_level==indent {
-					if (di<0 ||c==','as u8||c==';'as u8){last_open=ii;};
+					if di<0 ||c==','as u8||c==';'as u8 {
+                        last_open=ii;
+                    }
 
-					if c==','as u8||c==';'as u8 && first_base_delim==len{
+					if c==','as u8||c==';'as u8 && first_base_delim==len {
 						//first_base_delim=ii;
 					}
 				}

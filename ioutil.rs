@@ -1,13 +1,13 @@
 #[macro_escape];
 
+use std::cast;
 pub use std::io::{stdout, stdin};
 pub use std::libc::{fwrite, fread, fseek, fopen, ftell, fclose, FILE, c_void, c_char, SEEK_END,
 	SEEK_SET};
-pub use std::ptr::to_unsafe_ptr;
 pub use std::mem::size_of;	// for size_of
 pub use std::vec::from_elem;
 pub use std::num::Zero;
-use std::io::buffered::BufferedReader;
+use std::io::{BufferedReader, IoResult, File};
 
 pub type Size_t=u64;	// todo - we're not sure this should be u64
 						// as the libc stuff seems to want.
@@ -15,10 +15,16 @@ pub type Size_t=u64;	// todo - we're not sure this should be u64
 
 
 macro_rules! logi{
-	($($a:expr),*)=>(println(file!()+":"+line!().to_str()+": " $(+$a.to_str())* ))
+	($($a:expr),*)=>(println!("{}", file!()+":"+line!().to_str()+": " $(+$a.to_str())* ))
 }
 //macro_rules! dump{ ($a:expr)=>(logi!(fmt!("%s=%?",stringify!($a),$a).indent(2,160));)}
-fn newline_if_over(a:~str,l:uint)->~str{if a.len()>l {a+"\n"}else{a}}
+/*fn newline_if_over(a:~str,l:uint) -> ~str {
+    if a.len()>l {
+        a+"\n"
+    } else {
+        a
+    }
+}*/
 macro_rules! dump{ ($($a:expr),*)=>
 	(	{	let mut txt=~"";
 			$( txt=txt.append(
@@ -32,7 +38,7 @@ macro_rules! dump{ ($($a:expr),*)=>
 
 macro_rules! trace{
 	()=>(
-		println(file!().to_str()+":"+line!().to_str()+": ");
+		println!("{}", file!().to_str()+":"+line!().to_str()+": ");
 	);
 }
 
@@ -45,17 +51,17 @@ pub trait EndianSwap {
 // dbprint postfix form means we can print tuples?
 impl<T:ToStr> Dbprint for T {
 	fn dbprint(&self) {
-		println(self.to_str());
+		println!("{}", self.to_str());
 	}
 }
 
 pub fn promptInput(prompt:&str)->~str {
-	stdout().write(prompt.as_bytes());
-	BufferedReader::new(stdin()).read_line().expect("read_line failure")
+	println!("{}", prompt);
+	BufferedReader::new(stdin()).read_line().unwrap() // TODO add error handling
 }
 
-pub fn as_void_ptr<T>(a:&T)->*c_void { to_unsafe_ptr(a) as *c_void}
-pub fn as_mut_void_ptr<T>(a:&T)->*mut c_void { to_unsafe_ptr(a) as *mut c_void}
+pub fn as_void_ptr<T>(a:&T)->*c_void { unsafe {cast::transmute(a) } }
+pub fn as_mut_void_ptr<T>(a:&T)->*mut c_void {unsafe { cast::transmute(a) } }
 
 // this doest work?
 pub trait VoidPtr {
@@ -63,11 +69,11 @@ pub trait VoidPtr {
 	fn as_mut_void_ptr(&self)->*mut c_void;
 }
 impl<T> VoidPtr for T {
-	fn as_void_ptr(&self)->*c_void { to_unsafe_ptr(&self) as *c_void}
-	fn as_mut_void_ptr(&self)->*mut c_void { to_unsafe_ptr(self) as *mut c_void}
+	fn as_void_ptr(&self)->*c_void {unsafe { cast::transmute(self) } }
+	fn as_mut_void_ptr(&self)->*mut c_void {unsafe { cast::transmute(self) } }
 }
 
-pub fn printStr<T:ToStr>(a:&T){println(a.to_str());}
+pub fn printStr<T:ToStr>(a:&T){println!("{}", a.to_str());}
 
 pub fn c_str(rustStr:&str)->*c_char {
 	unsafe {
@@ -80,6 +86,19 @@ pub fn c_str(rustStr:&str)->*c_char {
 pub unsafe fn fileOpen(filename:&str,mode:&str)-> *FILE {
 	fopen(c_str(filename),c_str(mode))
 }
+
+pub fn file_create_with_dirs(file_path: &Path) -> IoResult<File> {
+    use std::io::{File, UserDir};
+    use std::io::fs::mkdir_recursive;
+
+    mkdir_recursive(&file_path.dir_path(), UserDir).and_then(|()| {
+        File::create(file_path)
+    }).map_err(|e| {
+        println!("error: could not write to {} - {}", file_path.display(), e);
+        e
+    })
+}
+
 /*
 pub fn fileLoadArray<T>(filename:&str)->~[T] {
 	unsafe {
@@ -162,20 +181,30 @@ pub fn fileSaveArray<T>(buffer:&[T],filename:&str) {
 }
 
 
-pub fn fileSaveStr(text:&str,filename:&str) {
-	unsafe {
-		let fp=fileOpen(filename,"wb");
-		if fp!=(0 as *FILE) {
-			fwrite(c_str(text) as *c_void,text.len() as u64,1,fp);
+pub fn fileSaveStr(text:&str, file_path: &Path) {
+    use std::io::{File, UserDir};
+    use std::io::fs::mkdir_recursive;
 
-			//fwrite(to_void_ptr(&buffer[0]),sizeofArray(buffer),1,fp);
-			fclose(fp);
-		} else {
-			printStr(&("could not write "+filename));
-		}
-	}
+    let res = mkdir_recursive(&file_path.dir_path(), UserDir).and_then(|()| {
+        let mut file = File::create(file_path);
+        file.write_str(text)
+    });
+    match res {
+        Ok(()) => (),
+        Err(e) => println!("error: could not write to {} - {}", file_path.display(), e)
+    };
 }
 
 
+pub trait ResultUtil<T> {
+    fn expect(self, error_message: &'static str) -> T;
+}
 
-
+impl<T, U> ResultUtil<T> for Result<T, U> {
+    fn expect(self, error_message: &'static str) -> T {
+        match self {
+            Ok(res) => res,
+            Err(_) => fail!(error_message)
+        }
+    }
+}
