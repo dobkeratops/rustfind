@@ -17,7 +17,7 @@ pub type Size_t=u64;	// todo - we're not sure this should be u64
 
 
 macro_rules! logi{
-	($($a:expr),*)=>(println(file!()+":"+line!().to_str()+": " $(+$a.to_str())* ))
+	($($a:expr),*)=>(println!("{:?}",file!()+":"+line!().to_str()+": " $(+$a.to_str())* ))
 }
 //macro_rules! dump{ ($a:expr)=>(logi!(fmt!("%s=%?",stringify!($a),$a).indent(2,160));)}
 fn newline_if_over(a:~str,l:uint)->~str{if a.len()>l {a+"\n"}else{a}}

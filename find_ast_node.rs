@@ -98,10 +98,11 @@ macro_rules! dump{ ($($a:expr),*)=>
 }
 
 /// main
-pub fn find_node_at_byte_pos(c:@ast::Crate,_location:codemap::BytePos)->AstNode {
+/*pub fn find_node_at_byte_pos(c:@ast::Crate,_location:codemap::BytePos)->AstNode {
 	let tree_loc=find_node_tree_loc_at_byte_pos(c,_location);
 	return tree_loc.last().clone();
 }
+*/
 
 
 pub fn find_node_tree_loc_at_byte_pos(c:@ast::Crate,_location:codemap::BytePos)->NodeTreeLoc {
@@ -110,8 +111,9 @@ pub fn find_node_tree_loc_at_byte_pos(c:@ast::Crate,_location:codemap::BytePos)-
 	// if we encoded hrc information in the node-spans-table,
 	// we wouldn't need all this iterator malarchy again.
 
+	let codemap::BytePos(_locationb)=_location;
 	let mut s= @ FindAstNodeSt{
-		result:~[astnode_root], location:*_location, stop:false
+		result:~[astnode_root], location:_locationb, stop:false
 
 	};
 
@@ -154,11 +156,14 @@ pub fn node_spans_table_to_json_sub(dc:&RFindCtx,ns:&FNodeInfoMap)->~str {
 			let ifpe=oifpe.unwrap();
 			// local node:-
 			//assert!(ifps.file_index==ifpe.file_index);
+
 			r.push_str(format!("\t\\{node_id:{:u},\tkind:\"{:s}\",\tlspan:\\{ lo:\\{file:{:u},line:{:u} ,ofs:{:u}\\},\thi:\\{file:{:u},line:{:u}, ofs:{:u}\\}\\}\\},\n",*k,v.kind,
 				ifps.file_index, ifps.line, ifps.col,ifpe.file_index, ifpe.line, ifpe.col));
 		} else {
 			// external node:-
-			r.push_str(format!("\t\\{node_id:{:u},\tkind:\"{:s}\"\trspan\\{lo:{:u},hi:{:u}\\}\\}\n",*k,v.kind, *v.span.lo,*v.span.hi));
+			let codemap::BytePos(v_span_lo)=v.span.lo;
+			let codemap::BytePos(v_span_hi)=v.span.hi;
+			r.push_str(format!("\t\\{node_id:{:u},\tkind:\"{:s}\"\trspan\\{lo:{:u},hi:{:u}\\}\\}\n",*k,v.kind, v_span_lo,v_span_hi));
 		}
 	}
 	r
@@ -175,7 +180,7 @@ impl ToJsonStr for HashMap<ast::NodeId,ast::DefId> {
 		let mut r=~"[\n";
 //		for self.iter().advance|(&key,&value)| {
 		for (&key,&value) in self.iter() {
-			r.push_str(format!("\t\\{node_id:{:?},\tdef_id:\\{crate:{:?},node:{:?}\\}\\},\n", key, value.crate,value.node));
+			r.push_str(format!("\t\\{node_id:{:?},\tdef_id:\\{crate:{:?},node:{:?}\\}\\},\n", key, value.krate,value.node));
 		}
 		r.push_str("]\n");
 		r
@@ -203,19 +208,26 @@ impl KindToStr for ast::Decl {
 		}
 	}
 }
-impl KindToStr for ast::Item_ {
+/*
+impl KindToStr for ast::Item {
+	fn kind_to_str(&self)->&'static str {
+		"Item_TODO"
+	}
+}
+*/
+impl KindToStr for ast::Item {
 	fn kind_to_str(&self)->&'static str {
 		match (self.node) {
 
-		ast::ItemStatic(_)=>"static",
-		ast::ItemFn(_)=>"fn",
+		ast::ItemStatic(_,_,_)=>"static",
+		ast::ItemFn(_,_,_,_,_)=>"fn",
 		ast::ItemMod(_)=>"mod",
 		ast::ItemForeignMod(_)=>"foreign_function",
-		ast::ItemTy(_)=>"ty",
-		ast::ItemEnum(_)=>"enum",
-		ast::ItemStruct(_)=>"struct",
-		ast::ItemTrait(_)=>"trait",
-		ast::ItemImpl(_)=>"impl",
+		ast::ItemTy(_,_)=>"ty",
+		ast::ItemEnum(_,_)=>"enum",
+		ast::ItemStruct(_,_)=>"struct",
+		ast::ItemTrait(_,_,_)=>"trait",
+		ast::ItemImpl(_,_,_,_)=>"impl",
 /*
 		ast::item_static(..)=>"static",
 		ast::item_fn(..)=>"fn",
@@ -232,13 +244,13 @@ impl KindToStr for ast::Item_ {
 		}
 	}
 }
-impl KindToStr for ast::Expr_ {
+impl KindToStr for ast::Expr {
 	fn kind_to_str(&self)->&'static str {
 		match self.node {
 		ast::ExprVstore(_,_)=>"vstore",
 		ast::ExprVec(_,_)=>"vec",
-		ast::ExprCall(_,_,_)=>"call",
-		ast::ExprMethodCall(_,_,_,_,_,_)=>"method_call",
+		ast::ExprCall(_,_)=>"call",
+		ast::ExprMethodCall(_,_,_,_)=>"method_call",
 		ast::ExprTup(_)=>"tup",
 		ast::ExprBinary(_, _binop, _,_)=>match _binop {
 //			ast_util::binop_to_*(binop) todo - we donnt use this because of ambiguity
@@ -263,7 +275,7 @@ impl KindToStr for ast::Expr_ {
 
 		},
 		ast::ExprUnary(_, unop, _)=>match unop {
-			ast::UnBox(_)=>"box",
+			ast::UnBox()=>"box",
 			ast::UnUniq=>"uniq",
 			ast::UnDeref=>"deref",
 			ast::UnNot=>"not",
@@ -384,7 +396,7 @@ impl AstNodeAccessors for ast::Item_ {
 	}
 }
 
-impl AstNodeAccessors for ast::Item_ {
+impl AstNodeAccessors for ast::Item {
 	fn get_id(&self)->Option<ast::NodeId> {	Some(self.id)}
 	fn get_ident(&self)->Option<ast::Ident> {	Some(self.ident) }
 }
@@ -478,13 +490,13 @@ impl AstNodeAccessors for ast::Ty {
 impl AstNodeAccessors for ast::ViewItem_ {
 	fn get_id(&self)->Option<ast::NodeId> {
 		match *self {
-			ast::ViewItemExternMod(_,_,_,node_id)=>Some(node_id),
+			ast::ViewItemExternMod(_,_,node_id)=>Some(node_id),
 			ast::ViewItemUse(_)=>None
 		}
 	}
 	fn get_ident(&self)->Option<ast::Ident> {
 		match *self {
-			ast::ViewItemExternMod(ident,_,_,_)=>Some(ident),
+			ast::ViewItemExternMod(ident,_,_)=>Some(ident),
 			ast::ViewItemUse(_)=>None
 		}
 	}
@@ -634,7 +646,8 @@ pub fn push_spanned<T:AstNodeAccessors>(spt:&mut FNodeInfoMap,k:&str,s:&codemap:
 }
 
 pub fn span_contains(x: u32, s: codemap::Span)->bool {
-	x>=*s.lo && x<*s.hi
+	let codemap::BytePos(lo)=s.lo; let codemap::BytePos(hi)=s.hi;
+	x>=lo && x<hi
 }
 
 pub struct FncsThing;
@@ -675,7 +688,7 @@ impl Visitor<FncsState> for FncsThing {
 		visit::walk_generics(self, g, (s, p));
 	}
 
-	fn visit_item(&mut self, a:@ast::Item, (s, p):FncsState) {
+	fn visit_item(&mut self, a:&ast::Item, (s, p):FncsState) {
 		push_span(s,a.id,p,item_get_ident(a),a.kind_to_str(),a.span,astnode_item(a));
 
 		// TODO: Push nodes for type-params... since we want to click on their defs...
@@ -707,19 +720,19 @@ impl Visitor<FncsState> for FncsThing {
 		visit::walk_item(self, a, (s, a.id));
 	}
 
-	fn visit_local(&mut self, a:@ast::Local, (s, p):FncsState) {
+	fn visit_local(&mut self, a:&ast::Local, (s, p):FncsState) {
 		push_span(s, a.id, p, None, "local", a.span, astnode_local(a));
 
 		visit::walk_local(self, a, (s, a.id));
 	}
 
-	fn visit_block(&mut self, a: @ast::Block, (s, p): FncsState) {
+	fn visit_block(&mut self, a: &ast::Block, (s, p): FncsState) {
 		push_span(s, a.id, p, None, "block", a.span, astnode_none);
 
 		visit::walk_block(self, a, (s, a.id));
 	}
 
-	fn visit_stmt(&mut self, a:@ast::Stmt, (s, p):FncsState) {
+	fn visit_stmt(&mut self, a:&ast::Stmt, (s, p):FncsState) {
 		push_spanned(s, "stmt", a, astnode_stmt(a), p);
 
 		visit::walk_stmt(self, a, (s, p));
@@ -734,7 +747,7 @@ impl Visitor<FncsState> for FncsThing {
 		visit::walk_pat(self, a, (s, a.id));
 	}
 
-	fn visit_decl(&mut self, a:@ast::Decl, (s, p):FncsState) {
+	fn visit_decl(&mut self, a:&ast::Decl, (s, p):FncsState) {
 		push_spanned(s, "decl", a, astnode_decl(a), p);
 
 		visit::walk_decl(self, a, (s, p));
@@ -742,7 +755,7 @@ impl Visitor<FncsState> for FncsThing {
 	// we do nothing, use default for now
 //	 fn visit_struct_def(&mut self, s)
 
-	fn visit_expr(&mut self, a:@ast::Expr_, (s, p):FncsState) {
+	fn visit_expr(&mut self, a:&ast::Expr, (s, p):FncsState) {
 		push_span(s, a.id, p, expr_get_ident(a), a.kind_to_str(), a.span, astnode_expr(a));
 
 		visit::walk_expr(self, a, (s, a.id));
