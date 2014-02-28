@@ -1,13 +1,10 @@
 use rf_common::*;
 use syntax::ast;
-use std::int;
-use std::uint;
 use rustc::metadata::cstore;
-use rfindctx::{str_of_opt_ident};
 use find_ast_node::FNodeInfoMap;
-use jumptodefmap::*;
+use jumptodefmap::{JumpToDefMap};
 use ioutil;
-use rfindctx::*;
+use rfindctx::{RFindCtx, str_of_opt_ident};
 
 /*new file*/
 
@@ -28,7 +25,7 @@ pub struct CrossCrateMapItem {
 pub type CrossCrateMap = HashMap<ast::DefId,CrossCrateMapItem>;
 
 
-pub fn read_cross_crate_map(dc:&RFindCtx, crate_num:int, crate_name:&str,lib_path:&str)->~CrossCrateMap {
+pub fn read_cross_crate_map(_:&RFindCtx, crate_num:int, crate_name:&str,lib_path:&str)->~CrossCrateMap {
 	let mut raw_bytes=ioutil::fileLoad(crate_name);
 	if (raw_bytes.len()==0) {
 		println("loading lib crosscratemap "+lib_path+"/"+crate_name);
@@ -39,9 +36,9 @@ pub fn read_cross_crate_map(dc:&RFindCtx, crate_num:int, crate_name:&str,lib_pat
 //	for &x in raw_bytes.iter() { rfx.push_char(x as char); }
 
 	let mut xcm=~HashMap::new();
-	for s in rfx.line_iter() {
+	for s in rfx.lines() {
 //		println(s.to_str());
-		let toks=s.split_iter('\t').to_owned_vec();
+		let toks=s.split('\t').to_owned_vec();
 		if toks.len()>=6 {
 			match toks[0] {
 				"jdef"=> {
@@ -52,8 +49,9 @@ pub fn read_cross_crate_map(dc:&RFindCtx, crate_num:int, crate_name:&str,lib_pat
 					//cratename is ignoredd, because we already know it.
 					// pareent id ignored, we use span information to reconstruct AST
 
+
 					let node_id:int= from_str(toks[2]).unwrap_or(0);
-					xcm.insert(ast::DefId{krate:crate_num, node:node_id,},
+					xcm.insert(ast::DefId{krate:crate_num, node:node_id,}, // as u32??
 						CrossCrateMapItem{
 							fname:	toks[4].to_owned(),
 							line:   from_str(toks[5]).unwrap_or(0)-1,
@@ -66,7 +64,8 @@ pub fn read_cross_crate_map(dc:&RFindCtx, crate_num:int, crate_name:&str,lib_pat
 				_=>{
 
 					let node_id:int=from_str(toks[1]).unwrap_or(0);
-					xcm.insert(ast::DefId{krate:crate_num, node:node_id,},
+
+					xcm.insert(ast::DefId{krate:crate_num, node:node_id,}, // as u32?
 						CrossCrateMapItem{
 							fname:	toks[2].to_owned(),
 							line:   from_str(toks[3]).unwrap_or(0)-1,
@@ -85,12 +84,12 @@ pub fn read_cross_crate_map(dc:&RFindCtx, crate_num:int, crate_name:&str,lib_pat
 
 
 
-pub fn write_cross_crate_map(dc:&RFindCtx,lib_html_path:&str,nim:&FNodeInfoMap, ndm:&HashMap<ast::NodeId, ast::DefId>, jdm:&JumpToDefMap) {
+pub fn write_cross_crate_map(dc:&RFindCtx, _:&str,nim:&FNodeInfoMap, _:&HashMap<ast::NodeId, ast::DefId>, jdm:&JumpToDefMap) {
 	// write inter-crate node map
 	let crate_rel_path_name= dc.sess.codemap.files[0].name;
 	let new_format:bool=true;
 
-	let curr_crate_name_only=crate_rel_path_name.split_iter('/').last().unwrap_or("").split_iter('.').nth(0).unwrap_or("");
+	let curr_crate_name_only=crate_rel_path_name.split('/').last().unwrap_or("").split('.').nth(0).unwrap_or("");
 	println("writing rustfind cross-crate link info for "+curr_crate_name_only);
 	let mut outp=~"";
 	// todo - idents to a seperate block, they're rare.
@@ -129,7 +128,7 @@ pub fn write_cross_crate_map(dc:&RFindCtx,lib_html_path:&str,nim:&FNodeInfoMap, 
 //	}
 
 
-	{	let x=curr_crate_name_only+~".rfx";
+	{	let x=curr_crate_name_only+ ".rfx";
 		println("writing "+x);
 		ioutil::fileSaveStr(outp, x);
 	}

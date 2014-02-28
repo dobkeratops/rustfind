@@ -1,36 +1,36 @@
-#[feature(macro_rules)];
+#[feature(managed_boxes)];
 #[feature(globs)];
+#[feature(macro_rules)];
 
 extern crate syntax;
 extern crate rustc;
 extern crate extra;
 
 
-use rustc::{front, metadata, driver, middle};
-//use rustc::middle::{ty,typeck};
+use rustc::{driver};
 use rustc::metadata::cstore;
+
 
 //use std::num::*;
 use std::{io,os,local_data};
 //use std::hashmap::HashMap;
 pub use rf_common::*;
-
-use syntax::{parse,ast,ast_map,codemap,diagnostic};
-use syntax::parse::token;
-use syntax::visit::{Visitor, fn_kind};
-use find_ast_node::{FNodeInfoMap,safe_node_id_to_type,get_node_info_str,build_node_info_map,AstNode,find_node_tree_loc_at_byte_pos,NodeTreeLoc,astnode_expr,FNodeInfo,ToJsonStr,ToJsonStrFc,AstNodeAccessors,KindToStr,build_node_def_node_table,get_node_source};
-use jumptodefmap::*;
-//pub use std::hashmap::HashMap;
-    
-use syntax::abi::AbiSet;
+/*=======
+use std::{os,local_data};
+use std::hashmap::HashMap;
+use std::path::Path;
+>>>>>>> fc8837b2b3b3223411feaba7bacb9b758dd79ef7
+*/
+use syntax::{parse,ast,codemap};
+use find_ast_node::{safe_node_id_to_type,get_node_info_str,find_node_tree_loc_at_byte_pos,ToJsonStr,ToJsonStrFc,AstNodeAccessors,KindToStr,get_node_source};
+use jumptodefmap::{lookup_def_at_text_file_pos_str, make_jdm, def_info_from_node_id,
+	lookup_def_at_text_file_pos, dump_json};
 
 use rfindctx::{RFindCtx,ctxtkey};
 pub use codemaput::{ZTextFilePos,ZTextFilePosLen,get_span_str,ToZTextFilePos,ZIndexFilePos,ToZIndexFilePos};
-use rsfind::{ShowDefMode,SDM_LineCol,SDM_Line,SDM_Source,SDM_GeditCmd,MyOption};
+use rsfind::{SDM_LineCol,SDM_Source,SDM_GeditCmd,MyOption};
 use crosscratemap::CrossCrateMap;
-use crosscratemap::CrossCrateMapItem;
 use std::path::PosixPath;
-use std::path::posix;
 
 pub mod rf_common;
 pub mod find_ast_node;
@@ -65,7 +65,7 @@ pub macro_rules! logi{
 macro_rules! dump{ ($($a:expr),*)=>
 	(	{	let mut txt=~"";
 			$( { txt=txt.append(
-				 fmt!("%s=%?",stringify!($a),$a)+",")
+				 format!("{:s}={:?}",stringify!($a),$a)+",")
 				}
 			);*;
 			logi!(txt);
@@ -93,8 +93,6 @@ pub macro_rules! if_some {
 fn main() {
 
     use extra::getopts::*;
-    use std::hashmap::HashMap;
-
 
 	//test_default_arg(1,(2,3));
 	//test_default_arg(1);
@@ -106,10 +104,10 @@ fn main() {
     ];
 
 	let matches = getopts(args.tail(), opts).unwrap();
-    let libs1 = matches.opt_strs("L").map(|s| std::path::posix::Path::new(s.clone ()));
+    let libs1 = matches.opt_strs("L").map(|s| Path::init(s.as_slice()));
 	let libs=if libs1.len()>0 {libs1} else {
 		match (os::getenv(&"RUST_LIBS")) {
-			Some(x)=>~[ posix::Path::new(x)],
+			Some(x)=>~[ Path::init(x)],
 			None=>~[]
 		}
 	};
@@ -133,7 +131,7 @@ fn main() {
 	if matches.free.len()>0 {
 		let mut done=false;
 		let filename=util::get_filename_only(matches.free[0]);
-		let dc = @get_ast_and_resolve(&posix::Path::new(filename), libs);
+		let dc = @get_ast_and_resolve(&Path::init(filename), libs);
 		local_data::set(ctxtkey, dc);
 
 		if (matches.opt_present("d")) {
@@ -190,11 +188,15 @@ fn get_ast_and_resolve(
     let sessopts = @driver::session::Options {
         //binary: @"rustdoc", //???
         maybe_sysroot: Some(@std::os::self_exe_path().unwrap()),
+
 //        maybe_sysroot: Some(@std::os::self_exe_path().unwrap().pop()),
         addl_lib_search_paths: @libs,
+
+//        addl_lib_search_paths: @mut libs.move_iter().collect(), ??? FROM MERGE 
         ..  (*rustc::driver::session::basic_options()).clone()
     };
-	let quiet=true;
+    // Currently unused
+// 	let quiet = true;
 
 
     let diagnostic_handler = syntax::diagnostic::mk_handler(None);
@@ -202,7 +204,7 @@ fn get_ast_and_resolve(
         syntax::diagnostic::mk_span_handler(diagnostic_handler, parsesess.cm);
 
 
-    let mut sess = driver::driver::build_session_(sessopts, parsesess.cm,
+    let sess = driver::driver::build_session_(sessopts, parsesess.cm,
                                                   @BlankEmitter as @syntax::diagnostic::Emitter,
                                                   span_diagnostic_handler);
 	let input=driver::driver::file_input(cpath.clone());
@@ -239,27 +241,36 @@ fn debug_test(dc:&RFindCtx) {
 	let mut test_cursor=15 as uint;
 
 	while test_cursor<500 {
-		let loc = rfindctx::get_source_loc(dc,codemap::BytePos(test_cursor));
+		let loc = rfindctx::get_source_loc(dc,codemap::BytePos(test_cursor as u32));
 
 		logi!(~"\n=====Find AST node at: ",loc.file.name,":",loc.line,":",loc.col,":"," =========");
+
 
 		let nodetloc = find_node_tree_loc_at_byte_pos(dc.krate,codemap::BytePos(test_cursor));
 		let node_info =  get_node_info_str(dc,&nodetloc);
 		dump!(node_info);
 		println("node ast loc:"+(nodetloc.map( |x| { x.get_id().to_str() }).to_str() ));
+/*
+========
+		let nodetloc = find_node_tree_loc_at_byte_pos(dc.crate,codemap::BytePos(test_cursor as u32));
+		let node_info =  get_node_info_str(dc,&nodetloc);
+		dump!(node_info);
+		println("node ast loc:"+(nodetloc.map(|x| { x.get_id().to_str() })).to_str());
+>>>>>>> fc8837b2b3b3223411feaba7bacb9b758dd79ef7
+*/
 
 
 		if_some!(id in nodetloc.last().ty_node_id() then {
 			logi!("source=",get_node_source(dc.tycx, node_info_map,ast::DefId{krate:0,node:id}));
 			if_some!(t in safe_node_id_to_type(dc.tycx, id) then {
-				println(fmt!("typeinfo: %?",
+				println(format!("typeinfo: {:?}",
 					{let ntt= rustc::middle::ty::get(t); ntt}));
 				dump!(id,dc.tycx.def_map.find(&id));
 				});
 			let (def_id,opt_info)= def_info_from_node_id(dc,node_info_map,id);
 			if_some!(info in opt_info then{
 				logi!("src node=",id," def node=",def_id,
-					" span=",fmt!("%?",info.span));
+					" span=",format!("{:?}",info.span));
 				logi!("def source=", get_node_source(dc.tycx, node_info_map, def_id));
 			})
 		})
@@ -298,7 +309,7 @@ pub fn write_source_as_html_and_rfx(dc:&RFindCtx,lib_html_path:&str,opts:uint, w
 	cstore::iter_crate_data(dc.tycx.cstore, |i,md| {
 //		dump!(i, md.name,md.data.len(),md.cnum);
 		println("loading cross crate data "+i.to_str()+" "+md.name);
-		let xcm_sub=crosscratemap::read_cross_crate_map(dc, i, md.name+&".rfx",lib_html_path);
+		let xcm_sub=crosscratemap::read_cross_crate_map(dc, i as int, md.name+&".rfx",lib_html_path);
 		for (k,v) in xcm_sub.iter() {xcm.insert(*k,(*v).clone());}
 	});
 

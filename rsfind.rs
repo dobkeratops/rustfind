@@ -2,37 +2,6 @@ extern crate syntax;
 extern crate rustc;
 extern crate extra;
 
-use rustc::{front, metadata, driver, middle};
-use rustc::middle::*;
-use rustc::middle::typeck;
-
-use std::num;
-use std::num::*;
-
-use syntax::parse;
-use syntax::ast;
-use syntax::ast_map;
-use syntax::visit;
-use syntax::parse::token;
-use syntax::visit::*;
-use syntax::visit::{Visitor, fn_kind};
-use syntax::diagnostic;
-use syntax::codemap::BytePos;
-use std::io;
-
-use syntax::abi::AbiSet;
-use syntax::ast;
-use syntax::codemap;
-
-use std::hashmap::*;
-use std::os;
-use std::local_data;
-use extra::json::ToJson;
-
-//use rust2html::*;
-//use rsfind::*;
-
-
 //pub static ctxtkey: local_data::Key<@DocContext> = &local_data::Key;
 
 pub macro_rules! if_some {
@@ -43,20 +12,20 @@ pub macro_rules! if_some {
 		}
 	);
 }
-pub macro_rules! tlogi{ 
+pub macro_rules! tlogi{
 	($($a:expr),*)=>(println((file!()+":"+line!().to_str()+": " $(+$a.to_str())*) ))
 }
-pub macro_rules! logi{ 
+pub macro_rules! logi{
 	($($a:expr),*)=>(println(""$(+$a.to_str())*) )
 }
 //macro_rules! dump{ ($a:expr)=>(logi!(fmt!("%s=%?",stringify!($a),$a).indent(2,160));)}
 macro_rules! dump{ ($($a:expr),*)=>
-	(	{	let mut txt=~""; 
+	(	{	let mut txt=~"";
 			$( { txt=txt.append(
-				 fmt!("%s=%?",stringify!($a),$a)+",") 
+				 format!("{:s}={:?}",stringify!($a),$a)+",")
 				}
-			);*; 
-			logi!(txt); 
+			);*;
+			logi!(txt);
 		}
 	)
 }

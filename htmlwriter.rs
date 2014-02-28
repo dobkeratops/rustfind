@@ -21,7 +21,7 @@ fn mk_xlat_table()-> HashMap<char,~str>
 			'>' =>~"&gt;",
 			'&' =>~"&amp;",
 			'\t' =>~"&nbsp;&nbsp;&nbsp;&nbsp;",
-			c=>str::from_char(i as char)//x.slice(0,1)
+			c => str::from_char(c)//x.slice(0,1)
 			});
 	}
 	xlat

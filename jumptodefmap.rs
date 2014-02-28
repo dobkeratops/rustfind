@@ -4,10 +4,12 @@ use rustc::middle::{ty,typeck};
 use syntax::codemap::BytePos;
 use rsfind::ShowDefMode;
 
-use find_ast_node::*;
+use find_ast_node::{FNodeInfoMap, FNodeInfo, AstNode, NodeTreeLoc, find_node_tree_loc_at_byte_pos,
+	build_node_def_node_table, build_node_info_map, get_node_source, astnode_expr,
+	get_def_id, byte_pos_from_text_file_pos_str};
 use rfindctx::{RFindCtx,get_source_loc};
 use codemaput::ZTextFilePos;
-use rf_ast_ut::*;
+use rf_ast_ut::{auto_deref_ty, find_named_struct_field};
 use util::flatten_to_str; //todo - why is qualifying manually not working?!
 //use super::rf_use_ast;
 
@@ -16,7 +18,7 @@ use util::flatten_to_str; //todo - why is qualifying manually not working?!
 // a user that needs the type JumpToDefMap needn't necaserily need all its functions...
 
 
-pub macro_rules! if_some {i
+pub macro_rules! if_some {
 	($b:ident in $a:expr then $c:expr)=>(
 		match $a {
 			Some($b)=>$c,
@@ -28,14 +30,15 @@ pub macro_rules! if_some {i
 pub type JumpToDefMap = HashMap<ast::NodeId,ast::DefId> ;
 
 
-pub fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, nodeinfomap:&FNodeInfoMap, node_def_node:&HashMap<ast::NodeId,ast::DefId>)->Option<ast::DefId> {
+pub fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, nodeinfomap:&FNodeInfoMap, _: &HashMap<ast::NodeId,ast::DefId>)->Option<ast::DefId> {
 
 	match *node {
 		astnode_expr(e)=>match e.node {
 			// handle methods-calls
-			ast::ExprMethodCall(ref id,ref receiver,ref ident,ref ty_params,ref arg_exprs,ref call_sugar)=>{
-				let rec_ty_node= astnode_expr(*receiver).ty_node_id();
-				let rec_ty_node1= dc.tycx.node_types.find(&(*id as uint));
+			ast::ExprMethodCall(..)=>{
+				// Currently unused
+// 				let rec_ty_node= astnode_expr(*receiver).ty_node_id();
+// 				let rec_ty_node1= dc.tycx.node_types.find(&(*id as uint));
 
 				match dc.ca.maps.method_map.find(&e.id) {
 					None=> {},//logi!("no method map entry for",e.id),
@@ -44,7 +47,7 @@ pub fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, nodeinfomap:&FNodeInf
 						match mme.origin {
 							typeck::method_static(def_id)=>
 								return Some(def_id),
-							typeck::method_object(mp)=>
+							typeck::method_object(_)=>
 // 								return Some(mp.trait_id),
 								return None,
 							typeck::method_param(mp)=>{
@@ -60,13 +63,13 @@ pub fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, nodeinfomap:&FNodeInf
 				}
 			},
 			// handle struct-fields? "object.field"
-			ast::ExprField(ref object_expr,ref ident,ref ty_params)=>{
+			ast::ExprField(ref object_expr, ref ident, _)=>{
 				// we want the type of the object..
 				let obj_ty=dc.tycx.node_types.find(&(object_expr.id as uint));
 				let tydef=/*rf_ast_ut::*/auto_deref_ty(ty::get(*obj_ty.unwrap()));
 				match tydef.sty {
 					ty::ty_struct(def,_)=> {
-						let node_to_show=/*rf_ast_ut::*/find_named_struct_field(dc.tycx, def.node, ident).unwrap_or(def);
+						let node_to_show=/*rf_ast_ut::*/find_named_struct_field(&dc.tycx, def.node, ident).unwrap_or(def);
 						return Some(node_to_show);//mk_result(dc,m,node_spans,node_to_show,"(struct_field)");
 					},
 					_=>return None
@@ -81,6 +84,7 @@ pub fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, nodeinfomap:&FNodeInf
 	// handle everything else
 	match node.ty_node_id() {
 		Some(id) =>{
+
 			let (def_id,opt_info)= def_info_from_node_id(dc,nodeinfomap,id);
 			return if def_id != ast::DefId{krate:0,node:id} {Some(def_id)} else {None}
 /*			match opt_info {
@@ -130,10 +134,17 @@ pub fn def_info_from_node_id<'a,'b>(dc:&'a RFindCtx, node_info:&'b FNodeInfoMap,
 //					0=>(b.node,node_info.find(&b.node)),
 //					_ => (id as int, None)
 //				},
+
 				None=>(ast::DefId{krate:0,node:id as int},None)
 			}
 		},
 		None=>(ast::DefId{krate:0,node:id as int},None)
+/*
+				None=>(ast::DefId{crate:0,node:id},None)
+			}
+		},
+		None=>(ast::DefId{crate:0,node:id},None)
+*/
 	}
 }
 
@@ -170,12 +181,12 @@ pub fn dump_json(dc:&RFindCtx) {
 
 fn lookup_def_at_file_line_pos_old(dc:&RFindCtx,filepos:&str, show_all:ShowDefMode)->Option<~str> {
 
-	let toks:~[&str]=filepos.split_iter(':').collect();
+	let toks:~[&str]=filepos.split(':').collect();
 	if toks.len()<3 { return None }
 
 //	let line:Option<uint> = FromStr::from_str(toks[1]);
-	if_some!(line in from_str::<uint>(toks[1]) then {
-		if_some!(col in from_str::<uint>(toks[2]) then {
+	if_some!(line in from_str::<u32>(toks[1]) then {
+		if_some!(col in from_str::<u32>(toks[2]) then {
 			//todo - if no column specified, just lookup everything on that line!
 
 			match ZTextFilePos::new(toks[0],line-1,col-1).to_byte_pos(dc.tycx) {
@@ -239,6 +250,7 @@ pub fn lookup_def_of_node(dc:&RFindCtx,node:&AstNode,m:ShowDefMode)->Option<~str
 
 pub fn lookup_def_of_node_sub(dc:&RFindCtx,node:&AstNode,m:ShowDefMode,nim:&FNodeInfoMap, node_def_node:&HashMap<ast::NodeId,ast::DefId>)->Option<~str> {
 	// TODO - cache outside?
+
 
 
 	fn mk_result(dc:&RFindCtx,  m:ShowDefMode, nim:&FNodeInfoMap, def_node_id:ast::DefId, extra_str:&str)->Option<~str> {
