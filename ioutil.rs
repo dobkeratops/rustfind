@@ -3,7 +3,6 @@
 pub use std::io::{stdout, stdin};
 pub use std::libc::{fwrite, fread, fseek, fopen, ftell, fclose, FILE, c_void, c_char, SEEK_END,
 	SEEK_SET};
-pub use std::ptr::to_unsafe_ptr;
 pub use std::mem::size_of;	// for size_of
 pub use std::vec::from_elem;
 pub use std::num::Zero;
@@ -54,8 +53,8 @@ pub fn promptInput(prompt:&str)->~str {
 	BufferedReader::new(stdin()).read_line().expect("read_line failure")
 }
 
-pub fn as_void_ptr<T>(a:&T)->*c_void { to_unsafe_ptr(a) as *c_void}
-pub fn as_mut_void_ptr<T>(a:&T)->*mut c_void { to_unsafe_ptr(a) as *mut c_void}
+pub fn as_cvoid_ptr<T>(a:&T)->*c_void { a.as_void_ptr(a) as *c_void}
+pub fn as_mut_void_ptr<T>(a:&T)->*mut c_void { a.as_void_ptr() as *mut c_void}
 
 // this doest work?
 pub trait VoidPtr {
@@ -63,8 +62,8 @@ pub trait VoidPtr {
 	fn as_mut_void_ptr(&self)->*mut c_void;
 }
 impl<T> VoidPtr for T {
-	fn as_void_ptr(&self)->*c_void { to_unsafe_ptr(&self) as *c_void}
-	fn as_mut_void_ptr(&self)->*mut c_void { to_unsafe_ptr(self) as *mut c_void}
+	fn as_void_ptr(&self)->*c_void { self.as_void_ptr() as *c_void}
+	fn as_mut_void_ptr(&self)->*mut c_void { self.as_void_ptr() as *mut c_void}
 }
 
 pub fn printStr<T:ToStr>(a:&T){println(a.to_str());}

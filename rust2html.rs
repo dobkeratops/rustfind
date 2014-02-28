@@ -2,9 +2,8 @@ use syntax::codemap;
 use syntax::ast;
 use rustc::middle::ty;
 use iou=ioutil;
-use std::hashmap::HashMap;
+
 use std::vec;
-use extra::sort;
 use codemaput::{ZIndexFilePos,ToZIndexFilePos};
 use find_ast_node::{FNodeInfoMap,FNodeInfo};
 use rfindctx::{RFindCtx};
@@ -826,7 +825,8 @@ fn write_references(doc:&mut htmlwriter::HtmlWriter,dc:&RFindCtx, fm:&codemap::F
 			let l=refs2.len();
 			fn pri_of(x:&FNodeInfo)->uint{ if &"impl"==x.kind{0} else {0x8000} }
 			// todo: we want to sort based on node type to find impls, but we dont quite find what we want..
-			sort::quick_sort(refs2.mut_slice_to(l - 1), |&(ni1,ref ifp1,_),&( ni2,ref ifp2,_)|{ ((ifp1.file_index-curr_file)&0x7fff) as uint +pri_of(ni1)<=((ifp2.file_index-curr_file)&0x7fff) as uint +pri_of(ni2) });
+			//sort::quick_sort(
+			refs2.mut_slice_to(l - 1).sort_by( |&(ni1,ref ifp1,_),&( ni2,ref ifp2,_)|{ ((ifp1.file_index-curr_file)&0x7fff) as uint +pri_of(ni1)<=((ifp2.file_index-curr_file)&0x7fff) as uint +pri_of(ni2) });
 			let mut newline=true;
 			for &(_, ref ref_ifp,ref id) in refs2.iter() {
 				if *id!=dn {

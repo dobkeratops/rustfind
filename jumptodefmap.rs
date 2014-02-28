@@ -157,11 +157,11 @@ pub fn dump_json(dc:&RFindCtx) {
 	println("\tcode_map:[");
 //	for dc.sess.codemap.files.iter().advance |f| {
 	for f in dc.sess.codemap.files.iter() {
-		print("\t\t{ name:\""+f.name+"\",\tglobal_start_pos:"+f.start_pos.to_str()+
+		println("\t\t{ name:\""+f.name+"\",\tglobal_start_pos:"+f.start_pos.to_str()+
 			",\tlength:"+(f.src.len()).to_str()+
 			",\tnum_lines:"+f.lines.len().to_str()+
 			",\tlines:[\n"+ flatten_to_str(*f.lines, |&x|{*x-*f.start_pos} ,",") +
-			"\n\t\t]\n\t},\n");
+			"\n\t\t]\n\t},");
 	}
 	println("\t]");
 	println("\tnode_spans:");

@@ -5,6 +5,8 @@
 extern crate syntax;
 extern crate rustc;
 extern crate extra;
+extern crate collections;
+extern crate getopts;
 
 
 use rustc::{driver};
@@ -92,7 +94,7 @@ pub macro_rules! if_some {
 
 fn main() {
 
-    use extra::getopts::*;
+    use getopts::*;
 
 	//test_default_arg(1,(2,3));
 	//test_default_arg(1);
