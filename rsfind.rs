@@ -46,7 +46,7 @@ pub macro_rules! if_some {
 }
 
 
-#[deriving(Clone, Eq, Encodable, Decodable)]
+#[deriving(Clone, Eq)]
 pub enum ShowDefMode {
 	SDM_Line=0,
 	SDM_LineCol=1,
