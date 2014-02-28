@@ -16,7 +16,7 @@ use util::flatten_to_str; //todo - why is qualifying manually not working?!
 // a user that needs the type JumpToDefMap needn't necaserily need all its functions...
 
 
-pub macro_rules! if_some {
+pub macro_rules! if_some {i
 	($b:ident in $a:expr then $c:expr)=>(
 		match $a {
 			Some($b)=>$c,
@@ -82,7 +82,7 @@ pub fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, nodeinfomap:&FNodeInf
 	match node.ty_node_id() {
 		Some(id) =>{
 			let (def_id,opt_info)= def_info_from_node_id(dc,nodeinfomap,id);
-			return if def_id != ast::DefId{crate:0,node:id} {Some(def_id)} else {None}
+			return if def_id != ast::DefId{krate:0,node:id} {Some(def_id)} else {None}
 /*			match opt_info {
 				Some(info)=> {
 					return Some(def_id);
@@ -102,7 +102,7 @@ pub fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, nodeinfomap:&FNodeInf
 	return None;
 }
 
-pub fn build_jump_to_def_map(dc:&RFindCtx, nim:@mut FNodeInfoMap,nd:&HashMap<ast::NodeId,ast::DefId>)->~JumpToDefMap{
+pub fn build_jump_to_def_map(dc:&RFindCtx, nim:@FNodeInfoMap,nd:&HashMap<ast::NodeId,ast::DefId>)->~JumpToDefMap{
 // todo: NodeId->AStNode  .. lookup_def_ inner functionality extracted
 	let mut jdm=~HashMap::new();
 	for (k,node_info) in nim.iter() {
@@ -126,14 +126,14 @@ pub fn def_info_from_node_id<'a,'b>(dc:&'a RFindCtx, node_info:&'b FNodeInfoMap,
 			match get_def_id(crate_num,*a){
 				Some(b)=>
 					(b,node_info.find(&b.node)),
-//				match b.crate {
+//				match b.krate {
 //					0=>(b.node,node_info.find(&b.node)),
 //					_ => (id as int, None)
 //				},
-				None=>(ast::DefId{crate:0,node:id as int},None)
+				None=>(ast::DefId{krate:0,node:id as int},None)
 			}
 		},
-		None=>(ast::DefId{crate:0,node:id as int},None)
+		None=>(ast::DefId{krate:0,node:id as int},None)
 	}
 }
 
@@ -154,7 +154,7 @@ pub fn dump_json(dc:&RFindCtx) {
 	}
 	println("\t]");
 	println("\tnode_spans:");
-	let nim=build_node_info_map(dc.crate);
+	let nim=build_node_info_map(dc.krate);
 	let node_def_node = build_node_def_node_table(dc);
 	let jdm=build_jump_to_def_map(dc,nim,node_def_node);
 	println(nim.to_json_str(dc));
@@ -212,7 +212,7 @@ pub fn node_id_from_text_file_pos_str(dc:&RFindCtx, file_pos_str:&str)->Option<a
 }
 pub fn node_from_text_file_pos_str(dc:&RFindCtx, file_pos_str:&str)->Option<AstNode> {
 	match byte_pos_from_text_file_pos_str(dc,file_pos_str) {
-		Some(bp)=>{let ndt=find_node_tree_loc_at_byte_pos(dc.crate,bp);Some(ndt.last().clone())},
+		Some(bp)=>{let ndt=find_node_tree_loc_at_byte_pos(dc.krate,bp);Some(ndt.last().clone())},
 		None=>None
 	}
 }
@@ -221,7 +221,7 @@ pub fn node_from_text_file_pos_str(dc:&RFindCtx, file_pos_str:&str)->Option<AstN
 
 
 pub fn lookup_def_at_byte_pos(dc:&RFindCtx, bp:BytePos, m:ShowDefMode)->Option<~str> {
-	let ndt=find_node_tree_loc_at_byte_pos(dc.crate,bp);
+	let ndt=find_node_tree_loc_at_byte_pos(dc.krate,bp);
 	lookup_def_of_node_tree_loc(dc,&ndt,m)
 }
 
@@ -231,7 +231,7 @@ pub fn lookup_def_of_node_tree_loc(dc:&RFindCtx,node_tree_loc:&NodeTreeLoc,m:Sho
 
 pub fn lookup_def_of_node(dc:&RFindCtx,node:&AstNode,m:ShowDefMode)->Option<~str> {
 	println("def of node:"+node.get_id().unwrap_or(0).to_str());
-	let node_spans=build_node_info_map(dc.crate);
+	let node_spans=build_node_info_map(dc.krate);
 	let node_def_node = build_node_def_node_table(dc);
 	lookup_def_of_node_sub(dc,node,m,node_spans,node_def_node)
 }
@@ -242,7 +242,7 @@ pub fn lookup_def_of_node_sub(dc:&RFindCtx,node:&AstNode,m:ShowDefMode,nim:&FNod
 
 
 	fn mk_result(dc:&RFindCtx,  m:ShowDefMode, nim:&FNodeInfoMap, def_node_id:ast::DefId, extra_str:&str)->Option<~str> {
-		if def_node_id.crate!=0 {
+		if def_node_id.krate!=0 {
 			Some(~"{cross-crate-def not implemented, "+def_node_id.to_str()+"}")
 		}
 		else {
@@ -269,9 +269,9 @@ pub fn lookup_def_of_node_sub(dc:&RFindCtx,node:&AstNode,m:ShowDefMode,nim:&FNod
 	}
 }
 
-pub fn make_jdm(dc:&RFindCtx)->(@mut FNodeInfoMap, ~HashMap<ast::NodeId,ast::DefId>,~JumpToDefMap)
+pub fn make_jdm(dc:&RFindCtx)->(@FNodeInfoMap, ~HashMap<ast::NodeId,ast::DefId>,~JumpToDefMap)
 {
-    let nim=build_node_info_map(dc.crate);
+    let nim=build_node_info_map(dc.krate);
     let ndm=build_node_def_node_table(dc);
     let jdm=build_jump_to_def_map(dc,nim,ndm);
     (nim,ndm,jdm)

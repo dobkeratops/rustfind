@@ -69,7 +69,7 @@ pub fn find_named_struct_field(tc:ty::ctxt, struct_node_id:ast::NodeId, field_id
 		Some((it,sd,ge))=>{
 			for f in sd.fields.iter() {
 				match f.node.kind {
-					ast::named_field(ref ident,vis)=>if ident.name ==field_ident.name {return Some(ast::DefId{crate:0,node:f.node.id});},
+					ast::named_field(ref ident,vis)=>if ident.name ==field_ident.name {return Some(ast::DefId{krate:0,node:f.node.id});},
 					_=>return None
 				}
 			}

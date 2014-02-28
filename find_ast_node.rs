@@ -112,7 +112,7 @@ pub fn find_node_tree_loc_at_byte_pos(c:@ast::Crate,_location:codemap::BytePos)-
 	// would it be more efficient to use that?
 	// if we encoded hrc information in the node-spans-table,
 	// we wouldn't need all this iterator malarchy again.
-	let mut s= @mut FindAstNodeSt{
+	let mut s= @ FindAstNodeSt{
 		result:~[astnode_root], location:*_location, stop:false
 
 	};
@@ -125,9 +125,9 @@ pub fn find_node_tree_loc_at_byte_pos(c:@ast::Crate,_location:codemap::BytePos)-
 }
 
 
-pub fn build_node_info_map(c:@ast::Crate)->@mut FNodeInfoMap {
+pub fn build_node_info_map(c:@ast::Crate)->@ FNodeInfoMap {
 	// todo-lambdas, big fcuntion but remove the extraneous symbols
-	let node_spans=@mut hashmap::HashMap::new();
+	let node_spans=@ hashmap::HashMap::new();
 
 	let mut vt = FncsThing;
 
@@ -208,16 +208,16 @@ impl KindToStr for ast::Decl {
 impl KindToStr for ast::item {
 	fn kind_to_str(&self)->&'static str {
 		match (self.node) {
-		ast::item_static(*)=>"static",
-		ast::item_fn(*)=>"fn",
-		ast::item_mod(*)=>"mod",
-		ast::item_foreign_mod(*)=>"foreign_mod",
-		ast::item_ty(*)=>"ty",
-		ast::item_enum(*)=>"enum",
-		ast::item_struct(*)=>"struct",
-		ast::item_trait(*)=>"trait",
-		ast::item_impl(*)=>"impl",
-		ast::item_mac(*)=>"mac",
+		ast::item_static(_)=>"static",
+		ast::item_fn(_)=>"fn",
+		ast::item_mod(_)=>"mod",
+		ast::item_foreign_mod(_)=>"foreign_mod",
+		ast::item_ty(_)=>"ty",
+		ast::item_enum(_)=>"enum",
+		ast::item_struct(_)=>"struct",
+		ast::item_trait(_)=>"trait",
+		ast::item_impl(_)=>"impl",
+		ast::item_mac(_)=>"mac",
 		}
 	}
 }
@@ -638,7 +638,7 @@ impl FncsThing {
 	}
 }
 
-type FncsState =(@mut FNodeInfoMap, ast::NodeId);
+type FncsState =(@ FNodeInfoMap, ast::NodeId);
 
 impl Visitor<FncsState> for FncsThing {
 	// use default impl
@@ -763,22 +763,22 @@ impl Visitor<FncsState> for FncsThing {
 
 pub struct Finder;
 
-impl Visitor<@mut FindAstNodeSt> for Finder {
-	fn visit_view_item(&mut self, a:&ast::view_item, s:@mut FindAstNodeSt) {
+impl Visitor<@ FindAstNodeSt> for Finder {
+	fn visit_view_item(&mut self, a:&ast::view_item, s:@ FindAstNodeSt) {
 		if span_contains(s.location, a.span) {
 			s.result.push(astnode_view_item(@a.clone()));;
 		}
 		visit::walk_view_item(self, a, s);
 	}
 
-	fn visit_item(&mut self, a:@ast::item, s:@mut FindAstNodeSt) {
+	fn visit_item(&mut self, a:@ast::item, s:@ FindAstNodeSt) {
 		if span_contains(s.location, a.span) {
 			s.result.push(astnode_item(a));
 		}
 		visit::walk_item(self, a, s);
 	}
 
-	fn visit_local(&mut self, a:@ast::Local, s:@mut FindAstNodeSt) {
+	fn visit_local(&mut self, a:@ast::Local, s:@ FindAstNodeSt) {
 		if span_contains(s.location, a.span) {
 			s.result.push(astnode_local(a));
 		}
@@ -786,7 +786,7 @@ impl Visitor<@mut FindAstNodeSt> for Finder {
 		visit::walk_local(self, a, s);
 	}
 
-	fn visit_block(&mut self, a:&ast::Block, s:@mut FindAstNodeSt) {
+	fn visit_block(&mut self, a:&ast::Block, s:@ FindAstNodeSt) {
 		if span_contains(s.location, a.span) {
 			s.result.push(astnode_block(@a.clone()));
 		}
@@ -794,7 +794,7 @@ impl Visitor<@mut FindAstNodeSt> for Finder {
 		visit::walk_block(self, a, s);
 	}
 
-	fn visit_stmt(&mut self, a:@ast::Stmt, s:@mut FindAstNodeSt) {
+	fn visit_stmt(&mut self, a:@ast::Stmt, s:@ FindAstNodeSt) {
 		if span_contains(s.location, a.span) {
 			s.result.push(astnode_stmt(a));
 		}
@@ -802,7 +802,7 @@ impl Visitor<@mut FindAstNodeSt> for Finder {
 		visit::walk_stmt(self, a, s);
 	}
 
-	fn visit_arm(&mut self, a:&ast::Arm, s:@mut FindAstNodeSt) {
+	fn visit_arm(&mut self, a:&ast::Arm, s:@ FindAstNodeSt) {
 		   // The whole arm doesn't have a span.
 //		 if span.contains(s.location, a.span) {
 //			 s.result.push(astnode_pat(a));
@@ -810,7 +810,7 @@ impl Visitor<@mut FindAstNodeSt> for Finder {
 		visit::walk_arm(self, a, s);
 	}
 
-	fn visit_pat(&mut self, a:@ast::Pat, s:@mut FindAstNodeSt) {
+	fn visit_pat(&mut self, a:@ast::Pat, s:@ FindAstNodeSt) {
 		if span_contains(s.location, a.span) {
 			s.result.push(astnode_pat(a));
 		}
@@ -818,7 +818,7 @@ impl Visitor<@mut FindAstNodeSt> for Finder {
 		visit::walk_pat(self, a, s);
 	}
 
-	fn visit_decl(&mut self, a:@ast::Decl, s:@mut FindAstNodeSt) {
+	fn visit_decl(&mut self, a:@ast::Decl, s:@ FindAstNodeSt) {
 		if span_contains(s.location, a.span) {
 			s.result.push(astnode_decl(a));
 		}
@@ -826,7 +826,7 @@ impl Visitor<@mut FindAstNodeSt> for Finder {
 		visit::walk_decl(self, a, s);
 	}
 
-	fn visit_expr(&mut self, a:@ast::Expr, s:@mut FindAstNodeSt) {
+	fn visit_expr(&mut self, a:@ast::Expr, s:@ FindAstNodeSt) {
 		if span_contains(s.location, a.span) {
 			s.result.push(astnode_expr(a));
 		}
@@ -834,7 +834,7 @@ impl Visitor<@mut FindAstNodeSt> for Finder {
 		visit::walk_expr(self, a, s);
 	}
 
-	fn visit_ty(&mut self, a:&ast::Ty, s:@mut FindAstNodeSt) {
+	fn visit_ty(&mut self, a:&ast::Ty, s:@ FindAstNodeSt) {
 		if span_contains(s.location, a.span) {
 			s.result.push(astnode_ty(@a.clone()));
 		}
@@ -846,7 +846,7 @@ impl Visitor<@mut FindAstNodeSt> for Finder {
 //	 fn visit_fn(fk:&vist::fn_kind, fd:&as::fn_decl, body:&ast::Block,
 //		 sp:codemap::Span, nid:ast::NodeId, s: @mut FindAstNodeSt) {}
 
-	fn visit_struct_field(&mut self, a:@ast::struct_field, s:@mut FindAstNodeSt) {
+	fn visit_struct_field(&mut self, a:@ast::struct_field, s:@ FindAstNodeSt) {
 		if span_contains(s.location, a.span) {
 			s.result.push(astnode_struct_field(a));
 		}
@@ -960,7 +960,7 @@ pub fn safe_node_id_to_type(cx: ty::ctxt, id: ast::NodeId) -> Option<ty::t> {
 }
 
 pub fn get_def_id(curr_crate:ast::CrateNum,src_def:ast::Def)->Option<ast::DefId> {
-	let mk=|x|{Some(ast::DefId{crate:curr_crate, node:x})}; // todo,mmaybe this is best 'None'..
+	let mk=|x|{Some(ast::DefId{krate:curr_crate, node:x})}; // todo,mmaybe this is best 'None'..
 	// todo-'definition' can be at multiple locations. we should return [def_id] really..
 	match (src_def) {
 		ast::DefFn(d,_)=>Some(d),
@@ -1062,7 +1062,7 @@ pub fn def_of_symbol_to_str(dc:&RFindCtx, ns:&FNodeInfoMap,ds:&HashMap<ast::Node
 
 // TODO- this should return a slice?
 pub fn get_node_source(c:ty::ctxt, nim:&FNodeInfoMap, did:ast::DefId)->~str {
-	if did.crate==0{
+	if did.krate==0{
 		match (nim.find(&did.node)){
 			None=>~"",
 			Some(info)=>{

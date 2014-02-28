@@ -16,7 +16,7 @@ use rustc::middle::ty;
 //use codemaput::*;
 
 pub struct RFindCtx {
-     crate: @ast::Crate,
+     krate: @ast::Crate,
      tycx: middle::ty::ctxt,
      sess: driver::session::Session,
      ca: driver::driver::CrateAnalysis

@@ -214,7 +214,7 @@ impl NodesPerLinePerFile {
 		for (k,v) in nim.iter() {
 			// TODO- only want the **DEF_NODES** for 'def_nodes_per_line', not all.
 			// todo, this could be more direct, file index, line index, ...
-			do v.span.lo.to_index_file_pos(dc.tycx).for_some|ifp|{
+			v.span.lo.to_index_file_pos(dc.tycx).for_some(|ifp|{
 				match v.span.hi.to_index_file_pos(dc.tycx) {
 					None=>{	},
 					Some(ifpe)=>{
@@ -230,7 +230,7 @@ impl NodesPerLinePerFile {
 						};
 					}
 				};
-			}
+			})
 		};
 //		npl.dump();
 		npl
@@ -341,16 +341,16 @@ fn sub_match(mut line:&str,x:uint,opts:&[&str])->Option<(uint,uint)>{
 	return None;
 }
 
-struct NodeMaps<'self>  {
-	nim:&'self FNodeInfoMap,
-	jdm:&'self JumpToDefMap,
-	jrm:&'self JumpToRefMap
+struct NodeMaps<'s>  {
+	nim:&'s FNodeInfoMap,
+	jdm:&'s JumpToDefMap,
+	jrm:&'s JumpToRefMap
 }
 
 /// interface for emitting source code serially
 /// carries state between emitting lines
-struct SourceCodeWriter<'self, T> {
-	doc: &'self mut T,
+struct SourceCodeWriter<'s, T> {
+	doc: &'s mut T,
 	multiline_comment_depth:int,
 	brace_depth:int,
 	bracket_depth:int,
@@ -359,8 +359,8 @@ struct SourceCodeWriter<'self, T> {
 	line_index:uint
 }
 
-impl<'self, T> SourceCodeWriter<'self,T> {
-	fn new(d:&'self mut T)->SourceCodeWriter<'self, T> {
+impl<'s, T> SourceCodeWriter<'s,T> {
+	fn new(d:&'s mut T)->SourceCodeWriter<'s, T> {
 		SourceCodeWriter{
 			doc:d, multiline_comment_depth:0, brace_depth:0,bracket_depth:0, angle_bracket_depth:0, in_string:0, line_index:0
 		}
@@ -592,7 +592,7 @@ fn resolve_link(link:i64, dc:&RFindCtx,fm:&codemap::FileMap,lib_path:&str, nmaps
 		{
 			let def_crate = (link>>48) as int;
 			let def_node=(link&((1<<48)-1)) as int;
-			match xcm.find(&ast::DefId{crate:def_crate,node:def_node}) {
+			match xcm.find(&ast::DefId{krate:def_crate,node:def_node}) {
 				None=>//"#n"+def_node.to_str(), by node linnk
 				{
 					match (nmaps.nim,def_node).to_index_file_pos(dc.tycx) {
@@ -616,7 +616,7 @@ fn resolve_link(link:i64, dc:&RFindCtx,fm:&codemap::FileMap,lib_path:&str, nmaps
 }
 
 
-fn write_line_attr_links(dst:&mut SourceCodeWriter<htmlwriter::HtmlWriter>,text_line:&str,color:&[int],links:&[i64], resolve_link:&fn(i64)->~str) {
+fn write_line_attr_links(dst:&mut SourceCodeWriter<htmlwriter::HtmlWriter>,text_line:&str,color:&[int],links:&[i64], resolve_link:&|i64|->~str) {
 	// emit a span..
 	let no_color=-1;
 	let mut curr_col=no_color;
@@ -665,18 +665,18 @@ pub struct MultiMap<K,V> {
 	items:~[~[V]],
 	empty:~[V]
 }
-impl<'self,K:IterBytes+Eq,V> MultiMap<K,V> {
+impl<'s,K:IterBytes+Eq,V> MultiMap<K,V> {
 	pub fn new()->MultiMap<K,V> {
 		MultiMap{ next_index:0, indices:HashMap::new(), items:~[], empty:~[] }
 	}
-	pub fn find(&'self self, k:K)->&'self~[V] {
+	pub fn find(&'s self, k:K)->&'s~[V] {
 		// TODO - return iterator, not collection
 		match self.indices.find(&k) {
 			None=>&self.empty,
 			Some(&ix)=>&self.items[ix]
 		}
 	}
-	pub fn insert(&'self mut self, k:K,v:V) {
+	pub fn insert(&'s mut self, k:K,v:V) {
 		let ix=match self.indices.find(&k) {
 			None=>{ self.indices.insert(k,self.next_index); self.next_index+=1; self.items.push(~[]); self.next_index-1},
 			Some(&ix)=> ix
@@ -762,7 +762,7 @@ struct Foo {
 trait Draw {
 	fn draw(self);
 }
-impl<'self> Draw for  (&'self Window,&'self str) {
+impl<'s> Draw for  (&'s Window,&'s str) {
 	fn draw(self) {
 	}
 }
@@ -881,7 +881,7 @@ fn write_references(doc:&mut htmlwriter::HtmlWriter,dc:&RFindCtx, fm:&codemap::F
 impl htmlwriter::HtmlWriter{
 	fn write_refs_header(&mut self,dc:&RFindCtx,nim:&FNodeInfoMap, fm:&codemap::FileMap, nid:ast::NodeId) {
 		self.writeln("");
-		do nim.find(&nid).for_some |info| {
+		nim.find(&nid).for_some( |info| {
 			let oifp=info.span.lo.to_index_file_pos(dc.tycx);//.unwrap();
 			let oifpe=info.span.hi.to_index_file_pos(dc.tycx);//.unwrap();
 			if (oifp.is_some() && oifpe.is_some())==true {
@@ -904,7 +904,7 @@ impl htmlwriter::HtmlWriter{
 				self.end_tag();
 				self.end_tag();
 			}
-		}
+		})
 	}
 	fn write_file_ref(&mut self, dc:&RFindCtx,origin_fm:&codemap::FileMap, fi:uint) {
 
@@ -947,7 +947,7 @@ impl htmlwriter::HtmlWriter{
 // things that are robust when some source changes, etc.
 // file_index:line_index:col_index:length
 
-impl<'self> ToZIndexFilePos for (&'self FNodeInfoMap,ast::NodeId) {
+impl<'s> ToZIndexFilePos for (&'s FNodeInfoMap,ast::NodeId) {
 	fn to_index_file_pos(&self,tc:ty::ctxt)->Option<ZIndexFilePos> {
 		let (ref nim,nid)=*self;
 		let oni=nim.find(&nid);

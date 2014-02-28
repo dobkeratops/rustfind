@@ -53,7 +53,7 @@ pub fn read_cross_crate_map(dc:&RFindCtx, crate_num:int, crate_name:&str,lib_pat
 					// pareent id ignored, we use span information to reconstruct AST
 
 					let node_id:int= from_str(toks[2]).unwrap_or(0);
-					xcm.insert(ast::DefId{crate:crate_num, node:node_id,},
+					xcm.insert(ast::DefId{krate:crate_num, node:node_id,},
 						CrossCrateMapItem{
 							fname:	toks[4].to_owned(),
 							line:   from_str(toks[5]).unwrap_or(0)-1,
@@ -66,7 +66,7 @@ pub fn read_cross_crate_map(dc:&RFindCtx, crate_num:int, crate_name:&str,lib_pat
 				_=>{
 
 					let node_id:int=from_str(toks[1]).unwrap_or(0);
-					xcm.insert(ast::DefId{crate:crate_num, node:node_id,},
+					xcm.insert(ast::DefId{krate:crate_num, node:node_id,},
 						CrossCrateMapItem{
 							fname:	toks[2].to_owned(),
 							line:   from_str(toks[3]).unwrap_or(0)-1,

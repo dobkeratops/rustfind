@@ -1,6 +1,6 @@
-extern mod syntax;
-extern mod rustc;
-extern mod extra;
+extern crate syntax;
+extern crate rustc;
+extern crate extra;
 
 use rustc::{front, metadata, driver, middle};
 use rustc::middle::*;
@@ -87,17 +87,17 @@ pub enum ShowDefMode {
 
 
 pub trait MyOption<T> {
-	fn for_some(&self, f:&fn(t:&T));
-	fn do_some<R>(&self, f:&fn(t:&T)->R)->Option<R>;
+	fn for_some(&self, f:&|t:&T|);
+	fn do_some<R>(&self, f:&|t:&T|->R)->Option<R>;
 }
 impl<T> MyOption<T> for Option<T>{
-	fn for_some(&self, f:&fn(t:&T)) {
+	fn for_some(&self, f:&|t:&T|) {
 		match self {
 			&None=>{},
 			&Some(ref t)=>f(t)
 		}
 	}
-	fn do_some<R>(&self, f:&fn(t:&T)->R)->Option<R> {
+	fn do_some<R>(&self, f:&|t:&T|->R)->Option<R> {
 		match self {
 			&None=>None,
 			&Some(ref t)=>Some(f(t))

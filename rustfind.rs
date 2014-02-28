@@ -1,9 +1,9 @@
 #[feature(macro_rules)];
 #[feature(globs)];
 
-extern mod syntax;
-extern mod rustc;
-extern mod extra;
+extern crate syntax;
+extern crate rustc;
+extern crate extra;
 
 
 use rustc::{front, metadata, driver, middle};
@@ -13,7 +13,7 @@ use rustc::metadata::cstore;
 //use std::num::*;
 use std::{io,os,local_data};
 //use std::hashmap::HashMap;
-use rf_common::*;
+pub use rf_common::*;
 
 use syntax::{parse,ast,ast_map,codemap,diagnostic};
 use syntax::parse::token;
@@ -187,11 +187,11 @@ fn get_ast_and_resolve(
 	-> RFindCtx {
 
     let parsesess = parse::new_parse_sess(None);
-    let sessopts = @driver::session::options {
-        binary: @"rustdoc",
+    let sessopts = @driver::session::Options {
+        //binary: @"rustdoc", //???
         maybe_sysroot: Some(@std::os::self_exe_path().unwrap()),
 //        maybe_sysroot: Some(@std::os::self_exe_path().unwrap().pop()),
-        addl_lib_search_paths: @mut libs,
+        addl_lib_search_paths: @libs,
         ..  (*rustc::driver::session::basic_options()).clone()
     };
 	let quiet=true;
@@ -212,7 +212,7 @@ fn get_ast_and_resolve(
 	let crate2=@driver::driver::phase_2_configure_and_expand(sess,cfg,crate1);
 
 	let ca=driver::driver::phase_3_run_analysis_passes(sess,crate2);
-    RFindCtx { crate: crate2, tycx: ca.ty_cx, sess: sess, ca:ca }
+    RFindCtx { krate: crate2, tycx: ca.ty_cx, sess: sess, ca:ca }
 }
 
 fn debug_test(dc:&RFindCtx) {
@@ -243,14 +243,14 @@ fn debug_test(dc:&RFindCtx) {
 
 		logi!(~"\n=====Find AST node at: ",loc.file.name,":",loc.line,":",loc.col,":"," =========");
 
-		let nodetloc = find_node_tree_loc_at_byte_pos(dc.crate,codemap::BytePos(test_cursor));
+		let nodetloc = find_node_tree_loc_at_byte_pos(dc.krate,codemap::BytePos(test_cursor));
 		let node_info =  get_node_info_str(dc,&nodetloc);
 		dump!(node_info);
-		println("node ast loc:"+(do nodetloc.map |x| { x.get_id().to_str() }).to_str());
+		println("node ast loc:"+(nodetloc.map( |x| { x.get_id().to_str() }).to_str() ));
 
 
 		if_some!(id in nodetloc.last().ty_node_id() then {
-			logi!("source=",get_node_source(dc.tycx, node_info_map,ast::DefId{crate:0,node:id}));
+			logi!("source=",get_node_source(dc.tycx, node_info_map,ast::DefId{krate:0,node:id}));
 			if_some!(t in safe_node_id_to_type(dc.tycx, id) then {
 				println(fmt!("typeinfo: %?",
 					{let ntt= rustc::middle::ty::get(t); ntt}));
