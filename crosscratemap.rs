@@ -49,9 +49,8 @@ pub fn read_cross_crate_map(_:&RFindCtx, crate_num:int, crate_name:&str,lib_path
 					//cratename is ignoredd, because we already know it.
 					// pareent id ignored, we use span information to reconstruct AST
 
-
-					let node_id:int= from_str(toks[2]).unwrap_or(0);
-					xcm.insert(ast::DefId{krate:crate_num, node:node_id,}, // as u32??
+					let node_id: int= from_str::<int>(toks[2]).unwrap_or(0);
+					xcm.insert(ast::DefId{crate:crate_num as u32, node:node_id as u32,},
 						CrossCrateMapItem{
 							fname:	toks[4].to_owned(),
 							line:   from_str(toks[5]).unwrap_or(0)-1,
@@ -64,8 +63,7 @@ pub fn read_cross_crate_map(_:&RFindCtx, crate_num:int, crate_name:&str,lib_path
 				_=>{
 
 					let node_id:int=from_str(toks[1]).unwrap_or(0);
-
-					xcm.insert(ast::DefId{krate:crate_num, node:node_id,}, // as u32?
+					xcm.insert(ast::DefId{crate:crate_num as u32, node:node_id as u32,},
 						CrossCrateMapItem{
 							fname:	toks[2].to_owned(),
 							line:   from_str(toks[3]).unwrap_or(0)-1,
@@ -115,7 +113,7 @@ pub fn write_cross_crate_map(dc:&RFindCtx, _:&str,nim:&FNodeInfoMap, _:&HashMap<
 
 	for (k,v) in jdm.iter()  {
 		let cname:~str= if v.crate>0 {
-			dc.tycx.cstore.get_crate_data(v.crate).name.to_str()
+			cstore::get_crate_data(dc.tycx.cstore,v.crate).name.to_str()
 		} else {
 			curr_crate_name_only.to_str()
 		};

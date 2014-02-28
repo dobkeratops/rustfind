@@ -50,8 +50,7 @@ pub fn text_offset_to_line_pos(text:&[u8], src_ofs: u32)-> Option<(u32, u32)> {
 	}
 	return None;
 }
-
-pub fn flatten_to_str<T,U:ToStr>(xs:&[T],f:&|x:&T|->U, sep:&str)->~str {
+pub fn flatten_to_str<T,U:ToStr>(xs:&[T],f: |&T| -> U, sep:&str)->~str {
 	let mut acc=~"";
 	let mut i=0; // TODO - functional way.
 	while i<xs.len() {

@@ -2,27 +2,18 @@
 #[feature(globs)];
 #[feature(macro_rules)];
 
-extern crate syntax;
-extern crate rustc;
-extern crate extra;
-extern crate collections;
-extern crate getopts;
+extern mod syntax;
+extern mod rustc;
+extern mod extra;
 
 
 use rustc::{driver};
 use rustc::metadata::cstore;
 
-
-//use std::num::*;
-use std::{io,os,local_data};
-//use std::hashmap::HashMap;
-pub use rf_common::*;
-/*=======
 use std::{os,local_data};
 use std::hashmap::HashMap;
 use std::path::Path;
->>>>>>> fc8837b2b3b3223411feaba7bacb9b758dd79ef7
-*/
+
 use syntax::{parse,ast,codemap};
 use find_ast_node::{safe_node_id_to_type,get_node_info_str,find_node_tree_loc_at_byte_pos,ToJsonStr,ToJsonStrFc,AstNodeAccessors,KindToStr,get_node_source};
 use jumptodefmap::{lookup_def_at_text_file_pos_str, make_jdm, def_info_from_node_id,
@@ -94,7 +85,7 @@ pub macro_rules! if_some {
 
 fn main() {
 
-    use getopts::*;
+    use extra::getopts::*;
 
 	//test_default_arg(1,(2,3));
 	//test_default_arg(1);
@@ -106,10 +97,10 @@ fn main() {
     ];
 
 	let matches = getopts(args.tail(), opts).unwrap();
-    let libs1 = matches.opt_strs("L").map(|s| Path::new(s.as_slice()));
+    let libs1 = matches.opt_strs("L").map(|s| Path::init(s.as_slice()));
 	let libs=if libs1.len()>0 {libs1} else {
 		match (os::getenv(&"RUST_LIBS")) {
-			Some(x)=>~[ Path::new(x)],
+			Some(x)=>~[ Path::init(x)],
 			None=>~[]
 		}
 	};
@@ -133,7 +124,7 @@ fn main() {
 	if matches.free.len()>0 {
 		let mut done=false;
 		let filename=util::get_filename_only(matches.free[0]);
-		let dc = @get_ast_and_resolve(&Path::new(filename), libs);
+		let dc = @get_ast_and_resolve(&Path::init(filename), libs);
 		local_data::set(ctxtkey, dc);
 
 		if (matches.opt_present("d")) {
@@ -147,7 +138,7 @@ fn main() {
 		if (matches.opt_present("f")) {
 			while i<matches.free.len() {
 				let mode=if matches.opt_present("g"){SDM_GeditCmd} else {SDM_Source};
-				io::print(lookup_def_at_text_file_pos_str(dc,matches.free[i],mode).unwrap_or(~"no def found\n"));
+				print(lookup_def_at_text_file_pos_str(dc,matches.free[i],mode).unwrap_or(~"no def found\n"));
 				i+=1;
 				done=true;
 			}
@@ -157,17 +148,17 @@ fn main() {
 			done=true;
 		}
 		if matches.opt_present("r") {
-			io::println("Writing .rfx ast nodes/cross-crate-map:-");
+			println("Writing .rfx ast nodes/cross-crate-map:-");
 			write_source_as_html_and_rfx(dc,lib_html_path, rust2html::DefaultOptions,false);
-			io::println("Writing .rfx .. done");
+			println("Writing .rfx .. done");
 			done=true;
 		}
 
 		// Dump as html..
 		if matches.opt_present("w") || !(done) {
-			io::println("Creating HTML pages from source & .rfx:-");
+			println("Creating HTML pages from source & .rfx:-");
 			write_source_as_html_and_rfx(dc,lib_html_path, rust2html::DefaultOptions,true);
-			io::println("Creating HTML pages from source.. done");
+			println("Creating HTML pages from source.. done");
 		}
 	}
 }
@@ -177,7 +168,7 @@ fn main() {
 
 struct BlankEmitter;
 impl syntax::diagnostic::Emitter for BlankEmitter {
-	fn emit(&self, _: Option<(@codemap::CodeMap, codemap::Span)>, _: &str, _: syntax::diagnostic::Level) {
+	fn emit(&self, _: Option<(@codemap::CodeMap, codemap::Span)>, _: &str, _: syntax::diagnostic::level) {
 	}
 }
 
@@ -187,14 +178,10 @@ fn get_ast_and_resolve(
 	-> RFindCtx {
 
     let parsesess = parse::new_parse_sess(None);
-    let sessopts = @driver::session::Options {
-        //binary: @"rustdoc", //???
+    let sessopts = @driver::session::options {
+        binary: @"rustdoc",
         maybe_sysroot: Some(@std::os::self_exe_path().unwrap()),
-
-//        maybe_sysroot: Some(@std::os::self_exe_path().unwrap().pop()),
-        addl_lib_search_paths: @libs,
-
-//        addl_lib_search_paths: @mut libs.move_iter().collect(), ??? FROM MERGE 
+        addl_lib_search_paths: @mut libs.move_iter().collect(),
         ..  (*rustc::driver::session::basic_options()).clone()
     };
     // Currently unused
@@ -209,14 +196,14 @@ fn get_ast_and_resolve(
     let sess = driver::driver::build_session_(sessopts, parsesess.cm,
                                                   @BlankEmitter as @syntax::diagnostic::Emitter,
                                                   span_diagnostic_handler);
-	let input=driver::driver::FileInput(cpath.clone());
+	let input=driver::driver::file_input(cpath.clone());
 	let cfg= driver::driver::build_configuration(sess); //was, @"", &input);
 
 	let crate1=driver::driver::phase_1_parse_input(sess,cfg.clone(),&input);
 	let crate2=@driver::driver::phase_2_configure_and_expand(sess,cfg,crate1);
 
 	let ca=driver::driver::phase_3_run_analysis_passes(sess,crate2);
-    RFindCtx { krate: crate2, tycx: ca.ty_cx, sess: sess, ca:ca }
+    RFindCtx { crate: crate2, tycx: ca.ty_cx, sess: sess, ca:ca }
 }
 
 fn debug_test(dc:&RFindCtx) {
@@ -247,23 +234,14 @@ fn debug_test(dc:&RFindCtx) {
 
 		logi!(~"\n=====Find AST node at: ",loc.file.name,":",loc.line,":",loc.col,":"," =========");
 
-
-		let nodetloc = find_node_tree_loc_at_byte_pos(dc.krate,codemap::BytePos(test_cursor));
-		let node_info =  get_node_info_str(dc,&nodetloc);
-		dump!(node_info);
-		println("node ast loc:"+(nodetloc.map( |x| { x.get_id().to_str() }).to_str() ));
-/*
-========
 		let nodetloc = find_node_tree_loc_at_byte_pos(dc.crate,codemap::BytePos(test_cursor as u32));
 		let node_info =  get_node_info_str(dc,&nodetloc);
 		dump!(node_info);
 		println("node ast loc:"+(nodetloc.map(|x| { x.get_id().to_str() })).to_str());
->>>>>>> fc8837b2b3b3223411feaba7bacb9b758dd79ef7
-*/
 
 
 		if_some!(id in nodetloc.last().ty_node_id() then {
-			logi!("source=",get_node_source(dc.tycx, node_info_map,ast::DefId{krate:0,node:id}));
+			logi!("source=",get_node_source(dc.tycx, node_info_map,ast::DefId{crate:0,node:id}));
 			if_some!(t in safe_node_id_to_type(dc.tycx, id) then {
 				println(format!("typeinfo: {:?}",
 					{let ntt= rustc::middle::ty::get(t); ntt}));
@@ -308,7 +286,7 @@ fn debug_test(dc:&RFindCtx) {
 pub fn write_source_as_html_and_rfx(dc:&RFindCtx,lib_html_path:&str,opts:uint, write_html:bool) {
 
 	let mut xcm:~CrossCrateMap=~HashMap::new();
-	dc.tycx.cstore.iter_crate_data(|i,md| {
+	cstore::iter_crate_data(dc.tycx.cstore, |i,md| {
 //		dump!(i, md.name,md.data.len(),md.cnum);
 		println("loading cross crate data "+i.to_str()+" "+md.name);
 		let xcm_sub=crosscratemap::read_cross_crate_map(dc, i as int, md.name+&".rfx",lib_html_path);

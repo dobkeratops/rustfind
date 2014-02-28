@@ -84,9 +84,8 @@ pub fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, nodeinfomap:&FNodeInf
 	// handle everything else
 	match node.ty_node_id() {
 		Some(id) =>{
-
-			let (def_id,opt_info)= def_info_from_node_id(dc,nodeinfomap,id);
-			return if def_id != ast::DefId{krate:0,node:id} {Some(def_id)} else {None}
+			let (def_id, _)= def_info_from_node_id(dc,nodeinfomap,id);
+			return if def_id != ast::DefId{crate:0,node:id} {Some(def_id)} else {None}
 /*			match opt_info {
 				Some(info)=> {
 					return Some(def_id);
@@ -106,7 +105,7 @@ pub fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, nodeinfomap:&FNodeInf
 	return None;
 }
 
-pub fn build_jump_to_def_map(dc:&RFindCtx, nim:@FNodeInfoMap,nd:&HashMap<ast::NodeId,ast::DefId>)->~JumpToDefMap{
+pub fn build_jump_to_def_map(dc:&RFindCtx, nim:@mut FNodeInfoMap,nd:&HashMap<ast::NodeId,ast::DefId>)->~JumpToDefMap{
 // todo: NodeId->AStNode  .. lookup_def_ inner functionality extracted
 	let mut jdm=~HashMap::new();
 	for (k,node_info) in nim.iter() {
@@ -130,21 +129,14 @@ pub fn def_info_from_node_id<'a,'b>(dc:&'a RFindCtx, node_info:&'b FNodeInfoMap,
 			match get_def_id(crate_num,*a){
 				Some(b)=>
 					(b,node_info.find(&b.node)),
-//				match b.krate {
+//				match b.crate {
 //					0=>(b.node,node_info.find(&b.node)),
 //					_ => (id as int, None)
 //				},
-
-				None=>(ast::DefId{krate:0,node:id as int},None)
-			}
-		},
-		None=>(ast::DefId{krate:0,node:id as int},None)
-/*
 				None=>(ast::DefId{crate:0,node:id},None)
 			}
 		},
 		None=>(ast::DefId{crate:0,node:id},None)
-*/
 	}
 }
 
@@ -157,15 +149,15 @@ pub fn dump_json(dc:&RFindCtx) {
 	println("\tcode_map:[");
 //	for dc.sess.codemap.files.iter().advance |f| {
 	for f in dc.sess.codemap.files.iter() {
-		println("\t\t{ name:\""+f.name+"\",\tglobal_start_pos:"+f.start_pos.to_str()+
+		print("\t\t{ name:\""+f.name+"\",\tglobal_start_pos:"+f.start_pos.to_str()+
 			",\tlength:"+(f.src.len()).to_str()+
 			",\tnum_lines:"+f.lines.len().to_str()+
 			",\tlines:[\n"+ flatten_to_str(*f.lines, |&x|{*x-*f.start_pos} ,",") +
-			"\n\t\t]\n\t},");
+			"\n\t\t]\n\t},\n");
 	}
 	println("\t]");
 	println("\tnode_spans:");
-	let nim=build_node_info_map(dc.krate);
+	let nim=build_node_info_map(dc.crate);
 	let node_def_node = build_node_def_node_table(dc);
 	let jdm=build_jump_to_def_map(dc,nim,node_def_node);
 	println(nim.to_json_str(dc));
@@ -223,7 +215,7 @@ pub fn node_id_from_text_file_pos_str(dc:&RFindCtx, file_pos_str:&str)->Option<a
 }
 pub fn node_from_text_file_pos_str(dc:&RFindCtx, file_pos_str:&str)->Option<AstNode> {
 	match byte_pos_from_text_file_pos_str(dc,file_pos_str) {
-		Some(bp)=>{let ndt=find_node_tree_loc_at_byte_pos(dc.krate,bp);Some(ndt.last().clone())},
+		Some(bp)=>{let ndt=find_node_tree_loc_at_byte_pos(dc.crate,bp);Some(ndt.last().clone())},
 		None=>None
 	}
 }
@@ -232,7 +224,7 @@ pub fn node_from_text_file_pos_str(dc:&RFindCtx, file_pos_str:&str)->Option<AstN
 
 
 pub fn lookup_def_at_byte_pos(dc:&RFindCtx, bp:BytePos, m:ShowDefMode)->Option<~str> {
-	let ndt=find_node_tree_loc_at_byte_pos(dc.krate,bp);
+	let ndt=find_node_tree_loc_at_byte_pos(dc.crate,bp);
 	lookup_def_of_node_tree_loc(dc,&ndt,m)
 }
 
@@ -242,7 +234,7 @@ pub fn lookup_def_of_node_tree_loc(dc:&RFindCtx,node_tree_loc:&NodeTreeLoc,m:Sho
 
 pub fn lookup_def_of_node(dc:&RFindCtx,node:&AstNode,m:ShowDefMode)->Option<~str> {
 	println("def of node:"+node.get_id().unwrap_or(0).to_str());
-	let node_spans=build_node_info_map(dc.krate);
+	let node_spans=build_node_info_map(dc.crate);
 	let node_def_node = build_node_def_node_table(dc);
 	lookup_def_of_node_sub(dc,node,m,node_spans,node_def_node)
 }
@@ -252,9 +244,8 @@ pub fn lookup_def_of_node_sub(dc:&RFindCtx,node:&AstNode,m:ShowDefMode,nim:&FNod
 	// TODO - cache outside?
 
 
-
-	fn mk_result(dc:&RFindCtx,  m:ShowDefMode, nim:&FNodeInfoMap, def_node_id:ast::DefId, extra_str:&str)->Option<~str> {
-		if def_node_id.krate!=0 {
+	fn mk_result(dc:&RFindCtx,  m:ShowDefMode, nim:&FNodeInfoMap, def_node_id:ast::DefId, _: &str)->Option<~str> {
+		if def_node_id.crate!=0 {
 			Some(~"{cross-crate-def not implemented, "+def_node_id.to_str()+"}")
 		}
 		else {
@@ -281,9 +272,9 @@ pub fn lookup_def_of_node_sub(dc:&RFindCtx,node:&AstNode,m:ShowDefMode,nim:&FNod
 	}
 }
 
-pub fn make_jdm(dc:&RFindCtx)->(@FNodeInfoMap, ~HashMap<ast::NodeId,ast::DefId>,~JumpToDefMap)
+pub fn make_jdm(dc:&RFindCtx)->(@mut FNodeInfoMap, ~HashMap<ast::NodeId,ast::DefId>,~JumpToDefMap)
 {
-    let nim=build_node_info_map(dc.krate);
+    let nim=build_node_info_map(dc.crate);
     let ndm=build_node_def_node_table(dc);
     let jdm=build_jump_to_def_map(dc,nim,ndm);
     (nim,ndm,jdm)

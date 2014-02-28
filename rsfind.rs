@@ -1,6 +1,6 @@
-extern crate syntax;
-extern crate rustc;
-extern crate extra;
+extern mod syntax;
+extern mod rustc;
+extern mod extra;
 
 //pub static ctxtkey: local_data::Key<@DocContext> = &local_data::Key;
 
@@ -46,7 +46,7 @@ pub macro_rules! if_some {
 }
 
 
-#[deriving(Clone, Eq)]
+#[deriving(Clone, Eq, Encodable, Decodable)]
 pub enum ShowDefMode {
 	SDM_Line=0,
 	SDM_LineCol=1,
@@ -56,17 +56,17 @@ pub enum ShowDefMode {
 
 
 pub trait MyOption<T> {
-	fn for_some(&self, f:&|t:&T|);
-	fn do_some<R>(&self, f:&|t:&T|->R)->Option<R>;
+	fn for_some(&self, f: |&T|);
+	fn do_some<R>(&self, f: |&T| -> R) -> Option<R>;
 }
 impl<T> MyOption<T> for Option<T>{
-	fn for_some(&self, f:&|t:&T|) {
+	fn for_some(&self, f: |&T|) {
 		match self {
 			&None=>{},
 			&Some(ref t)=>f(t)
 		}
 	}
-	fn do_some<R>(&self, f:&|t:&T|->R)->Option<R> {
+	fn do_some<R>(&self, f: |&T| -> R)->Option<R> {
 		match self {
 			&None=>None,
 			&Some(ref t)=>Some(f(t))

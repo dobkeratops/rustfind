@@ -1,11 +1,9 @@
 #[macro_escape];
 
-pub use std;
-pub use std::io;
-pub use std::io::stdio;
-pub use std::io::{stdout, stdin,println,stdio};
+pub use std::io::{stdout, stdin};
 pub use std::libc::{fwrite, fread, fseek, fopen, ftell, fclose, FILE, c_void, c_char, SEEK_END,
 	SEEK_SET};
+pub use std::ptr::to_unsafe_ptr;
 pub use std::mem::size_of;	// for size_of
 pub use std::vec::from_elem;
 pub use std::num::Zero;
@@ -17,7 +15,7 @@ pub type Size_t=u64;	// todo - we're not sure this should be u64
 
 
 macro_rules! logi{
-	($($a:expr),*)=>(println!("{:?}",file!()+":"+line!().to_str()+": " $(+$a.to_str())* ))
+	($($a:expr),*)=>(println(file!()+":"+line!().to_str()+": " $(+$a.to_str())* ))
 }
 //macro_rules! dump{ ($a:expr)=>(logi!(fmt!("%s=%?",stringify!($a),$a).indent(2,160));)}
 fn newline_if_over(a:~str,l:uint)->~str{if a.len()>l {a+"\n"}else{a}}
@@ -34,7 +32,7 @@ macro_rules! dump{ ($($a:expr),*)=>
 
 macro_rules! trace{
 	()=>(
-		std::io::stdio::println(file!().to_str()+":"+line!().to_str()+": ");
+		println(file!().to_str()+":"+line!().to_str()+": ");
 	);
 }
 
@@ -56,8 +54,8 @@ pub fn promptInput(prompt:&str)->~str {
 	BufferedReader::new(stdin()).read_line().expect("read_line failure")
 }
 
-pub fn as_cvoid_ptr<T>(a:&T)->*c_void { a.as_void_ptr(a) as *c_void}
-pub fn as_mut_void_ptr<T>(a:&T)->*mut c_void { a.as_void_ptr() as *mut c_void}
+pub fn as_void_ptr<T>(a:&T)->*c_void { to_unsafe_ptr(a) as *c_void}
+pub fn as_mut_void_ptr<T>(a:&T)->*mut c_void { to_unsafe_ptr(a) as *mut c_void}
 
 // this doest work?
 pub trait VoidPtr {
@@ -65,8 +63,8 @@ pub trait VoidPtr {
 	fn as_mut_void_ptr(&self)->*mut c_void;
 }
 impl<T> VoidPtr for T {
-	fn as_void_ptr(&self)->*c_void { self.as_void_ptr() as *c_void}
-	fn as_mut_void_ptr(&self)->*mut c_void { self.as_void_ptr() as *mut c_void}
+	fn as_void_ptr(&self)->*c_void { to_unsafe_ptr(&self) as *c_void}
+	fn as_mut_void_ptr(&self)->*mut c_void { to_unsafe_ptr(self) as *mut c_void}
 }
 
 pub fn printStr<T:ToStr>(a:&T){println(a.to_str());}
@@ -93,12 +91,12 @@ pub fn fileLoadArray<T>(filename:&str)->~[T] {
 
 pub unsafe fn fileWrite<T>(fp:*FILE, array:&[T]) {
 	printStr(&sizeofArray(array));
-	fwrite(as_cvoid_ptr(&array[0]),sizeofArray(array),1,fp);
+	fwrite(as_void_ptr(&array[0]),sizeofArray(array),1,fp);
 }
 
 
 pub unsafe fn fileWriteStruct<T>(fp:*FILE, s:&T) {
-	fwrite(as_cvoid_ptr(s),size_of::<T>() as Size_t,1,fp);
+	fwrite(as_void_ptr(s),size_of::<T>() as Size_t,1,fp);
 }
 
 
@@ -143,7 +141,7 @@ pub fn fileLoad(filename:&str)->~[u8] {
 
 pub unsafe fn fileWriteRange<T>(fp:*FILE, array:&[T],start:uint,end:uint) {
 	printStr(&sizeofArray(array));
-	fwrite(as_cvoid_ptr(&array[start]),sizeofArrayElem(array)*(end-start) as Size_t,1,fp);
+	fwrite(as_void_ptr(&array[start]),sizeofArrayElem(array)*(end-start) as Size_t,1,fp);
 }
 
 pub fn sizeofArray<T>(a:&[T])->Size_t { (size_of::<T>() * a.len()) as Size_t }

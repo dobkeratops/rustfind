@@ -48,13 +48,13 @@ pub fn dump_methods_of_type(tycx:ty::ctxt, type_node_id:ast::NodeId) {
 */
 
 
-pub fn get_struct_def<'a,'b>(tc:&'a ty::ctxt, struct_node_id:ast::NodeId)->Option<(@ast::Item,@ast::StructDef,ast::Generics)> {
+pub fn get_struct_def<'a,'b>(tc:&'a ty::ctxt, struct_node_id:ast::NodeId)->Option<(@ast::item,@ast::struct_def,ast::Generics)> {
 	match tc.items.find(&struct_node_id) {
 		None=>{None},
 		Some(node)=>match *node {
-			ast_map::NodeItem(item, _)=>{
+			ast_map::node_item(item, _)=>{
 				match item.node {
-					ast::ItemStruct(sd, ref generics)=>Some((item, sd, generics.clone())),
+					ast::item_struct(sd, ref generics)=>Some((item, sd, generics.clone())),
 					_=>None
 				}
 			}
@@ -69,10 +69,7 @@ pub fn find_named_struct_field(tc:&ty::ctxt, struct_node_id:ast::NodeId, field_i
 		Some((_, sd, _))=>{
 			for f in sd.fields.iter() {
 				match f.node.kind {
-
-					ast::NamedField(ref ident,vis)=>if ident.name ==field_ident.name {return Some(ast::DefId{krate:0,node:f.node.id});},
-					// UnnamedField
-//					ast::named_field(ref ident, _)=>if ident.name ==field_ident.name {return Some(ast::DefId{crate:0,node:f.node.id});},
+					ast::named_field(ref ident, _)=>if ident.name ==field_ident.name {return Some(ast::DefId{crate:0,node:f.node.id});},
 					_=>return None
 				}
 			}

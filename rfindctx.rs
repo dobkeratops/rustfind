@@ -5,7 +5,7 @@ use syntax::codemap;
 use rustc::{driver, middle};
 
 pub struct RFindCtx {
-     krate: @ast::Crate,
+     crate: @ast::Crate,
      tycx: middle::ty::ctxt,
      sess: driver::session::Session,
      ca: driver::driver::CrateAnalysis

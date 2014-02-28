@@ -1,5 +1,4 @@
 use rf_common::*;
-use std::from_str::FromStr;
 use syntax::ast;
 use syntax::codemap;
 use rustc::middle::ty;
@@ -271,7 +270,7 @@ impl ToZIndexFilePos for codemap::BytePos {
 
 pub fn get_crate_name(tc: ty::ctxt, i: ast::CrateNum) -> ~str {
 	if i > 0 {
-		let cd = tc.cstore.get_crate_data( i);
+		let cd = cstore::get_crate_data(tc.cstore, i);
 		cd.name.to_owned()
 	} else {
 		~""
@@ -306,7 +305,7 @@ pub fn dump_cstore_info(tc: ty::ctxt) {
 //}
 
 	println("crate files");
-	let ucf = tc.cstore.get_used_crate_sources();
+	let ucf = cstore::get_used_crate_sources(tc.cstore);
 	for x in ucf.iter() {
 		dump!(x);
 	}
@@ -318,7 +317,7 @@ pub fn dump_cstore_info(tc: ty::ctxt) {
 	}
 */
 	println("crate metadata");
-	tc.cstore.iter_crate_data( |i,md| {
+	cstore::iter_crate_data(tc.cstore, |i,md| {
 		dump!(i, md.name, md.data.len(), md.cnum);
 	});
 }
