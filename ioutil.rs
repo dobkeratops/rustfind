@@ -1,6 +1,6 @@
 #[macro_escape];
 
-pub use std::io::{stdout, stdin};
+pub use std::io::{stdout, stdin,println};
 pub use std::libc::{fwrite, fread, fseek, fopen, ftell, fclose, FILE, c_void, c_char, SEEK_END,
 	SEEK_SET};
 pub use std::mem::size_of;	// for size_of
@@ -14,7 +14,7 @@ pub type Size_t=u64;	// todo - we're not sure this should be u64
 
 
 macro_rules! logi{
-	($($a:expr),*)=>(println(file!()+":"+line!().to_str()+": " $(+$a.to_str())* ))
+	($($a:expr),*)=>(std::io::println(file!()+":"+line!().to_str()+": " $(+$a.to_str())* ))
 }
 //macro_rules! dump{ ($a:expr)=>(logi!(fmt!("%s=%?",stringify!($a),$a).indent(2,160));)}
 fn newline_if_over(a:~str,l:uint)->~str{if a.len()>l {a+"\n"}else{a}}
@@ -31,7 +31,7 @@ macro_rules! dump{ ($($a:expr),*)=>
 
 macro_rules! trace{
 	()=>(
-		println(file!().to_str()+":"+line!().to_str()+": ");
+		std::io::println(file!().to_str()+":"+line!().to_str()+": ");
 	);
 }
 
@@ -90,12 +90,12 @@ pub fn fileLoadArray<T>(filename:&str)->~[T] {
 
 pub unsafe fn fileWrite<T>(fp:*FILE, array:&[T]) {
 	printStr(&sizeofArray(array));
-	fwrite(as_void_ptr(&array[0]),sizeofArray(array),1,fp);
+	fwrite(as_cvoid_ptr(&array[0]),sizeofArray(array),1,fp);
 }
 
 
 pub unsafe fn fileWriteStruct<T>(fp:*FILE, s:&T) {
-	fwrite(as_void_ptr(s),size_of::<T>() as Size_t,1,fp);
+	fwrite(as_cvoid_ptr(s),size_of::<T>() as Size_t,1,fp);
 }
 
 
@@ -140,7 +140,7 @@ pub fn fileLoad(filename:&str)->~[u8] {
 
 pub unsafe fn fileWriteRange<T>(fp:*FILE, array:&[T],start:uint,end:uint) {
 	printStr(&sizeofArray(array));
-	fwrite(as_void_ptr(&array[start]),sizeofArrayElem(array)*(end-start) as Size_t,1,fp);
+	fwrite(as_cvoid_ptr(&array[start]),sizeofArrayElem(array)*(end-start) as Size_t,1,fp);
 }
 
 pub fn sizeofArray<T>(a:&[T])->Size_t { (size_of::<T>() * a.len()) as Size_t }

@@ -3,7 +3,7 @@ use jumptodefmap::{dump_json,lookup_def_at_text_file_pos_str};
 use std::io;
 use std::io::buffered::BufferedReader;
 use rsfind::{SDM_Source};
-use std::io::println;
+use std::io::{println,print};
 /*
 interactive mode, also server for IDE integration with command interface
 */

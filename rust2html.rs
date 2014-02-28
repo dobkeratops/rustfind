@@ -2,7 +2,8 @@ use syntax::codemap;
 use syntax::ast;
 use rustc::middle::ty;
 use iou=ioutil;
-
+use collections::HashMap;
+use std::io::println;
 use std::vec;
 use codemaput::{ZIndexFilePos,ToZIndexFilePos};
 use find_ast_node::{FNodeInfoMap,FNodeInfo};
@@ -234,16 +235,16 @@ impl NodesPerLinePerFile {
 	}
 	fn dump(&self) {
 		for f in self.file.iter() {
-			print("file {");
+			println("file {");
 			for l in f.nodes_per_line.iter() {
-				print("line {" + l.len().to_str());
+				println("line {" + l.len().to_str());
 				for n in l.iter() {
-					print(n.to_str()+",");
+					println(n.to_str()+",");
 				}
-				print("");
-				print("line {");
+				println("");
+				println("line {");
 			}
-			print("}file");
+			println("}file");
 		}
 	}
 }
