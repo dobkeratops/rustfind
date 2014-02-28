@@ -2,7 +2,8 @@
 
 pub use std;
 pub use std::io;
-pub use std::io::{stdout, stdin,println};
+pub use std::io::stdio;
+pub use std::io::{stdout, stdin,println,stdio};
 pub use std::libc::{fwrite, fread, fseek, fopen, ftell, fclose, FILE, c_void, c_char, SEEK_END,
 	SEEK_SET};
 pub use std::mem::size_of;	// for size_of
@@ -16,7 +17,7 @@ pub type Size_t=u64;	// todo - we're not sure this should be u64
 
 
 macro_rules! logi{
-	($($a:expr),*)=>(std::io::println(file!()+":"+line!().to_str()+": " $(+$a.to_str())* ))
+	($($a:expr),*)=>(println(file!()+":"+line!().to_str()+": " $(+$a.to_str())* ))
 }
 //macro_rules! dump{ ($a:expr)=>(logi!(fmt!("%s=%?",stringify!($a),$a).indent(2,160));)}
 fn newline_if_over(a:~str,l:uint)->~str{if a.len()>l {a+"\n"}else{a}}
@@ -33,7 +34,7 @@ macro_rules! dump{ ($($a:expr),*)=>
 
 macro_rules! trace{
 	()=>(
-		std::io::println(file!().to_str()+":"+line!().to_str()+": ");
+		std::io::stdio::println(file!().to_str()+":"+line!().to_str()+": ");
 	);
 }
 

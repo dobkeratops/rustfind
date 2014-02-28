@@ -271,7 +271,7 @@ impl ToZIndexFilePos for codemap::BytePos {
 
 pub fn get_crate_name(tc: ty::ctxt, i: ast::CrateNum) -> ~str {
 	if i > 0 {
-		let cd = cstore::get_crate_data(tc.cstore, i);
+		let cd = tc.cstore.get_crate_data( i);
 		cd.name.to_owned()
 	} else {
 		~""
