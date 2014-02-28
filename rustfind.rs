@@ -209,7 +209,7 @@ fn get_ast_and_resolve(
     let sess = driver::driver::build_session_(sessopts, parsesess.cm,
                                                   @BlankEmitter as @syntax::diagnostic::Emitter,
                                                   span_diagnostic_handler);
-	let input=driver::driver::file_input(cpath.clone());
+	let input=driver::driver::FileInput(cpath.clone());
 	let cfg= driver::driver::build_configuration(sess); //was, @"", &input);
 
 	let crate1=driver::driver::phase_1_parse_input(sess,cfg.clone(),&input);

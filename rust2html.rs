@@ -671,7 +671,7 @@ pub struct MultiMap<K,V> {
 	items:~[~[V]],
 	empty:~[V]
 }
-impl<'s,K:IterBytes+Eq,V> MultiMap<K,V> {
+impl<'s,K:/*IterBytes+*/Eq,V> MultiMap<K,V> {
 	pub fn new()->MultiMap<K,V> {
 		MultiMap{ next_index:0, indices:HashMap::new(), items:~[], empty:~[] }
 	}
