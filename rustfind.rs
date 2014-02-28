@@ -106,10 +106,10 @@ fn main() {
     ];
 
 	let matches = getopts(args.tail(), opts).unwrap();
-    let libs1 = matches.opt_strs("L").map(|s| Path::init(s.as_slice()));
+    let libs1 = matches.opt_strs("L").map(|s| Path::new(s.as_slice()));
 	let libs=if libs1.len()>0 {libs1} else {
 		match (os::getenv(&"RUST_LIBS")) {
-			Some(x)=>~[ Path::init(x)],
+			Some(x)=>~[ Path::new(x)],
 			None=>~[]
 		}
 	};
@@ -133,7 +133,7 @@ fn main() {
 	if matches.free.len()>0 {
 		let mut done=false;
 		let filename=util::get_filename_only(matches.free[0]);
-		let dc = @get_ast_and_resolve(&Path::init(filename), libs);
+		let dc = @get_ast_and_resolve(&Path::new(filename), libs);
 		local_data::set(ctxtkey, dc);
 
 		if (matches.opt_present("d")) {
@@ -147,7 +147,7 @@ fn main() {
 		if (matches.opt_present("f")) {
 			while i<matches.free.len() {
 				let mode=if matches.opt_present("g"){SDM_GeditCmd} else {SDM_Source};
-				print(lookup_def_at_text_file_pos_str(dc,matches.free[i],mode).unwrap_or(~"no def found\n"));
+				io::print(lookup_def_at_text_file_pos_str(dc,matches.free[i],mode).unwrap_or(~"no def found\n"));
 				i+=1;
 				done=true;
 			}
@@ -157,17 +157,17 @@ fn main() {
 			done=true;
 		}
 		if matches.opt_present("r") {
-			println("Writing .rfx ast nodes/cross-crate-map:-");
+			io::println("Writing .rfx ast nodes/cross-crate-map:-");
 			write_source_as_html_and_rfx(dc,lib_html_path, rust2html::DefaultOptions,false);
-			println("Writing .rfx .. done");
+			io::println("Writing .rfx .. done");
 			done=true;
 		}
 
 		// Dump as html..
 		if matches.opt_present("w") || !(done) {
-			println("Creating HTML pages from source & .rfx:-");
+			io::println("Creating HTML pages from source & .rfx:-");
 			write_source_as_html_and_rfx(dc,lib_html_path, rust2html::DefaultOptions,true);
-			println("Creating HTML pages from source.. done");
+			io::println("Creating HTML pages from source.. done");
 		}
 	}
 }
@@ -177,7 +177,7 @@ fn main() {
 
 struct BlankEmitter;
 impl syntax::diagnostic::Emitter for BlankEmitter {
-	fn emit(&self, _: Option<(@codemap::CodeMap, codemap::Span)>, _: &str, _: syntax::diagnostic::level) {
+	fn emit(&self, _: Option<(@codemap::CodeMap, codemap::Span)>, _: &str, _: syntax::diagnostic::Level) {
 	}
 }
 
@@ -308,7 +308,7 @@ fn debug_test(dc:&RFindCtx) {
 pub fn write_source_as_html_and_rfx(dc:&RFindCtx,lib_html_path:&str,opts:uint, write_html:bool) {
 
 	let mut xcm:~CrossCrateMap=~HashMap::new();
-	cstore::iter_crate_data(dc.tycx.cstore, |i,md| {
+	dc.tycx.cstore.iter_crate_data(|i,md| {
 //		dump!(i, md.name,md.data.len(),md.cnum);
 		println("loading cross crate data "+i.to_str()+" "+md.name);
 		let xcm_sub=crosscratemap::read_cross_crate_map(dc, i as int, md.name+&".rfx",lib_html_path);

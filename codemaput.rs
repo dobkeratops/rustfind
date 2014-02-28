@@ -1,4 +1,5 @@
 use rf_common::*;
+use std::from_str::FromStr;
 use syntax::ast;
 use syntax::codemap;
 use rustc::middle::ty;
@@ -305,7 +306,7 @@ pub fn dump_cstore_info(tc: ty::ctxt) {
 //}
 
 	println("crate files");
-	let ucf = cstore::get_used_crate_sources(tc.cstore);
+	let ucf = tc.cstore.get_used_crate_sources();
 	for x in ucf.iter() {
 		dump!(x);
 	}
@@ -317,7 +318,7 @@ pub fn dump_cstore_info(tc: ty::ctxt) {
 	}
 */
 	println("crate metadata");
-	cstore::iter_crate_data(tc.cstore, |i,md| {
+	tc.cstore.iter_crate_data( |i,md| {
 		dump!(i, md.name, md.data.len(), md.cnum);
 	});
 }

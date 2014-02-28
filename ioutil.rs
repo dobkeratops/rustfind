@@ -1,5 +1,7 @@
 #[macro_escape];
 
+pub use std;
+pub use std::io;
 pub use std::io::{stdout, stdin,println};
 pub use std::libc::{fwrite, fread, fseek, fopen, ftell, fclose, FILE, c_void, c_char, SEEK_END,
 	SEEK_SET};

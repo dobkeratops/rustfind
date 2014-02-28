@@ -115,7 +115,7 @@ pub fn write_cross_crate_map(dc:&RFindCtx, _:&str,nim:&FNodeInfoMap, _:&HashMap<
 
 	for (k,v) in jdm.iter()  {
 		let cname:~str= if v.crate>0 {
-			cstore::get_crate_data(dc.tycx.cstore,v.crate).name.to_str()
+			dc.tycx.cstore.get_crate_data(v.crate).name.to_str()
 		} else {
 			curr_crate_name_only.to_str()
 		};

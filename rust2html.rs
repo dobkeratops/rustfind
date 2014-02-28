@@ -716,7 +716,7 @@ pub struct Extents<T> {
 	lo:T, hi:T
 }
 
-impl<T:Orderable+Clone> Extents<T> {
+impl<T:Ord+Clone> Extents<T> {
 	pub fn new(lo:&T,hi:&T)->Extents<T> { Extents{lo:lo.clone(),hi:hi.clone()} }
 	pub fn new_from_value(v:&T)->Extents<T>{ Extents {lo:v.clone(),hi:v.clone()} }
 	pub fn contains(&self, other:&Extents<T>)->bool {
