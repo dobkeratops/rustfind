@@ -1,4 +1,4 @@
-
+use std::vec_ng::Vec;
 
 
 pub fn text_line_pos_to_offset(text: &[u8], (line, ofs_in_line): (u32, u32))->Option<u32> {
@@ -60,4 +60,26 @@ pub fn flatten_to_str<T,U:ToStr>(xs:&[T],f: |&T| -> U, sep:&str)->~str {
 		i+=1;
 	}
 	acc
+}
+
+pub fn flatten_to_str_ng<T, U:ToStr>(xs: &Vec<T>, f: |&T| -> U, sep: &str) -> ~str {
+    use std::str::with_capacity;
+
+    if xs.is_empty() { return ~""; }
+
+    // this calculation is not right, but not sure what the best approximation is
+    // code taken originally from StrVector code for collect()
+    let len = sep.len() * (xs.len() - 1);
+    let mut result = with_capacity(len);
+    let mut first = true;
+
+    for s in xs.iter() {
+        if first {
+            first = false;
+        } else {
+            result.push_str(sep);
+        }
+        result.push_str(f(s).to_str());
+    }
+    result
 }

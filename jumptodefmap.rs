@@ -11,7 +11,7 @@ use find_ast_node::{FNodeInfoMap, FNodeInfo, AstNode, NodeTreeLoc, find_node_tre
 use rfindctx::{RFindCtx,get_source_loc};
 use codemaput::ZTextFilePos;
 use rf_ast_ut::{auto_deref_ty, find_named_struct_field};
-use util::flatten_to_str; //todo - why is qualifying manually not working?!
+use util::flatten_to_str_ng; //todo - why is qualifying manually not working?!
 use timer::Timer;
 //use super::rf_use_ast;
 
@@ -159,7 +159,7 @@ pub fn dump_json(dc:&RFindCtx) {
         print!("\tglobal_start_pos:{},", f.start_pos.to_uint().to_str());
         print!("\tlength:{},", (f.src.len()).to_str());
 		print!("\tnum_lines:{},", lines.len().to_str());
-		print!("\tlines:[\n{},", flatten_to_str(*lines, |&x|{(x-f.start_pos).to_uint()} ,","));
+		print!("\tlines:[\n{},", flatten_to_str_ng(lines, |&x|{(x-f.start_pos).to_uint()} ,","));
 	    print!("\n\t\t]\n\t\\},\n");
 	}
 	println("\t]");
