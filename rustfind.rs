@@ -198,7 +198,7 @@ fn get_ast_and_resolve(
 // 	let quiet = true;
 
 
-    let diagnostic_handler = syntax::diagnostic::mk_handler();
+    let diagnostic_handler = syntax::diagnostic::default_handler(); // TODO add back the blank emitter here ...
     let span_diagnostic_handler =
         syntax::diagnostic::mk_span_handler(diagnostic_handler, parsesess.cm);
 

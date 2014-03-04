@@ -14,6 +14,7 @@ use crosscratemap::{CrossCrateMap};
 use jumptodefmap::{JumpToDefMap};
 use rsfind::MyOption;
 //use self::htmlwriter::HtmlWriter;
+
 mod htmlwriter;
 
 
@@ -80,12 +81,16 @@ pub fn make_html(dc:&RFindCtx, fm:&codemap::FileMap,nmaps:&NodeMaps,xcm:&CrossCr
 			// todo: line numbers want to go in a seperate column so they're unselectable..
 			scw.doc.write_tagged("ln",pad_to_length((line+1).to_str(),max_digits," "));
 			scw.doc.begin_tag_anchor((line+1).to_str());
-			let lend=if line<(fm.lines.get().len()-1){(fm.lines.get()[line+1]-fstart).to_uint()}else{fm.src.len()};
+			let lend = if line < (fm.lines.get().len()-1) {
+                (fm.lines.get().get(line+1) - fstart).to_uint()
+            } else {
+                fm.src.len()
+            };
 			scw.doc.write(" ");
-			let line_str=fm.src.slice((fm.lines.get()[line]-fstart).to_uint(),lend);
+			let line_str = fm.src.slice((fm.lines.get().get(line) - fstart).to_uint(), lend);
 			//doc.writeln(line_str);
 			scw.doc.end_tag();
-			for nl in fln.def_nodes_per_line[line].iter() {
+			for nl in fln.def_nodes_per_line.get(line).iter() {
 				scw.doc.begin_tag_anchor("n"+nl.to_str());
 			}
 			scw.doc.write(" "); // TODO, It should be ok to nest these surely.
@@ -179,7 +184,7 @@ fn pad_to_length(a:&str,l:uint,pad:&str)->~str {
 	acc
 }
 
-struct FileLineNodes {
+pub struct FileLineNodes {
 	nodes_per_line:~[~[ast::NodeId]],
 	def_nodes_per_line:~[~[ast::NodeId]]
 }
@@ -194,7 +199,9 @@ pub fn get_file_index(dc:&RFindCtx,fname:&str)->Option<uint> {
     let files = dc.sess.codemap.files.borrow();
     let files = files.get();
 	while index<files.len() {
-		if fname==files[index].name  { return Some(index);}
+		if fname == files.get(index).name {
+            return Some(index);
+        }
 		index+=1;
 	}
 	None
@@ -357,7 +364,7 @@ fn sub_match(line:&str,x:uint,opts:&[&str])->Option<(uint,uint)>{
 	return None;
 }
 
-struct NodeMaps<'a>  {
+pub struct NodeMaps<'a>  {
 	nim:&'a FNodeInfoMap,
 	jdm:&'a JumpToDefMap,
 	jrm:&'a JumpToRefMap
@@ -619,7 +626,7 @@ fn resolve_link(link:i64, dc:&RFindCtx,fm:&codemap::FileMap,lib_path:&str, nmaps
 						Some(ifp)=>{
                             let files = dc.sess.codemap.files.borrow();
                             let files = files.get();
-                            make_html_name_rel(files[ifp.file_index].name,fm.name) +
+                            make_html_name_rel(files.get(ifp.file_index as uint).name, fm.name) +
                                 "#" + (ifp.line + 1).to_str()
                         },
 						None=>~"c="+def_crate.to_str()+" n="+def_node.to_str()
@@ -709,7 +716,7 @@ impl<'a,K:Hash+Eq,V> MultiMap<K,V> {
 	}
 }
 
-type JumpToRefMap = MultiMap<ast::NodeId, ast::NodeId>;
+pub type JumpToRefMap = MultiMap<ast::NodeId, ast::NodeId>;
 
 // TODO: find nodes of enclosing context.
 // 'this function, called from these locations'
@@ -720,10 +727,14 @@ fn get_source_line(fm:&codemap::FileMap, i: u32) -> ~str {
 
     let lines = fm.lines.borrow();
     let lines = lines.get();
-	let le=if (i as uint) < (lines.len()-1) { lines[i+1].to_uint() } else {fm.src.len() as uint + fm.start_pos.to_uint()};
+	let le = if (i as uint) < (lines.len() - 1) {
+        lines.get(i as uint + 1).to_uint()
+    } else {
+        (fm.src.len() as uint) + fm.start_pos.to_uint()
+    };
 //	dump!(fm.lines[i-1],*fm.start_pos, fm.lines[i-1]-le);
 	if i > 0 {
-		fm.src.slice( (lines[i]-fm.start_pos).to_uint(), (le - fm.start_pos.to_uint()) as uint).to_owned()
+		fm.src.slice((lines.get(i as uint) - fm.start_pos).to_uint(), (le - fm.start_pos.to_uint()) as uint).to_owned()
 	} else {
 		~""
 	}
@@ -913,12 +924,12 @@ fn write_references(doc:&mut htmlwriter::HtmlWriter,dc:&RFindCtx, fm:&codemap::F
 						}
                         let files = dc.sess.codemap.files.borrow();
                         let files = files.get();
-						let rfm=&files[ref_ifp.file_index];
-						doc.begin_tag_link( make_html_name_rel(rfm.name,fm.name)+"#"+(ref_ifp.line+1).to_str());
+						let rfm = &files.get(ref_ifp.file_index as uint);
+						doc.begin_tag_link(make_html_name_rel(rfm.name, fm.name) + "#" + (ref_ifp.line + 1).to_str());
 
 						if  links_written<max_links {
 							doc.write_tagged("c40",(ref_ifp.line+1).to_str()+&": ");
-							doc.writeln(get_source_line(files[ref_ifp.file_index],ref_ifp.line));
+							doc.writeln(get_source_line(**rfm, ref_ifp.line));
 							newline=true;
 							links_written+=1;
 						} else {
@@ -955,7 +966,7 @@ impl htmlwriter::HtmlWriter{
 				self.begin_tag_anchor((ifp.line+1).to_str()+"_"+ifp.col.to_str() + "_refs" );
 				self.begin_tag_link( "#"+(ifp.line+1).to_str());
 				self.begin_tag("c40");
-				self.writeln(dc.sess.codemap.files.borrow().get()[ifp.file_index].name+":"+(ifp.line+1).to_str()+":"+ifp.col.to_str()
+				self.writeln(dc.sess.codemap.files.borrow().get().get(ifp.file_index as uint).name + ":" + (ifp.line + 1).to_str() + ":" + ifp.col.to_str()
 							+"-"+(ifpe.line+1).to_str()+":"+ifpe.col.to_str() +" -" +info.kind + "- definition:");
        			self.end_tag();
 				self.begin_tag("pr");
@@ -972,7 +983,7 @@ impl htmlwriter::HtmlWriter{
 	fn write_file_ref(&mut self, dc:&RFindCtx,origin_fm:&codemap::FileMap, fi:uint) {
 		let fname = dc.tycx.sess.codemap.files.borrow();
         let fname = fname.get();
-        let fname = fname[fi].name.as_slice();
+        let fname = fname.get(fi).name.as_slice();
 		self
             .begin_tag_link( make_html_name_rel(fname,origin_fm.name));
 		self

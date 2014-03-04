@@ -88,7 +88,7 @@ pub fn read_cross_crate_map(_:&RFindCtx, crate_num:int, crate_name:&str,lib_path
 pub fn write_cross_crate_map(dc:&RFindCtx, _:&str,nim:&FNodeInfoMap, _:&HashMap<ast::NodeId, ast::DefId>, jdm:&JumpToDefMap) {
     // write inter-crate node map
     let crate_rel_path_name= dc.sess.codemap.files.borrow();
-    let crate_rel_path_name = Path::new(crate_rel_path_name.get()[0].name.as_slice());
+    let crate_rel_path_name = Path::new(crate_rel_path_name.get().get(0).name.as_slice());
     let new_format:bool=true;
 
     let curr_crate_name_only = crate_rel_path_name.filestem_str().unwrap_or("");

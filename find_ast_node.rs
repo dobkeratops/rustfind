@@ -587,7 +587,7 @@ fn expr_get_ident(_ :&ast::Expr)->Option<ast::Ident> {
 
 
 #[deriving(Clone)]
-struct FindAstNodeSt {
+pub struct FindAstNodeSt {
 	result: NodeTreeLoc,		// todo - full tree path, all the parent nodes.
 	location: u32,
 	stop: bool,

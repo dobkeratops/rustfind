@@ -73,16 +73,16 @@ impl ToZTextFilePos for codemap::BytePos {
 
 		while i > 0 {
 			i -= 1;
-			let fm = &files[i];
+			let fm = &files.get(i);
 			if fm.start_pos <= self {
                 let lines = fm.lines.borrow();
                 let lines = lines.get();
 				let mut line = lines.len() as u32;
 				while line > 0 {
 					line -= 1;
-					let line_start = lines[line];
-					if line_start <= self {
-						return Some(ZTextFilePos::new(fm.name.to_owned(), line, (self-line_start).to_uint() as u32))
+					let line_start = lines.get(line as uint);
+					if line_start <= &self {
+						return Some(ZTextFilePos::new(fm.name.to_owned(), line, (self-*line_start).to_uint() as u32))
 					}
 				}
 			}
@@ -126,7 +126,7 @@ impl ZTextFilePos {
 		let mut i = files.len();
 		while i > 0 {	// caution, need loop because we return, wait for new foreach ..in..
 			i -= 1;
-			let fm = &files[i];
+			let fm = &files.get(i);
 			let filemap_filename: &str = fm.name;
 			if filemap_filename == self.name {
                 let lines = fm.lines.borrow();
@@ -134,7 +134,7 @@ impl ZTextFilePos {
 				if self.line as uint >= lines.len() {
 					return None;
 				}
-				return Some(codemap::BytePos(lines[self.line].to_uint() as u32 + self.col));
+				return Some(codemap::BytePos(lines.get(self.line as uint).to_uint() as u32 + self.col));
 			}
 		}
 		return None;
@@ -262,17 +262,17 @@ impl ToZIndexFilePos for codemap::BytePos {
 		while i > 0 {
 				// caution, need loop because we return, wait for new foreach ..in..
 			i -= 1;
-			let fm = &files[i];
+			let fm = &files.get(i as uint);
 			if *self >= fm.start_pos && self.to_uint() < fm.start_pos.to_uint() + fm.src.len() {
                 let lines = fm.lines.borrow();
                 let lines = lines.get();
 				let mut line = lines.len() as u32;
 				while line > 0 {
 					line -= 1;
-					let lstart = lines[line];
-					if lstart < *self {
+					let lstart = lines.get(line as uint);
+					if lstart < self {
 						return Some(
-							ZIndexFilePos{ file_index: i, line: line, col: (*self - lstart).to_uint() as u32});
+							ZIndexFilePos{ file_index: i, line: line, col: (*self - *lstart).to_uint() as u32});
 					}
 				}
 			}

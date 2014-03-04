@@ -17,7 +17,7 @@ pub static ctxtkey: local_data::Key<@RFindCtx> = &local_data::Key;
 pub fn first_file_name(dc:&RFindCtx)->~str {
     let files = dc.tycx.sess.codemap.files.borrow();
     let files = files.get();
-	files[0].name.to_str() // clone?
+	files.get(0).name.to_str() // clone?
 }
 
 pub fn find_file_name_in(dc:&RFindCtx,fname:&str)->Option<~str> {
