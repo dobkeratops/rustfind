@@ -19,6 +19,8 @@ use std::cell::RefCell;
 use collections::{HashMap,HashSet};
 use std::path::Path;
 
+use getopts::{optmulti, optopt, optflag, getopts};
+
 use syntax::{parse,ast,codemap};
 use syntax::codemap::Pos;
 use find_ast_node::{safe_node_id_to_type,get_node_info_str,find_node_tree_loc_at_byte_pos,ToJsonStr,ToJsonStrFc,AstNodeAccessors,get_node_source};
@@ -78,30 +80,38 @@ pub macro_rules! if_some {
     );
 }
 
-fn main() {
-
-    use getopts::*;
-
-    //test_default_arg(1,(2,3));
-    //test_default_arg(1);
-
-    let args = os::args();
-
-    let opts = ~[
+fn optgroups () -> ~[getopts::OptGroup] {
+    ~[
         optmulti("L", "", "Path to search for libraries", "<lib path>"),
-        optflag("d", "", "Debug for this tool"),
-        optflag("r", "", "Dump .rfx `crosscratemap` containing ast nods and jump definitions"),
-        optflag("j", "", "Dump json map of the ast nodes & definitions"),
-        optflag("h", "help", "Print this help menu"),
+        optflag("d", "", "Debug for this tool (DEBUG)"),
+        optflag("r", "", "Dump .rfx `crosscratemap` containing ast nodes and jump definitions"),
+        optflag("j", "", "Dump json map of the ast nodes & definitions (DEBUG)"),
+        optflag("h", "help", "Print this help menu and exit"),
         optflag("i", "", "Run interactive server"),
         optflag("g", "", "Format output as gedit `filepos +line filename` (use with -f)"),
         optflag("w", "", "Dump as html"),
         optflag("f", "", "Return definition reference of symbol at given position"),
-        optopt("x", "", "Where to look for html of external crates", "RUST_SRC"),
-        optopt("o", "output-dir", "Directory to output the html / rfx files to", "OUTDIR")
-    ];
+        optopt("x", "", "Path to html of external crates", "RUST_SRC"),
+        optopt("o", "", "Directory to output the html / rfx files to", "OUTDIR")
+    ]
+}
 
-    let matches = getopts(args.tail(), opts).unwrap();
+fn usage(binary: &str) {
+    let message = format!("Usage: {} [OPTIONS] INPUT", binary);
+    println!("{}", getopts::usage(message, optgroups()));
+
+    println!(" cratename.rs anotherfile.rs:line:col:");
+    println!("    - load cratename.rs; look for definition at anotherfile.rs:line:col");
+    println!("    - where anotherfile.rs is assumed to be a module of the crate");
+    println!(" Set RUST_LIBS for a default library search path");
+}
+
+fn main() {
+    let mut args = os::args();
+    let binary = args.shift().unwrap();
+
+    let opts = optgroups();
+	let matches = getopts(args, opts).unwrap();
     let libs1 = matches.opt_strs("L").map(|s| Path::new(s.as_slice()));
     let libs= if libs1.len() > 0 {
         libs1
@@ -112,23 +122,9 @@ fn main() {
         }
     };
 
-    if matches.opt_present("h") {
-        println!(" filename.rs [-L<lib path>] : create linked html pages for sources in crate");
-        println!(" -r filename.rs [-L<library path>]  : dump .rfx 'crosscratemap'  containing ast nodes and jump definitions");
-        println!(" -x where to look for html of external crates -  :eg rustfind filename mysource.rs -x ~/rust/src\n");
-        println!(" -o OUTDIR - Director to output the html / rfx files to");
-        println!(" cratename.rs anotherfile.rs:line:col:");
-        println!("    - load cratename.rs; look for definition at anotherfile.rs:line:col");
-        println!("    - where anotherfile.rs is assumed to be a module of the crate");
-        println!(" -f filename.rs:line:col : return definition reference of symbol at given position");
-        println!(" -i filename.rs [-L<lib path>] : interactive mode");
-        println!(" -g format output as gedit filepos +line filename");
-        println!(" debug opts:-\n");
-        println!(" -j filename.rs [-L<library path>]  : dump JSON map of the ast nodes & defintions");
-        println!(" -d filename.rs [-L<lib path>] : debug for this tool");
-        println!(" set RUST_LIBS for a default library search path");
-
-        //println!("{}", getopts::usage("Summary of available options:", opts));
+    if matches.opt_present("h") || matches.opt_present("help") {
+        usage(binary);
+        return;
     };
     if matches.free.len()>0 {
         let mut done=false;
@@ -177,6 +173,9 @@ fn main() {
             write_source_as_html_and_rfx(dc,lib_html_path, &html_options, true);
             println!("Creating HTML pages from source.. done");
         }
+	} else {
+        usage(binary);
+        return;
     }
 }
 
@@ -311,4 +310,5 @@ pub fn write_source_as_html_and_rfx(dc:&RFindCtx,lib_html_path:&str,opts: &rust2
         rust2html::write_source_as_html_sub(dc,&info_map,jump_map,xcm,lib_html_path,opts);
     }
 }
+
 
