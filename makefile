@@ -2,7 +2,7 @@ RF_LIBS= -L $(RUST_PATH)/x86_64-unknown-linux-gnu/stage2/lib/rustlib/x86_64-unkn
 RF_OPTS= $(RF_LIBS) -o html/
 SRC=$(wildcard *.rs)
 RUSTFIND=$(shell pwd)/rustfind
-RUSTSRC=$(RUST_PATH)/src
+RUSTSRC=$(RUST_PATH)/src/
 RUSTFLAGS = --opt-level=3 -A non-camel-case-types
 
 # generate HTML browser for the main sourcetree
@@ -47,7 +47,12 @@ include $(RUST_PATH)/mk/crates.mk
 define RUST_TARGET_LIB
 rust_lib$(1): rustfind rust_lib_pre $$(patsubst %,rust_lib%,$$(filter-out native:%,$$(DEPS_$(1))))
 	@echo "Generating HTML for lib$(1)"
-	@cd $(RUSTSRC); $(RUSTFIND) lib$(1)/lib.rs $(RF_OPTS)
+	@export CFG_VERSION=0; export CFG_PREFIX=0;export CFG_RUSTLIBDIR=0;export CF_COMPILER=0;export CG_LIBDIR_RELATIVE=0; \
+		$(RUSTFIND) $(RUSTSRC)/lib$(1)/lib.rs $(RF_LIBS) -o $(RUSTSRC)/html -x $(RUSTSRC)
+rust_lib$(1)_nodeps: rustfind rust_lib_pre
+	@echo "Generating HTML for lib$(1)"
+	@export CFG_VERSION=0; export CFG_PREFIX=0;export CFG_RUSTLIBDIR=0;export CF_COMPILER=0;export CG_LIBDIR_RELATIVE=0; \
+		$(RUSTFIND) $(RUSTSRC)/lib$(1)/lib.rs $(RF_LIBS) -o $(RUSTSRC)/html -x $(RUSTSRC)
 endef
 
 $(foreach crate,$(CRATES),$(eval $(call RUST_TARGET_LIB,$(crate))))
@@ -59,7 +64,6 @@ rust_lib_pre:
 	@echo "= Generating HTML for main rust sourcetree                       ="
 	@echo "= Be patient, sorry this is unoptimized and will take a few mins ="
 	@echo "=================================================================="
-	@export CFG_VERSION=0; export CFG_PREFIX=0;export CFG_RUSTLIBDIR=0;export CF_COMPILER=0;export CG_LIBDiR_RELATIVE=0;
 
 rust_libstd_old: rustfind
 	#firefox $(RUSTSRC)/libstd/iterator.rs.html

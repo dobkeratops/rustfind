@@ -1,5 +1,7 @@
 #[macro_escape];
 
+use std::io::{File, UserDir};
+use std::io::fs::{mkdir_recursive,copy,walk_dir};
 use std::cast;
 pub use std::io::{stdout, stdin};
 pub use std::libc::{fwrite, fread, fseek, fopen, ftell, fclose, FILE, c_void, c_char, SEEK_END,
@@ -7,7 +9,7 @@ pub use std::libc::{fwrite, fread, fseek, fopen, ftell, fclose, FILE, c_void, c_
 pub use std::mem::size_of;  // for size_of
 pub use std::vec::from_elem;
 pub use std::num::Zero;
-use std::io::{BufferedReader, IoResult, File};
+use std::io::{BufferedReader, IoResult};
 
 pub type Size_t=u64;    // todo - we're not sure this should be u64
                         // as the libc stuff seems to want.
@@ -182,9 +184,6 @@ pub fn fileSaveArray<T>(buffer:&[T],filename:&str) {
 
 
 pub fn fileSaveStr(text:&str, file_path: &Path) {
-    use std::io::{File, UserDir};
-    use std::io::fs::mkdir_recursive;
-
     let res = mkdir_recursive(&file_path.dir_path(), UserDir).and_then(|()| {
         let mut file = File::create(file_path);
         file.write_str(text)
@@ -195,6 +194,41 @@ pub fn fileSaveStr(text:&str, file_path: &Path) {
     };
 }
 
+pub fn copy_folder(source_dir: &Path, dest_dir: &Path) {
+    let directories = walk_dir(source_dir);
+    let res = match directories {
+        Ok(mut directories) => {
+            let mut result = Ok(());
+            for file in directories {
+                let mut dest_path = Path::new(dest_dir);
+                for c in file.components().skip(1) {
+                    dest_path.push(c);
+                }
+                let res = if file.is_dir () {
+                    mkdir_recursive(&dest_path, UserDir)
+                } else {
+                    copy(&file, &dest_path)
+                };
+                match res {
+                    Err(e) => {
+                        result =  Err(e);
+                        break;
+                    },
+                    _ => ()
+                }
+            };
+            result
+        },
+        Err(e) => {
+            println!("Unable to copy directory `{}`: {}", source_dir.display(), e);
+            return;
+        }
+    };
+    match res {
+        Err(e) => println!("Error while copying: {}", e),
+        _ => ()
+    }
+}
 
 pub trait ResultUtil<T> {
     fn expect(self, error_message: &'static str) -> T;

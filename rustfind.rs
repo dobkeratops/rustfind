@@ -139,7 +139,11 @@ fn main() {
             dump_json(dc);
         }
         let mut i=0;
-        let lib_html_path=if matches.opt_present("x"){ matches.opt_str("x").unwrap()} else {~""};
+        let lib_html_path = if matches.opt_present("x") {
+            matches.opt_str("x").unwrap() + "/"
+        } else {
+            ~""
+        };
         if matches.opt_present("f") {
             while i<matches.free.len() {
                 let mode=if matches.opt_present("g"){SDM_GeditCmd} else {SDM_Source};
@@ -156,9 +160,8 @@ fn main() {
         if matches.opt_present("o") {
             let out_dir = matches.opt_str("o").unwrap();
             let mut out_path = Path::new("./");
-            out_path.push(out_dir);
+            out_path.push(out_dir + "/");
             html_options.output_dir = out_path;
-            println!("Outputting to `{}`", html_options.output_dir.display());
         }
         if matches.opt_present("r") {
             println!("Writing .rfx ast nodes/cross-crate-map:-");
@@ -300,7 +303,7 @@ pub fn write_source_as_html_and_rfx(dc:&RFindCtx,lib_html_path:&str,opts: &rust2
     dc.tycx.cstore.iter_crate_data(|i,md| {
 //      dump!(i, md.name,md.data.len(),md.cnum);
         println!("loading cross crate data {} {}", i, md.name);
-        let xcm_sub=crosscratemap::read_cross_crate_map(dc, i as int, "lib"+md.name+&"/lib.rfx",lib_html_path);
+        let xcm_sub=crosscratemap::read_cross_crate_map(dc, i as int, lib_html_path + "lib"+md.name+&"/lib.rfx",lib_html_path);
         for (k,v) in xcm_sub.iter() {xcm.insert(*k,(*v).clone());}
     });
 
