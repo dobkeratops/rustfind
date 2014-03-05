@@ -8,7 +8,7 @@ RUSTFLAGS = --opt-level=3 -A non-camel-case-types
 # generate HTML browser for the main sourcetree
 html: rustfind
 	@echo "(set \$$RUST_PATH=<rust tree> & do 'make rustsrc' to generate html for rust stdlibs/compiler)"
-	@echo "generting HTML view of this sourcetree .."
+	@echo "generating HTML view of this sourcetree .."
 	./rustfind rustfind.rs $(RF_LIBS) -x $(RUSTSRC) -o html/
 
 test_dump: rustfind
@@ -42,37 +42,29 @@ tags:
 	ctags -e -f TAGS.emacs --options=$(RUSTSRC)/etc/ctags.rust -R .
 
 # Make the HTML view of the main rust sourcetree
-rust_src: rust_libextra rust_libsyntax rust_librustc
-	@echo "generating HTML for main rust sourcetree "
-	@echo "be patient, sorry this is unoptimized and will take a few mins"
+include $(RUST_PATH)/mk/crates.mk
 
-rust_libstd: rustfind
-	@echo "Generating HTML for rust libstd"
-	@echo "Please be patient, this could take quite a long time"
-	cd $(RUSTSRC);pwd; $(RUSTFIND) libstd/lib.rs $(RF_OPTS)
+define RUST_TARGET_LIB
+rust_lib$(1): rustfind rust_lib_pre $$(patsubst %,rust_lib%,$$(filter-out native:%,$$(DEPS_$(1))))
+	@echo "Generating HTML for lib$(1)"
+	@cd $(RUSTSRC); $(RUSTFIND) lib$(1)/lib.rs $(RF_OPTS)
+endef
+
+$(foreach crate,$(CRATES),$(eval $(call RUST_TARGET_LIB,$(crate))))
+
+rust_src: rustfind rust_lib_pre $(patsubst %,rust_lib%,$(filter-out native:%,$(CRATES)))
+	
+rust_lib_pre:
+	@echo "=================================================================="
+	@echo "= Generating HTML for main rust sourcetree                       ="
+	@echo "= Be patient, sorry this is unoptimized and will take a few mins ="
+	@echo "=================================================================="
+	@export CFG_VERSION=0; export CFG_PREFIX=0;export CFG_RUSTLIBDIR=0;export CF_COMPILER=0;export CG_LIBDiR_RELATIVE=0;
+
+rust_libstd_old: rustfind
 	#firefox $(RUSTSRC)/libstd/iterator.rs.html
 	#todo - make rustfind copy this! or at least make a decent copy script. or make the html ref same.
 	#?? find /some/tree -type d -exec echo cp /your/file '{}'/ \;
-
-rust_libextra: rustfind
-	@echo "Generating HTML for rust libextra"
-	@echo "Please be patient, this could take quite a long time"
-	cd $(RUSTSRC);pwd; $(RUSTFIND) libextra/lib.rs $(RF_OPTS)
-
-rust_libsyntax: rustfind
-	@echo "Generating HTML for rust libsyntax"
-	@echo "Please be patient, this could take quite a long time"
-	cd $(RUSTSRC);pwd; $(RUSTFIND) libsyntax/lib.rs $(RF_OPTS)
-
-rust_librustc: rustfind
-	@echo "Generating HTML for rust librustc"
-	@echo "Please be patient, this could take quite a long time"
-	export CFG_VERSION=0;export CFG_PREFIX=0;export CFG_RUSTLIBDIR=0;export CFG_COMPILER=0;export CFG_LIBDIR_RELATIVE=0;cd $(RUSTSRC);pwd; $(RUSTFIND) librustc/lib.rs $(RF_OPTS)
-
-rust_libcollections: rustfind
-	@echo "Generating HTML for rust libcollections"
-	@echo "Please be patient, this could take quite a long time"
-	cd $(RUSTSRC);pwd; $(RUSTFIND) libcollections/lib.rs $(RF_OPTS)
 
 copy:
 	cp sourcestyle.css $(RUSTSRC)/libstd
