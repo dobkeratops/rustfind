@@ -50,11 +50,13 @@ impl Options {
 
 
 //nim:&FNodeInfoMap,jdm:&JumpToDefMap, jrm:&JumpToRefMap
-pub fn make_html(dc:&RFindCtx, fm:&codemap::FileMap,nmaps:&NodeMaps,xcm:&CrossCrateMap, fln:&FileLineNodes, lib_path:&str, options: &Options)->~str {
+pub fn make_html(dc: &RFindCtx, fm: &codemap::FileMap, nmaps: &NodeMaps,
+                 xcm: &CrossCrateMap, fln: &FileLineNodes, lib_path: &str, 
+                 out_file: &Path, options: &Options) -> ~str {
     // todo - Rust2HtmlCtx { fm,nim,jdm,jrm } .. cleanup common intermediates
 
     let mut doc= htmlwriter::HtmlWriter::new();
-    write_head(&mut doc);
+    write_head(&mut doc, out_file, options);
 
     let hash=get_str_hash(fm.name);
 //  let bg=(~[~"383838",~"34383c",~"3c3834",~"383c34",~"343c38",~"38343c",~"3a343a",
@@ -134,10 +136,14 @@ pub fn write_source_as_html_sub(dc:&RFindCtx, nim:&FNodeInfoMap, jdm:&JumpToDefM
         if is_valid_filename(fm.name) {
             let html_name = options.output_dir.join(Path::new(make_html_name(fm.name)));
             println!("generating {}: {}..", fi.to_str(), html_name.display());
-            let doc_str=make_html(dc, *fm, &nmaps,xcm, &npl.file[fi] , lib_path,options);
+            let doc_str=make_html(dc, *fm, &nmaps,xcm, &npl.file[fi] , lib_path,
+                                  &html_name, options);
             iou::fileSaveStr(doc_str, &html_name);
         }
     }
+
+    // copy all resources to the output folder
+    iou::copy_folder(&Path::new("resources/"), &options.output_dir);
 }
 
 fn is_valid_filename(f:&str) ->bool{
@@ -150,12 +156,22 @@ fn is_valid_filename(f:&str) ->bool{
     }
 }
 
-fn write_head(doc:&mut htmlwriter::HtmlWriter) {
+fn write_head(doc:&mut htmlwriter::HtmlWriter, out_file: &Path, options: &Options) {
+    let css_rel_path = &options.output_dir
+                        .path_relative_from(&out_file.dir_path())
+                        .unwrap_or(Path::new(""));
+    fn write_css_link (doc: &mut htmlwriter::HtmlWriter, css_rel_path: &Path, stylesheet_name: &str) {
+        let path = match css_rel_path.with_filename(stylesheet_name).as_str() {
+            Some(s) => s,
+            None => stylesheet_name
+        }.to_owned();
+        doc.write_tag_ext("link", &[(~"href", path), (~"rel", ~"stylesheet"), (~"type", ~"text/css")]);
+    };
 
     doc.begin_tag("head");
-    doc.write_tag_ext("link",&[(~"href",~"css/shCore.css"),(~"rel",~"stylesheet"),(~"type",~"text/css")]);
-    doc.write_tag_ext("link",&[(~"href",~"css/shThemeDefault.css"),(~"rel",~"stylesheet"),(~"type",~"text/css")]);
-    doc.write_tag_ext("link",&[(~"rel",~"stylesheet"),(~"type",~"text/css"),(~"href",~"sourcestyle.css")]);
+    write_css_link(doc, css_rel_path, "css/shCore.css");
+    write_css_link(doc, css_rel_path, "css/shThemeDefault.css");
+    write_css_link(doc, css_rel_path, "css/sourcestyle.css");
     doc.end_tag();
 }
 

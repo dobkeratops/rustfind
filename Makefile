@@ -50,19 +50,23 @@ endif
 define RUST_TARGET_LIB
 rust_lib$(1): rustfind rust_lib_pre $$(patsubst %,rust_lib%,$$(filter-out native:%,$$(DEPS_$(1))))
 	@echo "Generating HTML for lib$(1)"
-	@cd $(RUSTSRC); $(RUST_FIND) lib$(1)/lib.rs $(RF_OPTS)
+	@export CFG_VERSION=0; export CFG_PREFIX=0;export CFG_RUSTLIBDIR=0;export CF_COMPILER=0;export CG_LIBDIR_RELATIVE=0; \
+		$(RUSTFIND) $(RUSTSRC)/lib$(1)/lib.rs $(RF_LIBS) -o $(RUSTSRC)/html -x $(RUSTSRC)
+rust_lib$(1)_nodeps: rustfind rust_lib_pre
+	@echo "Generating HTML for lib$(1)"
+	@export CFG_VERSION=0; export CFG_PREFIX=0;export CFG_RUSTLIBDIR=0;export CF_COMPILER=0;export CG_LIBDIR_RELATIVE=0; \
+		$(RUSTFIND) $(RUSTSRC)/lib$(1)/lib.rs $(RF_LIBS) -o $(RUSTSRC)/html -x $(RUSTSRC)
 endef
 
 $(foreach crate,$(CRATES),$(eval $(call RUST_TARGET_LIB,$(crate))))
 
 rust_src: rustfind rust_lib_pre $(patsubst %,rust_lib%,$(filter-out native:%,$(CRATES)))
 
-rust_lib_pre:
+rust_lib_pre: rustfind
 	@echo "==============================================================="
 	@echo "= Generating HTML for main rust sourcetree                    ="
 	@echo "= Be patient, sorry this is unoptimized and will take a while ="
 	@echo "==============================================================="
-	@export CFG_VERSION=0; export CFG_PREFIX=0;export CFG_RUSTLIBDIR=0;export CF_COMPILER=0;export CG_LIBDiR_RELATIVE=0;
 
 #Compile the main executable
 rustfind: rustfind.rs $(SRC) 
