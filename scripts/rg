@@ -1,0 +1,56 @@
+if [ -z "$RUST_SRC" ]; then
+	echo "Rust Grep helper "
+	export RUST_SRC as standard rust source tree to search
+fi	
+if [ ! "$1" ]; then
+	echo "Rust Grep helper "
+	echo "useage rg <search text> [unfold opts]"
+	echo " "
+	echo "searches for whole word following fn/struct/fn/trait/impl/type, and unfolds results"
+	echo "optionally provide more options to unfold eg -Su singleline output"
+	echo "searches *.rs in current location and $RUST_SRC recursively"
+	echo " "
+	echo "rg (struct|fn|trait|impl|enum|mod|type|for|method|ret|arg|field|def) Foo [unfold opts]-- search only for struct/fn/etc"
+	echo "rg method <name>  : finds fn <name>(.*self.*) )"
+	echo "rg <trait> for <type> : finds  impl <trait> for <type>  i.e. a function returning 'name')"
+	echo "rg ret <name> : finds ->.*<name>  i.e. a function returning 'name')"
+	echo "rg arg <name> : finds fn.*(.*<name>.*)  i.e. a function taking an argument 'name')"
+	echo "rg def <name> : just finds (fn|trait|impl|type|mod|for) <name> .. default rg<name> greps if it can't find)"
+	echo "rg grep <name>  : plain grep in rust dirs"
+
+else
+	if [ "$1" == "struct" ] || [ $1 == "fn" ] || [ $1 == "impl" ] || [ $1 == "trait" ] || [ $1 == "enum" ] || [ $1 == "mod" ] || [ $1 == "enum" ]  || [ $1 == "type" ] || [ $1 == "for" ] || [ $1 == "method" ] || [ $1 == "ret" ] || [ $1 == "arg" ] || [ $1 == "field" ] || [ $1 == "def" ] || [ $1 == "for" ]  || [ $1 == "grep" ] ; then
+		echo "search for $1 def only"
+		if [ $1 == "impl" ] && [ $3 == "for" ] ; then
+			echo "Find impl $2 for $4 "
+			grep -rn "\bimpl.*\s.*$2.*\s*for\s.*$4.*\b" . $RUST_SRC --include "*.rs" | unfold $4
+		elif [ $1 == "method" ] ; then
+			grep -rn "\bfn\s*$2\b\s*(.*\bself\b" . $RUST_SRC --include "*.rs" | unfold $3
+		elif [ $1 == "ret" ] ; then
+			grep -rn "\->.*$2" . $RUST_SRC --include "*.rs" | unfold $3
+		elif [ $1 == "arg" ] ; then
+			grep -rn "\bfn\b.*\(.*$2.*\)" . $RUST_SRC --include "*.rs" | unfold $3
+		elif [ $1 == "field" ] ; then
+			grep -rn "\b$2\b\s*:[^:]\b" . $RUST_SRC --include "*.rs" | unfold $3
+		elif [ $1 == "def" ] ; then
+			grep -rn "\(trait\|struct\|fn\|impl\|impl.*for\|type\|enum\|macro_rules!\)\s*$2\b" . $RUST_SRC --include "*.rs" | unfold $2
+		elif [ $1 == "grep" ] ; then
+			grep -rn $2 . $RUST_SRC --include "*.rs" | unfold $3 
+		else
+			
+			grep -rn "\b$1\s*$2\b" . $RUST_SRC --include "*.rs" | unfold $3
+		fi
+	else
+		if [ $2 == "for" ] ; then
+			echo "Find impl $1 for $3 "
+			grep -rn "\bimpl.*\s\s*.*$1.*\s*for\s\s*.*$3.*\b" . $RUST_SRC --include "*.rs" | unfold $3
+
+		elif !( grep -rn "\(trait\|struct\|fn\|fn.*(.*:.*\|impl\|impl.*for\|type\|enum\|macro_rules!\)\s*$1\b" . $RUST_SRC --include "*.rs" | unfold $2 );then
+             grep -rn "^\s$1\s*[,\n=(\{]" . $RUST_SRC --include "*.rs"
+    	fi
+	fi
+#	grep -rn "\(^\s*\|\(trait\|struct\|fn\|impl\|type\|enum\|macro_rules!\)\)\s*$1[^a-zA-Z0-9_]" . $RUST_SRC --include "*.rs" | unfold $2
+
+
+fi
+
