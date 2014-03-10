@@ -41,11 +41,15 @@ else
 			grep -rn "\b$1\s*$2\b" . $RUST_SRC --include "*.rs" | unfold $3
 		fi
 	else
-		if [ $2 == "for" ] ; then
-			echo "Find impl $1 for $3 "
-			grep -rn "\bimpl.*\s\s*.*$1.*\s*for\s\s*.*$3.*\b" . $RUST_SRC --include "*.rs" | unfold $3
-
-		elif !( grep -rn "\(trait\|struct\|fn\|fn.*(.*:.*\|impl\|impl.*for\|type\|enum\|macro_rules!\)\s*$1\b" . $RUST_SRC --include "*.rs" | unfold $2 );then
+		if [ -n $2 ] ; then 
+			echo "2nd param.."
+			if [ $2 == "for" ] ; then
+				echo "Find impl $1 for $3 "
+				grep -rn "\bimpl.*\s\s*.*$1.*\s*for\s\s*.*$3.*\b" . $RUST_SRC --include "*.rs" | unfold $3
+				exit
+			fi
+		fi
+		if !( grep -rn "\(trait\|struct\|fn\|fn.*(.*:.*\|impl\|impl.*for\|type\|enum\|macro_rules!\)\s*$1\b" . $RUST_SRC --include "*.rs" | unfold $2 );then
              grep -rn "^\s$1\s*[,\n=(\{]" . $RUST_SRC --include "*.rs"
     	fi
 	fi
