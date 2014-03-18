@@ -21,7 +21,8 @@ pub macro_rules! logi{
 }
 
 #[deriving(Clone)]
-pub enum AstNode {
+pub enum AstNode { 
+	// todo: CamelCase
     astnode_mod(@ast::Mod),
     astnode_view_item(@ast::ViewItem),
     astnode_item(@ast::Item),
@@ -143,8 +144,8 @@ pub fn node_spans_table_to_json_sub(dc:&RFindCtx,ns:&FNodeInfoMap)->~str {
     for (k,v) in ns.iter() {
         //let (_,line,_)=byte_pos_to_file_line_col(c,*v.span.lo);
 
-        let oifps=v.span.lo.to_index_file_pos(dc.tycx);
-        let oifpe=v.span.hi.to_index_file_pos(dc.tycx);
+        let oifps=v.span.lo.to_index_file_pos(dc.tycx_ref());
+        let oifpe=v.span.hi.to_index_file_pos(dc.tycx_ref());
         if oifps.is_some() && oifpe.is_some() {
             let ifps=oifps.unwrap();
             let ifpe=oifpe.unwrap();
@@ -965,7 +966,7 @@ pub fn get_node_info_str(dc:&RFindCtx,node:&NodeTreeLoc)->~str
     }
 }
 
-pub fn safe_node_id_to_type(cx: ty::ctxt, id: ast::NodeId) -> Option<ty::t> {
+pub fn safe_node_id_to_type(cx: &ty::ctxt, id: ast::NodeId) -> Option<ty::t> {
     //io::println!(fmt!("%?/%?", id, cx.node_types.len()));
     match cx.node_types.get().find(&(id as uint)) {
        Some(&t) => Some(t),
@@ -1027,7 +1028,7 @@ pub fn byte_pos_from_text_file_pos_str(dc:&RFindCtx,filepos:&str)->Option<codema
         //todo - if no column specified, just lookup everything on that line!
         let l0 = line.unwrap()-1;
         let c0= col.unwrap()-1;
-        let foo= ZTextFilePos::new(toks[0],l0,c0).to_byte_pos(dc.tycx);
+        let foo= ZTextFilePos::new(toks[0],l0,c0).to_byte_pos(dc.tycx_ref());
         return foo;
     }
     return None;
@@ -1071,12 +1072,12 @@ pub fn def_of_symbol_to_str(_:&RFindCtx, _:&FNodeInfoMap, _:&HashMap<ast::NodeId
 
 
 // TODO- this should return a slice?
-pub fn get_node_source(c:ty::ctxt, nim:&FNodeInfoMap, did:ast::DefId)->~str {
+pub fn get_node_source(tc:&ty::ctxt, nim:&FNodeInfoMap, did:ast::DefId)->~str {
     if did.krate==0{
         match nim.find(&did.node) {
             None=>~"",
             Some(info)=>{
-                get_span_str(c,&info.span)
+                get_span_str(tc,&info.span)
             }
         }
     } else {

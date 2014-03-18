@@ -1,4 +1,4 @@
-use std::io::println;
+use std::io;
 use rf_common::*;
 use syntax::ast;
 use rustc::middle::{ty,typeck};
@@ -39,13 +39,15 @@ pub fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, nodeinfomap:&FNodeInf
     match *node {
         astnode_expr(e)=>match e.node {
             // handle methods-calls
-            ast::ExprMethodCall(..)=>{
+            ast::ExprMethodCall(call_ident, call_type_params, call_args)=>{
                 // Currently unused
 //              let rec_ty_node= astnode_expr(*receiver).ty_node_id();
 //              let rec_ty_node1= dc.tycx.node_types.find(&(*id as uint));
 
                 let method_map =dc.ca.maps.method_map;
-                match method_map.borrow().get().get(&e.id).origin {
+				let method_call=typeck::MethodCall{expr_id:e.id,  autoderef:0}; // TODO is that e.id or call_ident...
+				io::println(format!("e.id={:?} call_ident={:?}", e.id, call_ident.name));
+                match method_map.borrow().get().get(&method_call).origin {
                     typeck::MethodStatic(def_id)=>
 							return Some(def_id),
                     typeck::MethodObject(_)=>
@@ -56,7 +58,7 @@ pub fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, nodeinfomap:&FNodeInf
                         match trait_method_def_ids.find(&mp.trait_id) {
                             None=>{},
                             Some(method_def_ids)=>{
-                                return Some(method_def_ids[mp.method_num])
+                                return Some(*method_def_ids.get(mp.method_num))
                             }
                         }
                     }
@@ -71,7 +73,7 @@ pub fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, nodeinfomap:&FNodeInf
                 let tydef=/*rf_ast_ut::*/auto_deref_ty(ty::get(*obj_ty.unwrap()));
                 match tydef.sty {
                     ty::ty_struct(def,_)=> {
-                        let node_to_show=/*rf_ast_ut::*/find_named_struct_field(&dc.tycx, def.node, ident).unwrap_or(def);
+                        let node_to_show=/*rf_ast_ut::*/find_named_struct_field(dc.tycx_ref(), def.node, ident).unwrap_or(def);
                         return Some(node_to_show);//mk_result(dc,m,node_spans,node_to_show,"(struct_field)");
                     },
                     _=>return None
@@ -149,10 +151,10 @@ pub fn def_info_from_node_id<'a,'b>(dc:&'a RFindCtx, node_info:&'b FNodeInfoMap,
 pub fn dump_json(dc:&RFindCtx) {
     // TODO: full/partial options - we currently wwrite out all the nodes we find.
     // need option to only write out nodes that map to definitons.
-    println("{");
-    println("\tcode_map:[");
+    io::println("{");
+    io::println("\tcode_map:[");
 //  for dc.sess.codemap.files.iter().advance |f| {
-    let files = dc.sess.codemap().files.borrow();
+    let files = dc.codemap().files.borrow();
     let files = files.get();
     for f in files.iter() {
         let lines = f.lines.borrow();
@@ -164,23 +166,23 @@ pub fn dump_json(dc:&RFindCtx) {
         print!("\tlines:[\n{},", flatten_to_str_ng(lines, |&x|{(x-f.start_pos).to_uint()} ,","));
         print!("\n\t\t]\n\t\\},\n");
     }
-    println("\t]");
-    println("\tnode_spans:");
+    io::println("\t]");
+    io::println("\tnode_spans:");
     let nim=build_node_info_map(dc.crate_);
     let node_def_node = build_node_def_node_table(dc);
     let jdm=build_jump_to_def_map(dc, &nim,node_def_node);
-    println(nim.to_json_str(dc));
-    println(",");
-    println("\tnode_defs [\n");
-    println(jdm.to_json_str());
-    println("\t],\n");
-    println("\tdef_ids:");
-    println(node_def_node.to_json_str());
-    println("}");
+    io::println(nim.to_json_str(dc));
+    io::println(",");
+    io::println("\tnode_defs [\n");
+    io::println(jdm.to_json_str());
+    io::println("\t],\n");
+    io::println("\tdef_ids:");
+    io::println(node_def_node.to_json_str());
+    io::println("}");
 }
 
 pub fn lookup_def_at_text_file_pos(dc:&RFindCtx, tfp:&ZTextFilePos, show_mode:ShowDefMode)->Option<~str> {
-    match tfp.to_byte_pos(dc.tycx) {
+    match tfp.to_byte_pos(dc.tycx_ref()) {
         None=>None,
         Some(bp)=>lookup_def_at_byte_pos(dc,bp,show_mode)
     }
@@ -219,7 +221,7 @@ pub fn lookup_def_of_node_tree_loc(dc:&RFindCtx,node_tree_loc:&NodeTreeLoc,m:Sho
 }
 
 pub fn lookup_def_of_node(dc: &RFindCtx, node: &AstNode, m: ShowDefMode)->Option<~str> {
-    println("def of node:"+node.get_id().unwrap_or(0).to_str());
+    io::println("def of node:"+node.get_id().unwrap_or(0).to_str());
     let node_spans=build_node_info_map(dc.crate_);
     let node_def_node = build_node_def_node_table(dc);
     lookup_def_of_node_sub(dc,node,m,&node_spans,node_def_node)
@@ -243,7 +245,7 @@ pub fn lookup_def_of_node_sub(dc:&RFindCtx,node:&AstNode,m:ShowDefMode,nim:&FNod
                         loc.file.name + ":"+loc.line.to_str()+": "+
                             match m { SDM_LineCol=>loc.col.to_uint().to_str()+": ", _ =>~"" }+"\n";
                     return  match m{
-                        SDM_Source=>Some(def_pos_str+get_node_source(dc.tycx,nim, def_node_id)+"\n"),
+                        SDM_Source=>Some(def_pos_str+get_node_source(dc.tycx_ref(),nim, def_node_id)+"\n"),
                         SDM_GeditCmd=>Some("+"+loc.line.to_str()+" "+loc.file.name+" "),
                         _ => Some(def_pos_str)
                     };
