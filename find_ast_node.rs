@@ -293,7 +293,7 @@ impl KindToStr for ast::Expr {
         ast::ExprBreak(_)=>"break",
         ast::ExprAgain(_)=>"again",
         ast::ExprRet(_)=>"ret",
-        ast::ExprLogLevel => "log",
+//        ast::ExprLogLevel => "log",
         ast::ExprInlineAsm(_)=>"inline_asm",
         ast::ExprMac(_)=>"mac",
         ast::ExprStruct(_,_,_)=>"expr_struct",
@@ -462,13 +462,13 @@ impl AstNodeAccessors for ast::Ty {
 impl AstNodeAccessors for ast::ViewItem_ {
     fn get_id(&self)->Option<ast::NodeId> {
         match *self {
-            ast::ViewItemExternMod(_,_,node_id)=>Some(node_id),
+            ast::ViewItemExternCrate(_,_,node_id)=>Some(node_id),
             ast::ViewItemUse(_)=>None
         }
     }
     fn get_ident(&self)->Option<ast::Ident> {
         match *self {
-            ast::ViewItemExternMod(ident,_,_)=>Some(ident),
+            ast::ViewItemExternCrate(ident,_,_)=>Some(ident),
             ast::ViewItemUse(_)=>None
         }
     }

@@ -46,6 +46,11 @@ impl ZIndexFilePos {
     }
 }
 
+impl Eq for ZIndexFilePos {
+	fn eq(&self, other:&ZIndexFilePos)->bool { self.file_index==other.file_index && self.line==other.line && self.col==other.col }
+	fn ne(&self, other:&ZIndexFilePos)->bool { self.file_index!=other.file_index || self.line!=other.line || self.col!=other.col}
+}
+
 impl Ord for ZIndexFilePos {
     // todo: as fixed width bignum? or int64 from int32 components?
     fn lt(&self, other: &ZIndexFilePos) -> bool {

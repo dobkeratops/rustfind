@@ -5,6 +5,8 @@ use rustc::middle::{ty,typeck};
 use syntax::codemap::{BytePos, Pos};
 use rsfind::ShowDefMode;
 
+//use rustc::middle::typeck::*;-
+
 use find_ast_node::{FNodeInfoMap, FNodeInfo, AstNode, NodeTreeLoc, find_node_tree_loc_at_byte_pos,
     build_node_def_node_table, build_node_info_map, get_node_source, astnode_expr,
     get_def_id, byte_pos_from_text_file_pos_str, ToJsonStr, ToJsonStrFc, AstNodeAccessors};
@@ -42,10 +44,10 @@ pub fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, nodeinfomap:&FNodeInf
 //              let rec_ty_node= astnode_expr(*receiver).ty_node_id();
 //              let rec_ty_node1= dc.tycx.node_types.find(&(*id as uint));
 
-                let method_map = dc.ca.maps.method_map;
+                let method_map =dc.ca.maps.method_map;
                 match method_map.borrow().get().get(&e.id).origin {
                     typeck::MethodStatic(def_id)=>
-                        return Some(def_id),
+							return Some(def_id),
                     typeck::MethodObject(_)=>
                             return None,
                     typeck::MethodParam(mp)=>{

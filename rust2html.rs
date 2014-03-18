@@ -129,14 +129,14 @@ pub fn write_source_as_html_sub(dc:&RFindCtx, nim:&FNodeInfoMap, jdm:&JumpToDefM
     };
 
     let nmaps=NodeMaps { nim:nim, jdm:jdm, jrm:def2refs};
-    let files=&dc.sess.codemap.files;
+    let files=&dc.sess.codemap().files;
     let files = files.borrow();
     let files = files.get();
     for (fi,fm) in files.iter().enumerate() {
         if is_valid_filename(fm.name) {
             let html_name = options.output_dir.join(Path::new(make_html_name(fm.name)));
             println!("generating {}: {}..", fi.to_str(), html_name.display());
-            let doc_str=make_html(dc, *fm, &nmaps,xcm, &npl.file[fi] , lib_path,
+            let doc_str=make_html(dc, &**fm, &nmaps,xcm, &npl.file[fi] , lib_path,
                                   &html_name, options);
             iou::fileSaveStr(doc_str, &html_name);
         }
@@ -212,7 +212,7 @@ struct NodesPerLinePerFile {
 pub fn get_file_index(dc:&RFindCtx,fname:&str)->Option<uint> {
     // todo - functional
     let mut index=0;
-    let files = dc.sess.codemap.files.borrow();
+    let files = dc.sess.codemap().files.borrow();
     let files = files.get();
     while index<files.len() {
         if fname == files.get(index).name {
@@ -237,7 +237,7 @@ impl NodesPerLinePerFile {
         let mut npl=~NodesPerLinePerFile{file:~[]};
 //      let mut fi=0;
 //      npl.file = vec::from_elem(dc.sess.codemap.files.len(),);
-        let files = dc.sess.codemap.files.borrow();
+        let files = dc.sess.codemap().files.borrow();
         let files = files.get();
         for cmfile in files.iter() {
 //      while fi<dc.sess.codemap.files.len() {
@@ -291,36 +291,36 @@ impl NodesPerLinePerFile {
 }
 pub fn node_color_index(ni:&FNodeInfo)->int {
     // TODO - map this a bit more intelligently..
-    match ni.kind {
-        ~"fn"=>1,
-        ~"add"|~"sub"|~"mul"|~"div"|~"assign"|~"eq"|~"le"|~"gt"|~"ge"|~"ne"|~"binop"|~"assign_op"
-        |~"bitand"|~"bitxor"|~"bitor"|~"shl"|~"shr"|~"not"|~"neg"|~"box"|~"uniq"|~"deref"|~"addr_of"
+    match ni.kind.as_slice() {
+        "fn"=>1,
+        "add"|"sub"|"mul"|"div"|"assign"|"eq"|"le"|"gt"|"ge"|"ne"|"binop"|"assign_op"
+        |"bitand"|"bitxor"|"bitor"|"shl"|"shr"|"not"|"neg"|"box"|"uniq"|"deref"|"addr_of"
             =>5,
-        ~"de"=>3,
-        ~"type_param"=>7,
-        ~"ty"=>8,
-        ~"struct_field"|~"field"=>24,
-        ~"path"=>26,
-        ~"call"=>27,
-        ~"variant"=>28,
-        ~"method_call"=>10,
-        ~"lit"=>12,
-        ~"stmt"=>13,
-        ~"mod"=>38,
-        ~"local"=>16,
-        ~"pat"=>20,
-        ~"block"|~"blk"|~"fn_block"=>22,
-        ~"method"|~"type_method"=>18,
-        ~"tup"=>14,
-        ~"arm"=>11,
-        ~"index"=>13,
-        ~"vstore"=>16,
-        ~"mac"=>10,
-        ~"struct"=>31,
-        ~"trait"=>32,
-        ~"impl"=>33,
-        ~"enum"=>34,
-        ~"keyword"|~"while"|~"match"|~"loop"|~"do"|~"cast"|~"if"|~"return"|~"unsafe"|~"extern"|~"crate"|~"as"|~"in"|~"for"=>21,
+        "de"=>3,
+        "type_param"=>7,
+        "ty"=>8,
+        "struct_field"|"field"=>24,
+        "path"=>26,
+        "call"=>27,
+        "variant"=>28,
+        "method_call"=>10,
+        "lit"=>12,
+        "stmt"=>13,
+        "mod"=>38,
+        "local"=>16,
+        "pat"=>20,
+        "block"|"blk"|"fn_block"=>22,
+        "method"|"type_method"=>18,
+        "tup"=>14,
+        "arm"=>11,
+        "index"=>13,
+        "vstore"=>16,
+        "mac"=>10,
+        "struct"=>31,
+        "trait"=>32,
+        "impl"=>33,
+        "enum"=>34,
+        "keyword"|"while"|"match"|"loop"|"do"|"cast"|"if"|"return"|"unsafe"|"extern"|"crate"|"as"|"in"|"for"=>21,
 
         _ =>1
     }
@@ -640,7 +640,7 @@ fn resolve_link(link:i64, dc:&RFindCtx,fm:&codemap::FileMap,lib_path:&str, nmaps
                 {
                     match (nmaps.nim,def_node).to_index_file_pos(dc.tycx) {
                         Some(ifp)=>{
-                            let files = dc.sess.codemap.files.borrow();
+                            let files = dc.sess.codemap().files.borrow();
                             let files = files.get();
                             make_html_name_rel(files.get(ifp.file_index as uint).name, fm.name) +
                                 "#" + (ifp.line + 1).to_str()
@@ -938,14 +938,14 @@ fn write_references(doc:&mut htmlwriter::HtmlWriter,dc:&RFindCtx, fm:&codemap::F
                                 doc.writeln("");
                             }
                         }
-                        let files = dc.sess.codemap.files.borrow();
+                        let files = dc.sess.codemap().files.borrow();
                         let files = files.get();
                         let rfm = &files.get(ref_ifp.file_index as uint);
                         doc.begin_tag_link(make_html_name_rel(rfm.name, fm.name) + "#" + (ref_ifp.line + 1).to_str());
 
                         if  links_written<max_links {
                             doc.write_tagged("c40",(ref_ifp.line+1).to_str()+&": ");
-                            doc.writeln(get_source_line(**rfm, ref_ifp.line));
+                            doc.writeln(get_source_line(&***rfm, ref_ifp.line));
                             newline=true;
                             links_written+=1;
                         } else {
@@ -977,12 +977,12 @@ impl htmlwriter::HtmlWriter{
                 let ifp=oifp.unwrap();
                 let ifpe=oifp.unwrap();
     //      let def_info=nim.find(&nid).unwrap();
-    //      let ifpe=get_node_index_file_pos(dc,nim,nid).unwrap();
+    //      let ifpe=get_node_index_file_pos(dc		,nim,nid).unwrap();
 
                 self.begin_tag_anchor((ifp.line+1).to_str()+"_"+ifp.col.to_str() + "_refs" );
                 self.begin_tag_link( "#"+(ifp.line+1).to_str());
                 self.begin_tag("c40");
-                self.writeln(dc.sess.codemap.files.borrow().get().get(ifp.file_index as uint).name + ":" + (ifp.line + 1).to_str() + ":" + ifp.col.to_str()
+                self.writeln(dc.sess.codemap().files.borrow().get().get(ifp.file_index as uint).name + ":" + (ifp.line + 1).to_str() + ":" + ifp.col.to_str()
                             +"-"+(ifpe.line+1).to_str()+":"+ifpe.col.to_str() +" -" +info.kind + "- definition:");
                 self.end_tag();
                 self.begin_tag("pr");
@@ -997,7 +997,7 @@ impl htmlwriter::HtmlWriter{
     }
 
     fn write_file_ref(&mut self, dc:&RFindCtx,origin_fm:&codemap::FileMap, fi:uint) {
-        let fname = dc.tycx.sess.codemap.files.borrow();
+        let fname = dc.tycx.sess.codemap().files.borrow();
         let fname = fname.get();
         let fname = fname.get(fi).name.as_slice();
         self
