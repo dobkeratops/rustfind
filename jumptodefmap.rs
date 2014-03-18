@@ -53,7 +53,7 @@ pub fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, nodeinfomap:&FNodeInf
                     typeck::MethodObject(_)=>
                             return None,
                     typeck::MethodParam(mp)=>{
-                        let trait_method_def_ids = dc.tycx.trait_method_def_ids.borrow();
+                        let trait_method_def_ids = dc.tycx_ref().trait_method_def_ids.borrow();
                         let trait_method_def_ids = trait_method_def_ids.get();
                         match trait_method_def_ids.find(&mp.trait_id) {
                             None=>{},
@@ -67,7 +67,7 @@ pub fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, nodeinfomap:&FNodeInf
             // handle struct-fields? "object.field"
             ast::ExprField(ref object_expr, ref ident, _)=>{
                 // we want the type of the object..
-                let node_types = dc.tycx.node_types.borrow();
+                let node_types = dc.tycx_ref().node_types.borrow();
                 let node_types = node_types.get();
                 let obj_ty=node_types.find(&(object_expr.id as uint));
                 let tydef=/*rf_ast_ut::*/auto_deref_ty(ty::get(*obj_ty.unwrap()));
@@ -128,7 +128,7 @@ pub fn build_jump_to_def_map(dc:&RFindCtx, nim: &FNodeInfoMap,nd:&HashMap<ast::N
 
 pub fn def_info_from_node_id<'a,'b>(dc:&'a RFindCtx, node_info:&'b FNodeInfoMap, id:ast::NodeId)->(ast::DefId,Option<&'b FNodeInfo>) {
     let crate_num=0;
-    let def_map = dc.tycx.def_map.borrow();
+    let def_map = dc.tycx_ref().def_map.borrow();
     let def_map = def_map.get();
     match def_map.find(&id) { // finds a def..
         Some(a)=>{

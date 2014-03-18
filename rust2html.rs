@@ -997,7 +997,7 @@ impl htmlwriter::HtmlWriter{
     }
 
     fn write_file_ref(&mut self, dc:&RFindCtx,origin_fm:&codemap::FileMap, fi:uint) {
-        let fname = dc.tycx.sess.codemap().files.borrow();
+        let fname = dc.codemap().files.borrow();
         let fname = fname.get();
         let fname = fname.get(fi).name.as_slice();
         self

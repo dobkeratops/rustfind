@@ -210,21 +210,28 @@ fn get_ast_and_resolve(
                                               Some(cpath.clone()), 
 //                                              parsesess.cm,
                                               span_diagnostic_handler);
-    let input=driver::driver::FileInput(cpath.clone());
     let cfg = driver::driver::build_configuration(&sess); //was, @"", &input);
+    let input=driver::driver::FileInput(cpath.clone());
 
     let crate1 = driver::driver::phase_1_parse_input(&sess,cfg.clone(),&input);
-    let loader = &mut Loader::new(&sess);
-    let (crate2, ast_map) =
+	
+    let (crate2, ast_map) = {
+		let loader = &mut Loader::new(&sess);
 		driver::driver::phase_2_configure_and_expand(
 			&sess,
 			loader,
 			crate1,
 			&from_str("TODO_WHAT_IS CrateId").unwrap()
-		);
+		)
+	};
 
-    let ca = driver::driver::phase_3_run_analysis_passes(sess, &crate2, ast_map);
-    RFindCtx { crate_: @crate2, tycx: ca.ty_cx,/* sess: sess,*/ ca:ca }
+//    let ca = driver::driver::phase_3_run_analysis_passes(sess, &crate2, ast_map);
+//    RFindCtx { crate_: @crate2, tycx: ca.ty_cx,/* sess: sess,*/ ca:ca }
+//    let driver::driver::CrateAnalysis{exported_items,public_items, ty_cx,..}
+//		 = driver::driver::phase_3_run_analysis_passes(sess, &crate2, ast_map);
+//    RFindCtx { crate_: @crate2, tycx: ty_cx,/* sess: sess,*/ /*ca:ca*/ }
+	let ca= driver::driver::phase_3_run_analysis_passes(sess, &crate2, ast_map);
+    RFindCtx { crate_: @crate2, /*tycx: ca.ty_cx, sess: sess,*/ ca:ca }
 }
 
 fn debug_test(dc:&RFindCtx) {
@@ -266,7 +273,7 @@ fn debug_test(dc:&RFindCtx) {
             if_some!(t in safe_node_id_to_type(dc.tycx_ref(), id) then {
                 println!("typeinfo: {:?}",
                     {let ntt= rustc::middle::ty::get(t); ntt});
-                dump!(id,dc.tycx.def_map.borrow().get().find(&id));
+                dump!(id,dc.tycx_ref().def_map.borrow().get().find(&id));
                 });
             let (def_id,opt_info)= def_info_from_node_id(dc,&node_info_map,id);
             if_some!(info in opt_info then{
@@ -307,7 +314,7 @@ fn debug_test(dc:&RFindCtx) {
 pub fn write_source_as_html_and_rfx(dc:&RFindCtx,lib_html_path:&str,opts: &rust2html::Options, write_html:bool) {
 
     let mut xcm:~CrossCrateMap=~HashMap::new();
-    dc.tycx.sess.cstore.iter_crate_data(|i,md| {
+    dc.cstore().iter_crate_data(|i,md| {
 //      dump!(i, md.name,md.data.len(),md.cnum);
         println!("loading cross crate data {} {}", i, md.name);
         let xcm_sub=crosscratemap::read_cross_crate_map(dc, i as int, lib_html_path + "lib"+md.name+&"/lib.rfx",lib_html_path);

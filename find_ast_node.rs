@@ -1040,9 +1040,9 @@ pub fn build_node_def_node_table(dc:&RFindCtx)->~HashMap<ast::NodeId, ast::DefId
     let mut r=~HashMap::new();
     let curr_crate_id_hack=0;   // TODO WHAT IS CRATE ID REALLY?!
 
-    for (id, _t) in dc.tycx.node_types.get().iter() { //range(0, dc.tycx.next_id.get() as uint) { 
+    for (id, _t) in dc.tycx_ref().node_types.get().iter() { //range(0, dc.tycx.next_id.get() as uint) { 
         //let id = id as ast::NodeId;
-        if_some!(def in dc.tycx.def_map.get().find(&(*id as u32)) then { // finds a def..
+        if_some!(def in dc.tycx_ref().def_map.get().find(&(*id as u32)) then { // finds a def..
             if_some!(did in get_def_id(curr_crate_id_hack,*def) then {
                 r.insert(*id as ast::NodeId,did);
             })
@@ -1054,7 +1054,7 @@ pub fn build_node_def_node_table(dc:&RFindCtx)->~HashMap<ast::NodeId, ast::DefId
 
 pub fn def_node_id_from_node_id(dc:&RFindCtx, id:ast::NodeId)->ast::NodeId {
     let crate_num=0;    // TODO - whats crate Id really???
-    match dc.tycx.def_map.get().find(&id) { // finds a def..
+    match dc.tycx_ref().def_map.get().find(&id) { // finds a def..
         Some(a)=>{
             match get_def_id(crate_num,*a) {
                 Some(b)=>b.node,
