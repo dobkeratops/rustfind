@@ -39,7 +39,7 @@ pub fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, nodeinfomap:&FNodeInf
     match *node {
         astnode_expr(e)=>match e.node {
             // handle methods-calls
-            ast::ExprMethodCall(call_ident, call_type_params, call_args)=>{
+            ast::ExprMethodCall(ref call_ident, ref call_type_params, ref call_args)=>{
                 // Currently unused
 //              let rec_ty_node= astnode_expr(*receiver).ty_node_id();
 //              let rec_ty_node1= dc.tycx.node_types.find(&(*id as uint));
