@@ -72,7 +72,7 @@ impl Ord for ZIndexFilePos {
 
 impl ToZTextFilePos for codemap::BytePos {
     fn to_text_file_pos(self, cx: ty::ctxt) -> Option<ZTextFilePos> {
-        let files = cx.sess.codemap.files.borrow();
+        let files = cx.sess.codemap().files.borrow();
         let files = files.get();
         let mut i = files.len();
 
@@ -126,7 +126,7 @@ impl ZTextFilePos {
     }
 
     pub fn to_byte_pos(&self, cx: ty::ctxt) -> Option<codemap::BytePos> {
-        let files = cx.sess.codemap.files.borrow();
+        let files = cx.sess.codemap().files.borrow();
         let files = files.get();
         let mut i = files.len();
         while i > 0 {   // caution, need loop because we return, wait for new foreach ..in..
@@ -187,7 +187,7 @@ impl ZTextFilePosLen {
 }
 
 pub fn get_span_str(c :ty::ctxt, sp: &codemap::Span) -> ~str {
-    let loc_lo = c.sess.codemap.lookup_char_pos(sp.lo);
+    let loc_lo = c.sess.codemap().lookup_char_pos(sp.lo);
     // TODO-assert both in same file!
     let file_org = loc_lo.file.start_pos;
     let slice = loc_lo.file.src.slice((sp.lo - file_org).to_uint(), (sp.hi - file_org).to_uint());
@@ -202,7 +202,8 @@ pub fn get_span_str(c :ty::ctxt, sp: &codemap::Span) -> ~str {
 
 
 /*
-fn text_file_pos_len_to_byte_pos(c:ty::ctxt,tfp:&ZTextFilePos,len:uint=0 )->Option<(codemap::BytePos,codemap::BytePos)>
+fn text_file_pos_len_to_byte_pos(c:ty::ctxt,tfp:&ZTextFilePos,len:uint=0 )->Option<(codemap::BytePos,codemap
+::BytePos)>
 
 {
 //  for c.sess.codemap.files.rev_iter().advance |fm:&codemap::FileMap| {
@@ -261,7 +262,7 @@ impl ToZIndexFilePos for codemap::BytePos {
     fn to_index_file_pos(&self, c: ty::ctxt) -> Option<ZIndexFilePos> {
         // TODO: cleanup with byte_pos_to_text_file_pos, one in terms of the other.
         // TODO - functional, and with binary search or something ..
-        let files = c.sess.codemap.files.borrow();
+        let files = c.sess.codemap().files.borrow();
         let files = files.get();
         let mut i = files.len() as u32;
         while i > 0 {
@@ -288,7 +289,7 @@ impl ToZIndexFilePos for codemap::BytePos {
 
 pub fn get_crate_name(tc: ty::ctxt, i: ast::CrateNum) -> ~str {
     if i > 0 {
-        let cd = tc.cstore.get_crate_data(i);
+        let cd = tc.sess.cstore.get_crate_data(i);
         cd.name.to_owned()
     } else {
         ~""
@@ -335,7 +336,7 @@ pub fn dump_cstore_info(tc: ty::ctxt) {
     }
 */
     println!("crate metadata");
-    tc.cstore.iter_crate_data(|i,md| {
+    tc.sess.cstore.iter_crate_data(|i,md| {
         dump!(i, md.name, md.data.as_slice().len(), md.cnum);
     });
 }

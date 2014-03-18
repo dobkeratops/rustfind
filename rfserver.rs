@@ -30,7 +30,7 @@ pub fn run_server(dc:&RFindCtx) {
                     println!("interactive mode\n - enter file:line:pos or line:pos for current file\n - show location & def of symbol there\n j-dump json q-quit i-info"),
                 "i"=> {
                     println!("files in current crate:-");
-                    let files = dc.tycx.sess.codemap.files.borrow();
+                    let files = dc.tycx.sess.codemap().files.borrow();
                     let files = files.get();
                     for x in files.iter() {
                         println!("\t{}", x.name);

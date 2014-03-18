@@ -152,7 +152,7 @@ pub fn dump_json(dc:&RFindCtx) {
     println("{");
     println("\tcode_map:[");
 //  for dc.sess.codemap.files.iter().advance |f| {
-    let files = dc.sess.codemap.files.borrow();
+    let files = dc.sess.codemap().files.borrow();
     let files = files.get();
     for f in files.iter() {
         let lines = f.lines.borrow();
