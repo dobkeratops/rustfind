@@ -5,7 +5,7 @@ use rustc::middle::ty;
 use iou=ioutil;
 use std::hash::Hash;
 use collections::HashMap;
-use std::vec;
+use std::slice;
 use std::cmp;
 use codemaput::{ZIndexFilePos,ToZIndexFilePos};
 use find_ast_node::{FNodeInfoMap,FNodeInfo};
@@ -131,7 +131,6 @@ pub fn write_source_as_html_sub(dc:&RFindCtx, nim:&FNodeInfoMap, jdm:&JumpToDefM
     let nmaps=NodeMaps { nim:nim, jdm:jdm, jrm:def2refs};
     let files=&dc.codemap().files;
     let files = files.borrow();
-    let files = files.get();
     for (fi,fm) in files.iter().enumerate() {
         if is_valid_filename(fm.name) {
             let html_name = options.output_dir.join(Path::new(make_html_name(fm.name)));
@@ -213,7 +212,6 @@ pub fn get_file_index(dc:&RFindCtx,fname:&str)->Option<uint> {
     // todo - functional
     let mut index=0;
     let files = dc.codemap().files.borrow();
-    let files = files.get();
     while index<files.len() {
         if fname == files.get(index).name {
             return Some(index);
@@ -231,22 +229,21 @@ impl NodesPerLinePerFile {
     fn new(dc:&RFindCtx, nim:&FNodeInfoMap)->~NodesPerLinePerFile {
         // todo, figure this out functionally?!
         //      dc.sess.codemap.files.map(
-        //              |fm:&@codemap::FileMap|{ vec::from_elem(fm.lines.len(), ~[]) }
+        //              |fm:&@codemap::FileMap|{ slice::from_elem(fm.lines.len(), ~[]) }
         //          ).collect();
 
         let mut npl=~NodesPerLinePerFile{file:~[]};
 //      let mut fi=0;
-//      npl.file = vec::from_elem(dc.sess.codemap.files.len(),);
+//      npl.file = slice::from_elem(dc.sess.codemap.files.len(),);
         let files = dc.codemap().files.borrow();
-        let files = files.get();
         for cmfile in files.iter() {
 //      while fi<dc.sess.codemap.files.len() {
 //          let num_lines=dc.sess.codemap.files[fi].lines.len();
             let num_lines=cmfile.lines.borrow();
-            let num_lines = num_lines.get().len();
+            let num_lines = num_lines.len();
             npl.file.push(FileLineNodes{
-                nodes_per_line: vec::from_elem(num_lines,~[]),
-                def_nodes_per_line: vec::from_elem(num_lines,~[])
+                nodes_per_line: slice::from_elem(num_lines,~[]),
+                def_nodes_per_line: slice::from_elem(num_lines,~[])
             });
 //          fi+=1;
         };
@@ -419,9 +416,9 @@ fn write_line_with_links(dst:&mut SourceCodeWriter<htmlwriter::HtmlWriter>,dc:&R
 //  dump!(node_infos);
 // todo - sorting node spans, not this "painters-algorithm" approach..
 
-    let mut link:~[i64] = vec::from_elem(line.len(),0 as ast::NodeId as i64);
-    let mut color:~[int] = vec::from_elem(line.len(),0 as int);
-    let mut depth:~[uint]= vec::from_elem(line.len(),0x7fffffff as uint);
+    let mut link:~[i64] = slice::from_elem(line.len(),0 as ast::NodeId as i64);
+    let mut color:~[int] = slice::from_elem(line.len(),0 as int);
+    let mut depth:~[uint]= slice::from_elem(line.len(),0x7fffffff as uint);
 
     for n in nodes.iter() {
 
@@ -641,7 +638,6 @@ fn resolve_link(link:i64, dc:&RFindCtx,fm:&codemap::FileMap,lib_path:&str, nmaps
                     match (nmaps.nim,def_node).to_index_file_pos(dc.tycx_ref()) {
                         Some(ifp)=>{
                             let files = dc.codemap().files.borrow();
-                            let files = files.get();
                             make_html_name_rel(files.get(ifp.file_index as uint).name, fm.name) +
                                 "#" + (ifp.line + 1).to_str()
                         },
@@ -712,7 +708,7 @@ pub struct MultiMap<K,V> {
     items:~[~[V]],
     empty:~[V]
 }
-impl<'a,K:Hash+Eq,V> MultiMap<K,V> {
+impl<'a,K:Hash+TotalEq,V> MultiMap<K,V> {
     pub fn new()->MultiMap<K,V> {
         MultiMap{ next_index:0, indices:HashMap::new(), items:~[], empty:~[] }
     }
@@ -742,7 +738,6 @@ pub type JumpToRefMap = MultiMap<ast::NodeId, ast::NodeId>;
 fn get_source_line(fm:&codemap::FileMap, i: u32) -> ~str {
 
     let lines = fm.lines.borrow();
-    let lines = lines.get();
     let le = if (i as uint) < (lines.len() - 1) {
         lines.get(i as uint + 1).to_uint()
     } else {
@@ -879,7 +874,7 @@ fn write_references(doc:&mut htmlwriter::HtmlWriter,dc:&RFindCtx, fm:&codemap::F
 
 
             let mut curr_file=def_tfp.file_index;
-            let  mut refs2=refs.iter()
+            let mut refs2=refs.iter()
                 .filter(|&id|{nmaps.nim.find(id).is_some()})
                 .map(|&id|{
                     let oni=nmaps.nim.find(&id); assert!(oni.is_some());
@@ -887,7 +882,7 @@ fn write_references(doc:&mut htmlwriter::HtmlWriter,dc:&RFindCtx, fm:&codemap::F
                     let oifp=ni.span.lo.to_index_file_pos(dc.tycx_ref());
                     assert!(oifp.is_some()); let ifp=oifp.unwrap();
                     (ni,ifp,id)})
-                .to_owned_vec();
+                .collect::<~[(&FNodeInfo,ZIndexFilePos,u32)]>();
 
             let l=refs2.len();
             fn pri_of(x:&FNodeInfo) -> uint { 
@@ -939,7 +934,6 @@ fn write_references(doc:&mut htmlwriter::HtmlWriter,dc:&RFindCtx, fm:&codemap::F
                             }
                         }
                         let files = dc.codemap().files.borrow();
-                        let files = files.get();
                         let rfm = &files.get(ref_ifp.file_index as uint);
                         doc.begin_tag_link(make_html_name_rel(rfm.name, fm.name) + "#" + (ref_ifp.line + 1).to_str());
 
@@ -982,7 +976,7 @@ impl htmlwriter::HtmlWriter{
                 self.begin_tag_anchor((ifp.line+1).to_str()+"_"+ifp.col.to_str() + "_refs" );
                 self.begin_tag_link( "#"+(ifp.line+1).to_str());
                 self.begin_tag("c40");
-                self.writeln(dc.codemap().files.borrow().get().get(ifp.file_index as uint).name + ":" + (ifp.line + 1).to_str() + ":" + ifp.col.to_str()
+                self.writeln(dc.codemap().files.borrow().get(ifp.file_index as uint).name + ":" + (ifp.line + 1).to_str() + ":" + ifp.col.to_str()
                             +"-"+(ifpe.line+1).to_str()+":"+ifpe.col.to_str() +" -" +info.kind + "- definition:");
                 self.end_tag();
                 self.begin_tag("pr");
@@ -998,7 +992,6 @@ impl htmlwriter::HtmlWriter{
 
     fn write_file_ref(&mut self, dc:&RFindCtx,origin_fm:&codemap::FileMap, fi:uint) {
         let fname = dc.codemap().files.borrow();
-        let fname = fname.get();
         let fname = fname.get(fi).name.as_slice();
         self
             .begin_tag_link( make_html_name_rel(fname,origin_fm.name));
@@ -1014,7 +1007,7 @@ impl htmlwriter::HtmlWriter{
         self.writeln("");
         let file_path_col=&"c0";
         let file_delim_col=&"c1";
-        let name_parts = file_name.split('/').to_owned_vec();
+        let name_parts = file_name.split('/').collect::<~[&str]>();
         let num_dirs=name_parts.len()-1;
         let mut link_target=~"./";
 

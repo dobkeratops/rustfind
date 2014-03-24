@@ -1,4 +1,4 @@
-use std::vec_ng::Vec;
+use std::vec::Vec;
 
 
 pub fn text_line_pos_to_offset(text: &[u8], (line, ofs_in_line): (u32, u32))->Option<u32> {
@@ -69,7 +69,7 @@ pub fn flatten_to_str_ng<T, U:ToStr>(xs: &Vec<T>, f: |&T| -> U, sep: &str) -> ~s
 
     // this calculation is not right, but not sure what the best approximation is
     // code taken originally from StrVector code for collect()
-    let len = sep.len() * (xs.len() - 1);
+    let len = sep.len() * (xs.len() * 2 - 1);
     let mut result = with_capacity(len);
     let mut first = true;
 

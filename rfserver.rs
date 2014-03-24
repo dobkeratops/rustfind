@@ -31,7 +31,6 @@ pub fn run_server(dc:&RFindCtx) {
                 "i"=> {
                     println!("files in current crate:-");
                     let files = dc.codemap().files.borrow();
-                    let files = files.get();
                     for x in files.iter() {
                         println!("\t{}", x.name);
                     }
