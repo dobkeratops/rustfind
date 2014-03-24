@@ -139,7 +139,11 @@ fn main() {
             dump_json(dc);
         }
         let mut i=0;
-        let lib_html_path=if matches.opt_present("x"){ matches.opt_str("x").unwrap()} else {~""};
+        let lib_html_path = if matches.opt_present("x") {
+            matches.opt_str("x").unwrap() + "/"
+        } else {
+            ~""
+        };
         if matches.opt_present("f") {
             while i<matches.free.len() {
                 let mode=if matches.opt_present("g"){SDM_GeditCmd} else {SDM_Source};
@@ -156,9 +160,8 @@ fn main() {
         if matches.opt_present("o") {
             let out_dir = matches.opt_str("o").unwrap();
             let mut out_path = Path::new("./");
-            out_path.push(out_dir);
+            out_path.push(out_dir + "/");
             html_options.output_dir = out_path;
-            println!("Outputting to `{}`", html_options.output_dir.display());
         }
         if matches.opt_present("r") {
             println!("Writing .rfx ast nodes/cross-crate-map:-");
@@ -188,33 +191,47 @@ fn get_ast_and_resolve(
     -> RFindCtx {
 
     let parsesess = parse::new_parse_sess();
-    let sessopts = @driver::session::Options {
-        maybe_sysroot: Some(@std::os::self_exe_path().unwrap()),
-        addl_lib_search_paths:  @RefCell::new(libs),
-        ..  (*rustc::driver::session::basic_options()).clone()
+    let sessopts = driver::session::Options {
+        maybe_sysroot: Some(std::os::self_exe_path().unwrap()),
+        addl_lib_search_paths:  RefCell::new(libs),
+        ..  (rustc::driver::session::basic_options()).clone()
     };
     // Currently unused
 //  let quiet = true;
 
 
+	let codemap = syntax::codemap::CodeMap::new();
     let diagnostic_handler = syntax::diagnostic::default_handler(); // TODO add back the blank emitter here ...
     let span_diagnostic_handler =
-        syntax::diagnostic::mk_span_handler(diagnostic_handler, parsesess.cm);
+        syntax::diagnostic::mk_span_handler(diagnostic_handler, codemap);
 
 
     let sess = driver::driver::build_session_(sessopts, 
                                               Some(cpath.clone()), 
-                                              parsesess.cm,
+//                                              parsesess.cm,
                                               span_diagnostic_handler);
+    let cfg = driver::driver::build_configuration(&sess); //was, @"", &input);
     let input=driver::driver::FileInput(cpath.clone());
-    let cfg = driver::driver::build_configuration(sess); //was, @"", &input);
 
-    let crate1 = driver::driver::phase_1_parse_input(sess,cfg.clone(),&input);
-    let loader = &mut Loader::new(sess);
-    let (crate2, ast_map) = driver::driver::phase_2_configure_and_expand(sess, loader, crate1);
+    let crate1 = driver::driver::phase_1_parse_input(&sess,cfg.clone(),&input);
+	
+    let (crate2, ast_map) = {
+		let loader = &mut Loader::new(&sess);
+		driver::driver::phase_2_configure_and_expand(
+			&sess,
+			loader,
+			crate1,
+			&from_str("TODO_WHAT_IS CrateId").unwrap()
+		)
+	};
 
-    let ca = driver::driver::phase_3_run_analysis_passes(sess, &crate2, ast_map);
-    RFindCtx { crate_: @crate2, tycx: ca.ty_cx, sess: sess, ca:ca }
+//    let ca = driver::driver::phase_3_run_analysis_passes(sess, &crate2, ast_map);
+//    RFindCtx { crate_: @crate2, tycx: ca.ty_cx,/* sess: sess,*/ ca:ca }
+//    let driver::driver::CrateAnalysis{exported_items,public_items, ty_cx,..}
+//		 = driver::driver::phase_3_run_analysis_passes(sess, &crate2, ast_map);
+//    RFindCtx { crate_: @crate2, tycx: ty_cx,/* sess: sess,*/ /*ca:ca*/ }
+	let ca= driver::driver::phase_3_run_analysis_passes(sess, &crate2, ast_map);
+    RFindCtx { crate_: @crate2, /*tycx: ca.ty_cx, sess: sess,*/ ca:ca }
 }
 
 fn debug_test(dc:&RFindCtx) {
@@ -233,7 +250,7 @@ fn debug_test(dc:&RFindCtx) {
 
 
     logi!("==== dump def table.===");
-    rf_ast_ut::dump_ctxt_def_map(dc.tycx);
+    rf_ast_ut::dump_ctxt_def_map(dc.tycx_ref());
 
     logi!("==== Test node search by location...===");
 
@@ -252,17 +269,17 @@ fn debug_test(dc:&RFindCtx) {
 
 
         if_some!(id in nodetloc.last().get_ref().ty_node_id() then {
-            logi!("source=",get_node_source(dc.tycx, &node_info_map,ast::DefId{krate:0,node:id}));
-            if_some!(t in safe_node_id_to_type(dc.tycx, id) then {
+            logi!("source=",get_node_source(dc.tycx_ref(), &node_info_map,ast::DefId{krate:0,node:id}));
+            if_some!(t in safe_node_id_to_type(dc.tycx_ref(), id) then {
                 println!("typeinfo: {:?}",
                     {let ntt= rustc::middle::ty::get(t); ntt});
-                dump!(id,dc.tycx.def_map.borrow().get().find(&id));
+                dump!(id,dc.tycx_ref().def_map.borrow().get().find(&id));
                 });
             let (def_id,opt_info)= def_info_from_node_id(dc,&node_info_map,id);
             if_some!(info in opt_info then{
                 logi!("src node=",id," def node=",def_id,
                     " span=",format!("{:?}",info.span));
-                logi!("def source=", get_node_source(dc.tycx, &node_info_map, def_id));
+                logi!("def source=", get_node_source(dc.tycx_ref(), &node_info_map, def_id));
             })
         })
 
@@ -271,17 +288,17 @@ fn debug_test(dc:&RFindCtx) {
 
     // test byte pos from file...
     logi!("====test file:pos source lookup====");
-    dump!(ZTextFilePosLen::new("test_input.rs",3-1,0,10).get_str(dc.tycx));
-    dump!(ZTextFilePosLen::new("test_input.rs",9-1,0,10).get_str(dc.tycx));
-    dump!(ZTextFilePosLen::new("test_input2.rs",4-1,0,10).get_str(dc.tycx));
-    dump!(ZTextFilePosLen::new("test_input2.rs",11-1,0,10).get_str(dc.tycx));
-    let ospan=ZTextFilePosLen::new("test_input2.rs", 10-1,0,32).to_byte_pos(dc.tycx);
+    dump!(ZTextFilePosLen::new("test_input.rs",3-1,0,10).get_str(dc.tycx_ref()));
+    dump!(ZTextFilePosLen::new("test_input.rs",9-1,0,10).get_str(dc.tycx_ref()));
+    dump!(ZTextFilePosLen::new("test_input2.rs",4-1,0,10).get_str(dc.tycx_ref()));
+    dump!(ZTextFilePosLen::new("test_input2.rs",11-1,0,10).get_str(dc.tycx_ref()));
+    let ospan=ZTextFilePosLen::new("test_input2.rs", 10-1,0,32).to_byte_pos(dc.tycx_ref());
     if_some!(x in ospan then {
         let (lo,hi)=x;
-        logi!(get_span_str(dc.tycx, &codemap::Span{lo:lo,hi:hi,expn_info:None} ));
+        logi!(get_span_str(dc.tycx_ref(), &codemap::Span{lo:lo,hi:hi,expn_info:None} ));
     });
-    dump!(codemaput::zget_file_line_str(dc.tycx,"test_input2.rs",5-1));
-    dump!(codemaput::zget_file_line_str(dc.tycx,"test_input.rs",9-1));
+    dump!(codemaput::zget_file_line_str(dc.tycx_ref(),"test_input2.rs",5-1));
+    dump!(codemaput::zget_file_line_str(dc.tycx_ref(),"test_input.rs",9-1));
 
     logi!("\n====test full file:pos lookup====");
     dump!(lookup_def_at_text_file_pos(dc, &ZTextFilePos::new("test_input.rs",8-1,21),SDM_Source));println!("");
@@ -297,10 +314,10 @@ fn debug_test(dc:&RFindCtx) {
 pub fn write_source_as_html_and_rfx(dc:&RFindCtx,lib_html_path:&str,opts: &rust2html::Options, write_html:bool) {
 
     let mut xcm:~CrossCrateMap=~HashMap::new();
-    dc.tycx.cstore.iter_crate_data(|i,md| {
+    dc.cstore().iter_crate_data(|i,md| {
 //      dump!(i, md.name,md.data.len(),md.cnum);
         println!("loading cross crate data {} {}", i, md.name);
-        let xcm_sub=crosscratemap::read_cross_crate_map(dc, i as int, "lib"+md.name+&"/lib.rfx",lib_html_path);
+        let xcm_sub=crosscratemap::read_cross_crate_map(dc, i as int, lib_html_path + "lib"+md.name+&"/lib.rfx",lib_html_path);
         for (k,v) in xcm_sub.iter() {xcm.insert(*k,(*v).clone());}
     });
 

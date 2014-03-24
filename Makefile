@@ -14,7 +14,7 @@ RUSTFLAGS = --opt-level=3 -A non-camel-case-types
 
 # generate HTML browser for the main sourcetree
 html: rustfind
-	./rustfind rustfind.rs $(RF_LIBS) -x $(RUSTSRC)/html -o html/
+	./rustfind rustfind.rs $(RF_LIBS) -x $(RUSTSRC) -o html/
 
 test_dump: rustfind
 	./rustfind  -d $(RF_OPTS) test_input.rs
@@ -50,12 +50,12 @@ endif
 define RUST_TARGET_LIB
 rust_lib$(1): rustfind rust_lib_pre $$(patsubst %,rust_lib%,$$(filter-out native:%,$$(DEPS_$(1))))
 	@echo "Generating HTML for lib$(1)"
-	@export CFG_VERSION=0; export CFG_PREFIX=0;export CFG_RUSTLIBDIR=0;export CFG_COMPILER=0;export CFG_LIBDIR_RELATIVE=0; \
-		$(RUST_FIND) $(RUSTSRC)/lib$(1)/lib.rs $(RF_LIBS) -o $(RUSTSRC)/html/lib$(1) -x $(RUSTSRC)
+	@export CFG_VERSION=0; export CFG_PREFIX=0;export CFG_RUSTLIBDIR=0;export CF_COMPILER=0;export CG_LIBDIR_RELATIVE=0; \
+		$(RUSTFIND) $(RUSTSRC)/lib$(1)/lib.rs $(RF_LIBS) -o $(RUSTSRC)/html -x $(RUSTSRC)
 rust_lib$(1)_nodeps: rustfind rust_lib_pre
 	@echo "Generating HTML for lib$(1)"
-	@export CFG_VERSION=0; export CFG_PREFIX=0;export CFG_RUSTLIBDIR=0;export CFG_COMPILER=0;export CFG_LIBDIR_RELATIVE=0; \
-		$(RUST_FIND) $(RUSTSRC)/lib$(1)/lib.rs $(RF_LIBS) -o $(RUSTSRC)/html/lib$(1) -x $(RUSTSRC)
+	@export CFG_VERSION=0; export CFG_PREFIX=0;export CFG_RUSTLIBDIR=0;export CF_COMPILER=0;export CG_LIBDIR_RELATIVE=0; \
+		$(RUSTFIND) $(RUSTSRC)/lib$(1)/lib.rs $(RF_LIBS) -o $(RUSTSRC)/html -x $(RUSTSRC)
 endef
 
 $(foreach crate,$(CRATES),$(eval $(call RUST_TARGET_LIB,$(crate))))

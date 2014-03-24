@@ -1,6 +1,6 @@
 extern crate syntax;
 extern crate rustc;
-extern crate extra;
+//extern crate extra;
 
 //pub static ctxtkey: local_data::Key<@DocContext> = &local_data::Key;
 

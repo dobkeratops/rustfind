@@ -5,4 +5,4 @@ rustfind
 test_input
 test_input0
 TAGS.emacs
-html/*.html
+html/*

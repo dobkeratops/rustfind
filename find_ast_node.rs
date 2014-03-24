@@ -21,7 +21,8 @@ pub macro_rules! logi{
 }
 
 #[deriving(Clone)]
-pub enum AstNode {
+pub enum AstNode { 
+	// todo: CamelCase
     astnode_mod(@ast::Mod),
     astnode_view_item(@ast::ViewItem),
     astnode_item(@ast::Item),
@@ -143,8 +144,8 @@ pub fn node_spans_table_to_json_sub(dc:&RFindCtx,ns:&FNodeInfoMap)->~str {
     for (k,v) in ns.iter() {
         //let (_,line,_)=byte_pos_to_file_line_col(c,*v.span.lo);
 
-        let oifps=v.span.lo.to_index_file_pos(dc.tycx);
-        let oifpe=v.span.hi.to_index_file_pos(dc.tycx);
+        let oifps=v.span.lo.to_index_file_pos(dc.tycx_ref());
+        let oifpe=v.span.hi.to_index_file_pos(dc.tycx_ref());
         if oifps.is_some() && oifpe.is_some() {
             let ifps=oifps.unwrap();
             let ifpe=oifpe.unwrap();
@@ -293,7 +294,7 @@ impl KindToStr for ast::Expr {
         ast::ExprBreak(_)=>"break",
         ast::ExprAgain(_)=>"again",
         ast::ExprRet(_)=>"ret",
-        ast::ExprLogLevel => "log",
+//        ast::ExprLogLevel => "log",
         ast::ExprInlineAsm(_)=>"inline_asm",
         ast::ExprMac(_)=>"mac",
         ast::ExprStruct(_,_,_)=>"expr_struct",
@@ -462,13 +463,13 @@ impl AstNodeAccessors for ast::Ty {
 impl AstNodeAccessors for ast::ViewItem_ {
     fn get_id(&self)->Option<ast::NodeId> {
         match *self {
-            ast::ViewItemExternMod(_,_,node_id)=>Some(node_id),
+            ast::ViewItemExternCrate(_,_,node_id)=>Some(node_id),
             ast::ViewItemUse(_)=>None
         }
     }
     fn get_ident(&self)->Option<ast::Ident> {
         match *self {
-            ast::ViewItemExternMod(ident,_,_)=>Some(ident),
+            ast::ViewItemExternCrate(ident,_,_)=>Some(ident),
             ast::ViewItemUse(_)=>None
         }
     }
@@ -965,7 +966,7 @@ pub fn get_node_info_str(dc:&RFindCtx,node:&NodeTreeLoc)->~str
     }
 }
 
-pub fn safe_node_id_to_type(cx: ty::ctxt, id: ast::NodeId) -> Option<ty::t> {
+pub fn safe_node_id_to_type(cx: &ty::ctxt, id: ast::NodeId) -> Option<ty::t> {
     //io::println!(fmt!("%?/%?", id, cx.node_types.len()));
     match cx.node_types.get().find(&(id as uint)) {
        Some(&t) => Some(t),
@@ -1027,7 +1028,7 @@ pub fn byte_pos_from_text_file_pos_str(dc:&RFindCtx,filepos:&str)->Option<codema
         //todo - if no column specified, just lookup everything on that line!
         let l0 = line.unwrap()-1;
         let c0= col.unwrap()-1;
-        let foo= ZTextFilePos::new(toks[0],l0,c0).to_byte_pos(dc.tycx);
+        let foo= ZTextFilePos::new(toks[0],l0,c0).to_byte_pos(dc.tycx_ref());
         return foo;
     }
     return None;
@@ -1039,9 +1040,9 @@ pub fn build_node_def_node_table(dc:&RFindCtx)->~HashMap<ast::NodeId, ast::DefId
     let mut r=~HashMap::new();
     let curr_crate_id_hack=0;   // TODO WHAT IS CRATE ID REALLY?!
 
-    for (id, _t) in dc.tycx.node_types.get().iter() { //range(0, dc.tycx.next_id.get() as uint) { 
+    for (id, _t) in dc.tycx_ref().node_types.get().iter() { //range(0, dc.tycx.next_id.get() as uint) { 
         //let id = id as ast::NodeId;
-        if_some!(def in dc.tycx.def_map.get().find(&(*id as u32)) then { // finds a def..
+        if_some!(def in dc.tycx_ref().def_map.get().find(&(*id as u32)) then { // finds a def..
             if_some!(did in get_def_id(curr_crate_id_hack,*def) then {
                 r.insert(*id as ast::NodeId,did);
             })
@@ -1053,7 +1054,7 @@ pub fn build_node_def_node_table(dc:&RFindCtx)->~HashMap<ast::NodeId, ast::DefId
 
 pub fn def_node_id_from_node_id(dc:&RFindCtx, id:ast::NodeId)->ast::NodeId {
     let crate_num=0;    // TODO - whats crate Id really???
-    match dc.tycx.def_map.get().find(&id) { // finds a def..
+    match dc.tycx_ref().def_map.get().find(&id) { // finds a def..
         Some(a)=>{
             match get_def_id(crate_num,*a) {
                 Some(b)=>b.node,
@@ -1071,12 +1072,12 @@ pub fn def_of_symbol_to_str(_:&RFindCtx, _:&FNodeInfoMap, _:&HashMap<ast::NodeId
 
 
 // TODO- this should return a slice?
-pub fn get_node_source(c:ty::ctxt, nim:&FNodeInfoMap, did:ast::DefId)->~str {
+pub fn get_node_source(tc:&ty::ctxt, nim:&FNodeInfoMap, did:ast::DefId)->~str {
     if did.krate==0{
         match nim.find(&did.node) {
             None=>~"",
             Some(info)=>{
-                get_span_str(c,&info.span)
+                get_span_str(tc,&info.span)
             }
         }
     } else {
