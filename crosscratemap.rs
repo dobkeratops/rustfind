@@ -40,7 +40,7 @@ pub fn read_cross_crate_map(_:&RFindCtx, crate_num:int, crate_name:&str,lib_path
     let mut xcm=~HashMap::new();
     for s in rfx.get_ref().lines() {
 //      println(s.to_str());
-        let toks=s.split('\t').to_owned_vec();
+        let toks=s.split('\t').collect::<~[&str]>();
         if toks.len()>=6 {
             match toks[0] {
                 "jdef"=> {
@@ -88,7 +88,7 @@ pub fn read_cross_crate_map(_:&RFindCtx, crate_num:int, crate_name:&str,lib_path
 pub fn write_cross_crate_map(dc:&RFindCtx, _:&str,nim:&FNodeInfoMap, _:&HashMap<ast::NodeId, ast::DefId>, jdm:&JumpToDefMap) {
     // write inter-crate node map
     let crate_rel_path_name= dc.codemap().files.borrow();
-    let crate_rel_path_name = Path::new(crate_rel_path_name.get().get(0).name.as_slice());
+    let crate_rel_path_name = Path::new(crate_rel_path_name.get(0).name.as_slice());
     let new_format:bool=true;
 
     let curr_crate_name_only = crate_rel_path_name.filestem_str().unwrap_or("");

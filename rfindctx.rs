@@ -1,6 +1,5 @@
 use std::local_data;
 
-use syntax;
 use syntax::ast;
 use syntax::codemap;
 use syntax::parse::token;
@@ -29,7 +28,6 @@ pub static ctxtkey: local_data::Key<@RFindCtx> = &local_data::Key;
 
 pub fn first_file_name(dc:&RFindCtx)->~str {
     let files = dc.codemap().files.borrow();
-    let files = files.get();
     files.get(0).name.to_str() // clone?
 }
 
@@ -37,7 +35,6 @@ pub fn find_file_name_in(dc:&RFindCtx,fname:&str)->Option<~str> {
     // todo subsequence match..
     // TODO - is there an existing way of doing this, "index_of.." ..contains()..?
     let files = dc.codemap().files.borrow();
-    let files = files.get();
     for f in files.iter() {
         if fname==f.name {return Some(fname.to_owned());}
     }

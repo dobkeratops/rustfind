@@ -1015,7 +1015,7 @@ impl ToJsonStr for JumpToDefMap {
 */
 
 pub fn byte_pos_from_text_file_pos_str(dc:&RFindCtx,filepos:&str)->Option<codemap::BytePos> {
-    let toks=filepos.split(':').to_owned_vec();
+    let toks=filepos.split(':').collect::<~[_]>();
     if toks.len()<3 { return None; }
 //  let t0:()=toks[0];
 

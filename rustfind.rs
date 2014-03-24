@@ -117,8 +117,8 @@ fn main() {
         libs1
     } else {
         match os::getenv(&"RUST_LIBS") {
-            Some(x) => ~[Path::new(x)],
-            None => ~[]
+            Some(x) => vec!(Path::new(x)),
+            None => vec!()
         }
     };
 
@@ -128,7 +128,7 @@ fn main() {
     };
     if matches.free.len()>0 {
         let mut done=false;
-        let filename=util::get_filename_only(matches.free[0]);
+        let filename=util::get_filename_only(matches.free.get(0).as_slice());
         let dc = @get_ast_and_resolve(&Path::new(filename), libs.move_iter().collect());
         local_data::set(ctxtkey, dc);
 
@@ -147,7 +147,7 @@ fn main() {
         if matches.opt_present("f") {
             while i<matches.free.len() {
                 let mode=if matches.opt_present("g"){SDM_GeditCmd} else {SDM_Source};
-                println!("{}", lookup_def_at_text_file_pos_str(dc,matches.free[i],mode).unwrap_or(~"no def found"));
+                println!("{}", lookup_def_at_text_file_pos_str(dc,matches.free.get(i).as_slice(),mode).unwrap_or(~"no def found"));
                 i+=1;
                 done=true;
             }
@@ -273,7 +273,7 @@ fn debug_test(dc:&RFindCtx) {
             if_some!(t in safe_node_id_to_type(dc.tycx_ref(), id) then {
                 println!("typeinfo: {:?}",
                     {let ntt= rustc::middle::ty::get(t); ntt});
-                dump!(id,dc.tycx_ref().def_map.borrow().get().find(&id));
+                dump!(id,dc.tycx_ref().def_map.borrow().find(&id));
                 });
             let (def_id,opt_info)= def_info_from_node_id(dc,&node_info_map,id);
             if_some!(info in opt_info then{

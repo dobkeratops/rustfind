@@ -47,14 +47,13 @@ pub fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, nodeinfomap:&FNodeInf
                 let method_map =dc.ca.maps.method_map;
 				let method_call=typeck::MethodCall{expr_id:e.id,  autoderef:0}; // TODO is that e.id or call_ident...
 				io::println(format!("e.id={:?} call_ident={:?}", e.id, call_ident.name));
-                match method_map.borrow().get().get(&method_call).origin {
+                match method_map.borrow().get(&method_call).origin {
                     typeck::MethodStatic(def_id)=>
 							return Some(def_id),
                     typeck::MethodObject(_)=>
                             return None,
                     typeck::MethodParam(mp)=>{
                         let trait_method_def_ids = dc.tycx_ref().trait_method_def_ids.borrow();
-                        let trait_method_def_ids = trait_method_def_ids.get();
                         match trait_method_def_ids.find(&mp.trait_id) {
                             None=>{},
                             Some(method_def_ids)=>{
@@ -68,7 +67,6 @@ pub fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, nodeinfomap:&FNodeInf
             ast::ExprField(ref object_expr, ref ident, _)=>{
                 // we want the type of the object..
                 let node_types = dc.tycx_ref().node_types.borrow();
-                let node_types = node_types.get();
                 let obj_ty=node_types.find(&(object_expr.id as uint));
                 let tydef=/*rf_ast_ut::*/auto_deref_ty(ty::get(*obj_ty.unwrap()));
                 match tydef.sty {
@@ -129,7 +127,6 @@ pub fn build_jump_to_def_map(dc:&RFindCtx, nim: &FNodeInfoMap,nd:&HashMap<ast::N
 pub fn def_info_from_node_id<'a,'b>(dc:&'a RFindCtx, node_info:&'b FNodeInfoMap, id:ast::NodeId)->(ast::DefId,Option<&'b FNodeInfo>) {
     let crate_num=0;
     let def_map = dc.tycx_ref().def_map.borrow();
-    let def_map = def_map.get();
     match def_map.find(&id) { // finds a def..
         Some(a)=>{
             match get_def_id(crate_num,*a){
@@ -155,15 +152,13 @@ pub fn dump_json(dc:&RFindCtx) {
     io::println("\tcode_map:[");
 //  for dc.sess.codemap.files.iter().advance |f| {
     let files = dc.codemap().files.borrow();
-    let files = files.get();
     for f in files.iter() {
         let lines = f.lines.borrow();
-        let lines = lines.get();
         print!("\t\t\\{ name:\"{}\"", f.name);
         print!("\tglobal_start_pos:{},", f.start_pos.to_uint().to_str());
         print!("\tlength:{},", (f.src.len()).to_str());
         print!("\tnum_lines:{},", lines.len().to_str());
-        print!("\tlines:[\n{},", flatten_to_str_ng(lines, |&x|{(x-f.start_pos).to_uint()} ,","));
+        print!("\tlines:[\n{},", flatten_to_str_ng(&*lines, |&x|{(x-f.start_pos).to_uint()} ,","));
         print!("\n\t\t]\n\t\\},\n");
     }
     io::println("\t]");
