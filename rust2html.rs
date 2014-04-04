@@ -62,19 +62,19 @@ pub fn make_html(dc: &RFindCtx, fm: &codemap::FileMap, nmaps: &NodeMaps,
 //  let bg=(~[~"383838",~"34383c",~"3c3834",~"383c34",~"343c38",~"38343c",~"3a343a",
 //          ~"3a343a",~"36363a",~"363a36",~"3a3636",~"3a3a34",~"3a333a",~"343a3a",~"343a3c",~"343838"])[hash&15];
     // write the doc lines..
-    doc.begin_tag("body");//,&[(~"style",~"background-color:#"+bg+";")]);
-    doc.begin_tag("div");//,&[(~"style",~"background-color:#"+bg+";")]);
-    doc.begin_tag("bg"+(hash&15).to_str());
-    doc.begin_tag("maintext");
+    let body=doc.begin_tag_check("body");//,&[(~"style",~"background-color:#"+bg+";")]);
+    let div=doc.begin_tag_check("div");//,&[(~"style",~"background-color:#"+bg+";")]);
+//    let bg_tag=doc.begin_tag_check("bg"+(hash&15).to_str()); - todo -we had tinted different pages, doesn't seem to work well
+    let maintext=doc.begin_tag_check("maintext");
     let fstart = fm.start_pos;
     let max_digits=num_digits(fm.lines.get().len());
 
     if options.write_file_path {
-        doc.begin_tag("div");//,&[(~"style",~"background-color:#"+bg+";")]);
-        doc.begin_tag("fileblock");
+        let t0=doc.begin_tag_check("div");//,&[(~"style",~"background-color:#"+bg+";")]);
+        let t1=doc.begin_tag_check("fileblock");
         doc.write_path_links(fm.name);
-        doc.end_tag();
-        doc.end_tag();
+        doc.end_tag_check(t1);
+        doc.end_tag_check(t0);
     }
     {
         let mut scw=SourceCodeWriter::new(&mut doc);
@@ -82,7 +82,7 @@ pub fn make_html(dc: &RFindCtx, fm: &codemap::FileMap, nmaps: &NodeMaps,
             scw.line_index=line;
             // todo: line numbers want to go in a seperate column so they're unselectable..
             scw.doc.write_tagged("ln",pad_to_length((line+1).to_str(),max_digits," "));
-            scw.doc.begin_tag_anchor((line+1).to_str());
+            scw.doc.begin_tag_anchor((line+1).to_str()); 
             let lend = if line < (fm.lines.get().len()-1) {
                 (fm.lines.get().get(line+1) - fstart).to_uint()
             } else {
@@ -91,14 +91,22 @@ pub fn make_html(dc: &RFindCtx, fm: &codemap::FileMap, nmaps: &NodeMaps,
             scw.doc.write(" ");
             let line_str = fm.src.slice((fm.lines.get().get(line) - fstart).to_uint(), lend);
             //doc.writeln(line_str);
+			
             scw.doc.end_tag();
+            
+            // this block appears to be what corrupted it - is it anything to do with the iteration?
+            
+            let depth=scw.doc.depth();
             for nl in fln.def_nodes_per_line.get(line).iter() {
                 scw.doc.begin_tag_anchor("n"+nl.to_str());
             }
             scw.doc.write(" "); // TODO, It should be ok to nest these surely.
-            for _ in fln.def_nodes_per_line[line].iter() {
+            for _ in fln.def_nodes_per_line.get(line).iter() {
                 scw.doc.end_tag();
             }
+            scw.doc.check_depth(depth);
+            
+            
             write_line_with_links(&mut scw,dc,fm,lib_path, nmaps,xcm, line_str, fln.nodes_per_line[line]);
             scw.doc.writeln("");
     //      doc.writeln(markup_line);
@@ -108,10 +116,10 @@ pub fn make_html(dc: &RFindCtx, fm: &codemap::FileMap, nmaps: &NodeMaps,
         write_references(&mut doc,dc,fm,lib_path,nmaps, fln.nodes_per_line);
     }
 
-    doc.end_tag();
-    doc.end_tag();
-    doc.end_tag();
-    doc.end_tag();
+    doc.end_tag_check(maintext);
+//    doc.end_tag_check(bg_tag);
+    doc.end_tag_check(div);
+    doc.end_tag_check(body);
 
     doc.doc
 }
@@ -663,9 +671,9 @@ fn write_line_attr_links(dst:&mut SourceCodeWriter<htmlwriter::HtmlWriter>,text_
     // emit a span..
     let no_color=-1;
     let mut curr_col=no_color;
-    let mut curr_link=0;
+    let mut curr_link=no_link;
     //let mut outp=HtmlWriter::new();
-    let tag_depth=dst.doc.tag_stack.len();
+    let tag_depth=dst.doc.depth();
     assert!(text_line.len()==color.len() && text_line.len()==links.len());
 
     for x in range(0,text_line.len()) {
@@ -687,7 +695,7 @@ fn write_line_attr_links(dst:&mut SourceCodeWriter<htmlwriter::HtmlWriter>,text_
     }
     if curr_col !=no_color {dst.doc.end_tag();}
     if curr_link !=no_link {dst.doc.end_tag();}
-    assert!(tag_depth==dst.doc.tag_stack.len());
+    assert!(tag_depth==dst.doc.depth());
 }
 
 fn find_defs_in_file(fm:&codemap::FileMap, nim:&FNodeInfoMap)->~[ast::NodeId] {
@@ -760,22 +768,26 @@ pub struct Extents<T> {
 
 macro_rules! min(
     ($left:expr, $right:expr) => (
-        if $left < $right {
-            $left.clone()
-        } else {
-            $right.clone()
+		{	let a=$left.clone(); let b=$right.clone(); // evaluate once
+        	if a < b {
+	            a.clone()
+	        } else  {
+	            b.clone()
+	        }
         }
-        );
-    )
+	)
+)
 macro_rules! max(
     ($left:expr, $right:expr) => (
-        if $left > $right {
-            $left.clone()
-        } else  {
-            $right.clone()
+        {	let a=$left.clone(); let b=$right.clone(); // evaluate once
+        	if a > b {
+	            a.clone()
+	        } else  {
+	            b.clone()
+	        }
         }
-        );
     )
+)
 
 impl<T:Ord+Clone> Extents<T> {
     pub fn new(lo:&T,hi:&T)->Extents<T> { Extents{lo:lo.clone(),hi:hi.clone()} }
@@ -804,38 +816,12 @@ impl<T:Ord+Clone> Extents<T> {
     }
 }
 
-/*
-fn get_decl_span(dc:&RFindCtx, fm:&codemap::FileMap, n:ast::NodeId)->Extents<ZIndexFilePos>
-{
-
-}
-*/
-
-/* TODO find out what these are used for and then uncomment / delete them
-enum CwOpts {
-    Rect(int,int,int,int), Pos(int,int), SplitHoriz(int),SplitVert(int),full
-}
-enum TitleStyle {
-
-}
-struct Window {
-    name:~str,x:int,y:int,w:int,h:int,child:~[Window],
-}
-
-
-trait Draw {
-    fn draw(self);
-}
-impl<'a> Draw for  (&'a Window,&'a str) {
-    fn draw(self) {
-    }
-}
-*/
 
 
 fn write_references(doc:&mut htmlwriter::HtmlWriter,dc:&RFindCtx, fm:&codemap::FileMap, _:&str,  nmaps:&NodeMaps, _: &[~[ast::NodeId]]) {
 
 
+    let depth=doc.depth();
     doc.begin_tag_ext("div",[(~"class",~"refblock")]);
 
 //  let (nim,jdm,jrm)=(nmaps.nim, nmaps.jdm, nmaps.jrm);
@@ -959,10 +945,12 @@ fn write_references(doc:&mut htmlwriter::HtmlWriter,dc:&RFindCtx, fm:&codemap::F
         }
     }
     doc.end_tag();
+    doc.check_depth(depth);
 }
 
 impl htmlwriter::HtmlWriter{
     fn write_refs_header(&mut self,dc:&RFindCtx,nim:&FNodeInfoMap, fm:&codemap::FileMap, nid:ast::NodeId) {
+    	let depth=self.depth();
         self.writeln("");
         nim.find(&nid).for_some( |info| {
             let oifp=info.span.lo.to_index_file_pos(dc.tycx_ref());//.unwrap();
@@ -987,7 +975,8 @@ impl htmlwriter::HtmlWriter{
                 self.end_tag();
                 self.end_tag();
             }
-        })
+        });
+        self.check_depth(depth);
     }
 
     fn write_file_ref(&mut self, dc:&RFindCtx,origin_fm:&codemap::FileMap, fi:uint) {
@@ -1004,6 +993,7 @@ impl htmlwriter::HtmlWriter{
     }
 
     pub fn write_path_links(&mut self/*doc:&mut HtmlWriter*/, file_name:&str) {
+    	let pldepth=self.depth();
         self.writeln("");
         let file_path_col=&"c0";
         let file_delim_col=&"c1";
@@ -1014,21 +1004,24 @@ impl htmlwriter::HtmlWriter{
 
         for _ in range(0,num_dirs) {link_target.push_str("../");}
         self.write("    ");
-        self.begin_tag_link(link_target+"index.html").write("(index<- )").end_tag().write("    ");
-        self.begin_tag_link(link_target).write("    ./").end_tag();
+        let t0=self.begin_tag_link(link_target+"index.html"); self.write("(index<- )"); self.end_tag_check(t0); self.write("    ");
+        let t1=self.begin_tag_link(link_target); self.write("    ./"); self.end_tag_check(t1);
 
         for (i,x) in name_parts.iter().enumerate() {
             let is_dir = i < num_dirs;
             link_target.push_str(*x);
             if is_dir {link_target.push_str("/");}
             else { link_target.push_str(".html");}
-            self.begin_tag(file_path_col);
-            self.begin_tag_link(link_target).write(*x).end_tag();
-//          self.end_tag();
+            
+            let fpc=self.begin_tag_check(file_path_col);
+            let fpl=self.begin_tag_link(link_target); self.write(*x);
+            self.end_tag_check(fpl);/*link*/
+			self.end_tag_check(fpc);/*file_path_col*/
             if is_dir {self.write_tagged(file_delim_col,"/");}
         }
         self.writeln("");
         self.writeln("");
+        self.check_depth(pldepth);
     }
 }
 

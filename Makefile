@@ -67,6 +67,7 @@ rust_lib_pre: rustfind
 	@echo "= Generating HTML for main rust sourcetree                    ="
 	@echo "= Be patient, sorry this is unoptimized and will take a while ="
 	@echo "==============================================================="
+	@echo $(CRATES)
 
 #Compile the main executable
 rustfind: rustfind.rs $(SRC) 

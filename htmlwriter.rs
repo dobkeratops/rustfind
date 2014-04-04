@@ -44,6 +44,10 @@ impl<'a> HtmlWriter {
     pub fn begin_tag(&'a mut self, tag_name:&str)->&'a mut HtmlWriter {
         self.begin_tag_ext(tag_name,&[])
     }
+    pub fn begin_tag_check(&'a mut self, tag_name:&str)->int {
+        self.begin_tag_ext(tag_name,&[]);
+        self.depth()
+    }
     pub fn write_tag_ext(&'a mut self, tag_name:&str, key_values:&[(~str,~str)])->&'a mut HtmlWriter {
         self.write_tag_sub(tag_name,key_values,true)
     }
@@ -74,6 +78,11 @@ impl<'a> HtmlWriter {
         };
         self
     }
+    pub fn depth(&self)->int { self.tag_stack.len() as int }
+    pub fn end_tag_check(&'a mut self,depth:int) {
+		self.check_depth(depth);    	
+    	self.end_tag();
+	}
     #[allow(dead_code)]
     pub fn end_all_tags(&'a mut self)->&'a mut HtmlWriter {
         while self.tag_stack.len()>0 {
@@ -106,16 +115,24 @@ impl<'a> HtmlWriter {
         self.doc.push_str(self.xlat.get(&(x as char)).to_owned());
         self
     }
-    pub fn begin_tag_anchor(&'a mut self, anchor:&str)->&'a mut HtmlWriter {
-        self.begin_tag_ext("a",[(~"id",anchor.to_owned())])
+    pub fn begin_tag_anchor(&'a mut self, anchor:&str)->int {
+        self.begin_tag_ext("a",[(~"id",anchor.to_owned())]);
+        self.depth()
+        
     }
-    pub fn begin_tag_link(&'a mut self, link:&str)->&'a mut HtmlWriter {
-        self.begin_tag_ext("a",[(~"href",link.to_owned())])
+    pub fn begin_tag_link(&'a mut self, link:&str)->int {
+        self.begin_tag_ext("a",[(~"href",link.to_owned())]);
+        self.depth()
     }
     #[allow(dead_code)]
     pub fn write_space(&'a mut self)->&'a mut HtmlWriter {
         self.doc.push_str("&emsp;");
         self
     }
+    pub fn check_depth(&self,depth:int) {
+    	if self.depth() !=depth {
+	    	fail!(format!("check_depth should be {} it is {}", depth, self.depth()))
+	    }
+	}
 }
 

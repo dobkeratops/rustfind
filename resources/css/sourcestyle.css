@@ -1,4 +1,4 @@
-maintext {color:#f0f0f0; font-size:12px; font-family:\"Courier New\"}
+maintext {color:#f0f0f0; font-size:12px; font-family:\"monospace\"}
 a:link{ color:inherit; font-style:inherit;   text-decoration:none;}
 a:visited{ color:inherit;  font-style:inherit;   text-decoration:none;}
 a:link:hover{ color:inherit;  font-style:inherit; background-color:#606060; }
