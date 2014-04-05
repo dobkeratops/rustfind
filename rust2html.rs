@@ -97,11 +97,13 @@ pub fn make_html(dc: &RFindCtx, fm: &codemap::FileMap, nmaps: &NodeMaps,
             // this block appears to be what corrupted it - is it anything to do with the iteration?
             
             let depth=scw.doc.depth();
-            for nl in fln.def_nodes_per_line.get(line).iter() {
+            let null_line=~[];
+            let def_nodes_on_line=fln.def_nodes_per_line.get(line).unwrap_or(&null_line); // caution, because what it returned was Option, it seems.
+            for nl in def_nodes_on_line.iter() {
                 scw.doc.begin_tag_anchor("n"+nl.to_str());
             }
             scw.doc.write(" "); // TODO, It should be ok to nest these surely.
-            for _ in fln.def_nodes_per_line.get(line).iter() {
+            for _ in def_nodes_on_line.iter() {
                 scw.doc.end_tag();
             }
             scw.doc.check_depth(depth);
@@ -743,7 +745,7 @@ pub type JumpToRefMap = MultiMap<ast::NodeId, ast::NodeId>;
 // 'this function, called fromm these functions ... <<< BETTER
 // 'this type, used in these functions ... '
 
-fn get_source_line(fm:&codemap::FileMap, i: u32) -> ~str {
+fn get_source_line(fm:&codemap::FileMap, i: uint) -> ~str {
 
     let lines = fm.lines.borrow();
     let le = if (i as uint) < (lines.len() - 1) {
@@ -757,6 +759,10 @@ fn get_source_line(fm:&codemap::FileMap, i: u32) -> ~str {
     } else {
         ~""
     }
+}
+fn num_source_lines(fm:&codemap::FileMap)->uint {
+    let lines = fm.lines.borrow();
+	lines.len()
 }
 
 //fn split_by_key<T,K>(src:&[T],f:&fn(t:&T)->K)->(K,[&T])] {
@@ -890,6 +896,7 @@ fn write_references(doc:&mut htmlwriter::HtmlWriter,dc:&RFindCtx, fm:&codemap::F
                 }
             });
             let mut newline=true;
+            let mut last_link_line=0;
             for &(_, ref ref_ifp,ref id) in refs2.iter() {
                 if *id!=dn {
                     //let opt_ref_info = nim.find(r);
@@ -906,7 +913,9 @@ fn write_references(doc:&mut htmlwriter::HtmlWriter,dc:&RFindCtx, fm:&codemap::F
                         doc.writeln_tagged("c40","references:-");
                         newline=true;
                     };
+                    // Write a reference to the file, if we're looking a new file now
                     if curr_file!=ref_ifp.file_index {
+                    	last_link_line=!0; // invalid value 
                         if newline==false {doc.writeln("");}
                         curr_file=ref_ifp.file_index;
                         doc.write_file_ref(dc,fm,curr_file as uint);
@@ -924,14 +933,29 @@ fn write_references(doc:&mut htmlwriter::HtmlWriter,dc:&RFindCtx, fm:&codemap::F
                         doc.begin_tag_link(make_html_name_rel(rfm.name, fm.name) + "#" + (ref_ifp.line + 1).to_str());
 
                         if  links_written<max_links {
-                            doc.write_tagged("c40",(ref_ifp.line+1).to_str()+&": ");
-                            doc.writeln(get_source_line(&***rfm, ref_ifp.line));
-                            newline=true;
-                            links_written+=1;
+                        	// Display a line from the referenced location, but
+                            // step past any #[lang items] - we want to show a meaningful definition.
+                            let  mut ref_line_index = ref_ifp.line as uint;
+                            let mut src_line=get_source_line(&***rfm, ref_line_index);
+                            while ref_line_index < num_source_lines(&***rfm){ 
+                            	src_line = get_source_line(&***rfm, ref_line_index);
+                            	if src_line.chars().nth(0).unwrap_or('\0')!='#' {break};
+                            	ref_line_index+=1;
+                            }
+                            if last_link_line !=ref_line_index { // dont write multiple links on the same line.
+	                            doc.write_tagged("c40",(ref_ifp.line+1).to_str()+&": ");
+                            	last_link_line=ref_line_index;
+	                            doc.writeln(src_line);
+	                            newline=true;
+	                            links_written+=1;
+						   }
                         } else {
-                            doc.write_tagged("c40","("+(ref_ifp.line+1).to_str()+")");
-                            newline=false;
-                            links_written+=1;
+                        	if last_link_line != ref_ifp.line as uint+1 {
+	                            doc.write_tagged("c40","("+(ref_ifp.line+1).to_str()+")");
+    	                        newline=false;
+    	                        links_written+=1;
+    	                        last_link_line=ref_ifp.line as uint+1;
+							}
                         }
                         doc.end_tag();
                     }
@@ -969,8 +993,8 @@ impl htmlwriter::HtmlWriter{
                 self.end_tag();
                 self.begin_tag("pr");
             //          dump!(def_tfp);
-                self.writeln(get_source_line(fm,ifp.line) );
-                self.writeln(get_source_line(fm,ifp.line+1) );
+                self.writeln(get_source_line(fm,ifp.line as uint) );
+                self.writeln(get_source_line(fm,ifp.line  as uint+1) );
                 self.end_tag();
                 self.end_tag();
                 self.end_tag();
