@@ -91,7 +91,7 @@ fn optgroups () -> ~[getopts::OptGroup] {
         optflag("g", "", "Format output as gedit `filepos +line filename` (use with -f)"),
         optflag("w", "", "Dump as html"),
         optflag("f", "", "Return definition reference of symbol at given position"),
-        optopt("x", "", "Path to html of external crates", "RUST_SRC"),
+        optopt("x", "external_crates", "Path to html of external crates", "$RUST_PATH/src"),
         optopt("o", "", "Directory to output the html / rfx files to", "OUTDIR")
     ]
 }
@@ -142,7 +142,14 @@ fn main() {
         let lib_html_path = if matches.opt_present("x") {
             matches.opt_str("x").unwrap() + "/"
         } else {
-            ~""
+			println!("No library path specified with -x, so using $RUST_PATH/src\n")
+			match os::getenv("RUST_PATH") {
+				None=>{
+					println!("$RUST_PATH not set, so can't find library crate .rfx files to get standard library links. set this or pass the path with option -x");
+					~""
+				}
+	            Some(value) => value+"/src/"
+			}
         };
         if matches.opt_present("f") {
             while i<matches.free.len() {

@@ -194,7 +194,7 @@ pub fn fileSaveStr(text:&str, file_path: &Path) {
     };
 }
 
-pub fn copy_folder(source_dir: &Path, dest_dir: &Path) {
+pub fn copy_folder(source_dir: &Path, dest_dir: &Path)->Result<(),()> {
     let directories = walk_dir(source_dir);
     let res = match directories {
         Ok(mut directories) => {
@@ -221,12 +221,12 @@ pub fn copy_folder(source_dir: &Path, dest_dir: &Path) {
         },
         Err(e) => {
             println!("Unable to copy directory `{}`: {}", source_dir.display(), e);
-            return;
+            return Err(());
         }
     };
     match res {
-        Err(e) => println!("Error while copying: {}", e),
-        _ => ()
+        Err(e) => {println!("Error while copying: {}", e)return Err(()) },
+        _ => return Ok(())
     }
 }
 

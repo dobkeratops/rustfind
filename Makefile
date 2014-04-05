@@ -63,11 +63,51 @@ $(foreach crate,$(CRATES),$(eval $(call RUST_TARGET_LIB,$(crate))))
 rust_src: rustfind rust_lib_pre $(patsubst %,rust_lib%,$(filter-out native:%,$(CRATES)))
 
 rust_lib_pre: rustfind
-	@echo "==============================================================="
-	@echo "= Generating HTML for main rust sourcetree                    ="
-	@echo "= Be patient, sorry this is unoptimized and will take a while ="
-	@echo "==============================================================="
+	@echo "========================================================================"
+	@echo "= Generating HTML for main rust sourcetree                             ="
+	@echo "= Be patient, sorry this is unoptimized and will take a very long time ="
+	@echo "========================================================================"
 	@echo $(CRATES)
+
+# compile the main rust sourcetree html, (compiler plus libraries)
+# brute force because the above wasn't working, we have extra options for rustc aswell.
+# any suggestions on how to make the makefile better welcome.
+rust: rust_lib_pre
+	@if [ ! -f /usr/local/bin/rustfind ];then  echo "run make install first"; /usr/local/bin/rustfind; fi ; 
+
+	cd $(RUST_PATH)/src;pwd;
+	
+	cd $(RUST_PATH)/src;pwd; rustfind libstd/lib.rs
+	cd $(RUST_PATH)/src;pwd; rustfind libgreen/lib.rs
+	cd $(RUST_PATH)/src;pwd; rustfind librustuv/lib.rs
+	cd $(RUST_PATH)/src;pwd; rustfind libnative/lib.rs
+	cd $(RUST_PATH)/src;pwd; rustfind libflate/lib.rs
+	cd $(RUST_PATH)/src;pwd; rustfind libarena/lib.rs
+	cd $(RUST_PATH)/src;pwd; rustfind libglob/lib.rs
+	cd $(RUST_PATH)/src;pwd; rustfind libterm/lib.rs
+	cd $(RUST_PATH)/src;pwd; rustfind libsemver/lib.rs
+	cd $(RUST_PATH)/src;pwd; rustfind libuuid/lib.rs
+	cd $(RUST_PATH)/src;pwd; rustfind libserialize/lib.rs
+	cd $(RUST_PATH)/src;pwd; rustfind libsync/lib.rs
+	cd $(RUST_PATH)/src;pwd; rustfind libgetopts/lib.rs
+
+	cd $(RUST_PATH)/src;pwd; rustfind libcollections/lib.rs
+	cd $(RUST_PATH)/src;pwd; rustfind libnum/lib.rs
+	cd $(RUST_PATH)/src;pwd; rustfind libtest/lib.rs
+	cd $(RUST_PATH)/src;pwd; rustfind libtime/lib.rs
+	cd $(RUST_PATH)/src;pwd; rustfind librand/lib.rs
+	cd $(RUST_PATH)/src;pwd; rustfind libworkcache/lib.rs
+#	cd $(RUST_PATH)/src;pwd; ~/rustfind/rustfind libextra/lib.rs
+	cd $(RUST_PATH)/src;pwd; rustfind liburl/lib.rs
+	cd $(RUST_PATH)/src;pwd; rustfind liblog/lib.rs
+
+	cd $(RUST_PATH)/src;pwd; rustfind libsyntax/lib.rs
+	export CFG_VERSION=0;export CFG_COMPILER=0;export CFG_PREFIX=0;export CFG_LIBDIR_RELATIVE=0; export CFG_RUSTLIBDIR=0;export CFG_COMPILER_TRIPLE=0;cd $(RUST_SRC);pwd; ~/rustfind/rustfind librustc/lib.rs
+	cd $(RUST_PATH)/src;pwd; rustfind librustdoc/lib.rs
+
+	cd $(RUST_PATH)/src;pwd; rustfind libfourcc/lib.rs
+	cd $(RUST_PATH)/src;pwd; rustfind libhexfloat/lib.rs
+
 
 #Compile the main executable
 rustfind: rustfind.rs $(SRC) 

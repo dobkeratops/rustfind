@@ -32,6 +32,9 @@ pub fn read_cross_crate_map(_:&RFindCtx, crate_num:int, crate_name:&str,lib_path
     if raw_bytes.len()==0 {
         println("loading lib crosscratemap "+lib_path+"/"+crate_name);
         raw_bytes=ioutil::fileLoad(lib_path+"/"+crate_name);
+		if raw_bytes.len()<=0 {
+			println("must run rustfind in library directories if you want links to work (needs html & .rfx files)\n"
+		}
     }
     let rfx=str::from_utf8(raw_bytes);
     println("loaded cratemap "+rfx.get_ref().len().to_str()+" bytes"+" as crate "+crate_num.to_str());

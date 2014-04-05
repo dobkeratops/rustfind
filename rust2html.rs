@@ -152,8 +152,31 @@ pub fn write_source_as_html_sub(dc:&RFindCtx, nim:&FNodeInfoMap, jdm:&JumpToDefM
     }
 
     // copy all resources to the output folder
-    iou::copy_folder(&Path::new("resources/"), &options.output_dir);
+
+// can't be bothered with making this data driven now.
+// just have some styles compiled in, and maybe have a switch light/dark theme to begin with.
+// its more important that it actually works without faffing around with paths. Its just some colored text
+//
+//	match iou::copy_folder(&Path::new("resources/"), &options.output_dir) {
+//		Ok(_)	=>{},
+//		Err(_)	=>{
+//			println!("Could not copy resources, so copying default CSS\n");
+
+	{
+		use std::io;
+		use std::io::fs;
+		fs::mkdir(&Path::new("css"),io::UserDir);
+		match io::fs::File::create(&Path::new("css/sourcestyle.css")) {
+			Err(_) => println!("can't write css/sourcestyle.css"),
+			Ok(mut file)=>{
+				println!("Writing default CSS");
+				file.write(g_default_css);
+			}
+		}
+	}
 }
+
+static g_default_css:&'static [u8]=include_bin!("resources/css/sourcestyle.css");
 
 fn is_valid_filename(f:&str) ->bool{
     match f.chars().nth(0) {
