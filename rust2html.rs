@@ -14,6 +14,7 @@ use crosscratemap::{CrossCrateMap};
 use jumptodefmap::{JumpToDefMap};
 use rsfind::MyOption;
 //use self::htmlwriter::HtmlWriter;
+use timer::Profiler;
 
 mod htmlwriter;
 
@@ -54,6 +55,7 @@ pub fn make_html(dc: &RFindCtx, fm: &codemap::FileMap, nmaps: &NodeMaps,
                  xcm: &CrossCrateMap, fln: &FileLineNodes, lib_path: &str, 
                  out_file: &Path, options: &Options) -> ~str {
     // todo - Rust2HtmlCtx { fm,nim,jdm,jrm } .. cleanup common intermediates
+	let mut p=Profiler::new("make_html");
 
     let mut doc= htmlwriter::HtmlWriter::new();
     write_head(&mut doc, out_file, options);

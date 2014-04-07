@@ -22,15 +22,44 @@ impl Timer {
     pub fn end(&mut self) -> () {
         self.end_time = time::precise_time_ns();
     }
-    pub fn get_time_string(&mut self) -> ~str {
+    pub fn get_time_string(&self) -> ~str {
         return format_as_time(self.get_total_time());
     }
-    pub fn get_total_time(&mut self) -> u64 {
+    pub fn get_total_time(&self) -> u64 {
         return self.end_time - self.start_time;
     }
-    pub fn show_time(&mut self) -> () {
+    pub fn show_time(&self) -> () {
         println!("Total time: {:s}", self.get_time_string());
     }
+    pub fn show_time_of(&self,txt:&str) -> () {
+        println!("Total time:{:s}={:s}", txt,self.get_time_string());
+    }
+}
+
+/// automatically profile a scopeblock, RAII based.
+pub struct Profiler {
+	time:Timer,
+	name:~str,
+}
+
+static  mut g_depth:int=0;	// TODO - use an appropriate primitive, threadsafe, howto?
+
+/// helper to automatically profile a scope block. place a "let p=Profiler::new("my_profiler")" at the begining of a scope, time is reported at the end using drop. Care would be needed if you were profiling other drops..
+impl Profiler {
+	// todo - cfg(profile)..
+	pub fn new(n:&'static str)->Profiler{
+		let mut p=Profiler { time: Timer::new(), name:n.to_owned()};
+		p.time.start();
+		unsafe {g_depth+=1;};
+		p
+	}
+}
+impl Drop for Profiler {
+	fn drop(&mut self) {
+		unsafe {g_depth-=1;};
+		self.time.end();
+		self.time.show_time_of(self.name);
+	}
 }
 
 pub fn format_as_time(total_time: u64) -> ~str {

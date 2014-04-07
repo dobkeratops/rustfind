@@ -123,6 +123,7 @@ pub fn find_node_tree_loc_at_byte_pos(c:@ast::Crate,_location:codemap::BytePos)-
 
 pub fn build_node_info_map(c:@ast::Crate)-> FNodeInfoMap {
     // todo-lambdas, big fcuntion but remove the extraneous symbols
+	let prof=::timer::Profiler::new("build_node_info_map");
 
     let mut vt = FncsThing::new();
 

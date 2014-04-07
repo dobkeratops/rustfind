@@ -5,6 +5,7 @@ use rustc::middle::{ty,typeck};
 use syntax::codemap::{BytePos, Pos};
 use rsfind::ShowDefMode;
 
+
 //use rustc::middle::typeck::*;-
 
 use find_ast_node::{FNodeInfoMap, FNodeInfo, AstNode, NodeTreeLoc, find_node_tree_loc_at_byte_pos,
@@ -109,6 +110,7 @@ pub fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, nodeinfomap:&FNodeInf
 
 pub fn build_jump_to_def_map(dc:&RFindCtx, nim: &FNodeInfoMap,nd:&HashMap<ast::NodeId,ast::DefId>)->~JumpToDefMap{
 // todo: NodeId->AStNode  .. lookup_def_ inner functionality extracted
+	let prof=::timer::Profiler::new("build_jump_to_def_map");
     let mut jdm=~HashMap::new();
     for (k,node_info) in nim.iter() {
         match lookup_def_node_of_node(dc,&node_info.node, nim,nd) {
@@ -257,18 +259,9 @@ pub fn lookup_def_of_node_sub(dc:&RFindCtx,node:&AstNode,m:ShowDefMode,nim:&FNod
 
 pub fn make_jdm(dc:&RFindCtx)->( FNodeInfoMap, ~HashMap<ast::NodeId,ast::DefId>,~JumpToDefMap)
 {
-    let mut t = Timer::new();
-    t.start();
+    let mut t = Profiler::new("make_jdm");
     let nim=build_node_info_map(dc.crate_);
-    t.end();
-    println!("build_node_info_map: {}", t.get_time_string());
-    t.start();
     let ndm=build_node_def_node_table(dc);
-    t.end();
-    println!("build_node_def_node_table: {}", t.get_time_string());
-    t.start();
     let jdm=build_jump_to_def_map(dc, &nim,ndm);
-    t.end();
-    println!("build_jump_to_def_map: {}", t.get_time_string());
     (nim,ndm,jdm)
 }

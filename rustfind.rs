@@ -31,6 +31,7 @@ use rfindctx::{RFindCtx,ctxtkey};
 pub use codemaput::{ZTextFilePos,ZTextFilePosLen,get_span_str,ToZTextFilePos,ZIndexFilePos,ToZIndexFilePos};
 use rsfind::{SDM_LineCol,SDM_Source,SDM_GeditCmd};
 use crosscratemap::CrossCrateMap;
+use timer::Profiler;
 
 pub mod rf_common;
 pub mod find_ast_node;
@@ -317,10 +318,10 @@ fn debug_test(dc:&RFindCtx) {
 }
 
 
-
 pub fn write_source_as_html_and_rfx(dc:&RFindCtx,lib_html_path:&str,opts: &rust2html::Options, write_html:bool) {
-
     let mut xcm:~CrossCrateMap=~HashMap::new();
+	let tm=Profiler::new("write_source_as_html_and_rfx");
+
     dc.cstore().iter_crate_data(|i,md| {
 //      dump!(i, md.name,md.data.len(),md.cnum);
         println!("loading cross crate data {} {}", i, md.name);
@@ -331,7 +332,9 @@ pub fn write_source_as_html_and_rfx(dc:&RFindCtx,lib_html_path:&str,opts: &rust2
     let (info_map,def_map,jump_map) = make_jdm(dc);
     crosscratemap::write_cross_crate_map(dc,lib_html_path, &info_map,def_map,jump_map);
     if write_html {
+		let mut tm=::timer::Profiler::new("write_source_as_html_and_rfx");
         rust2html::write_source_as_html_sub(dc,&info_map,jump_map,xcm,lib_html_path,opts);
+
     }
 }
 
