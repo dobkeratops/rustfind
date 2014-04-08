@@ -49,11 +49,11 @@ pub enum AstNode {
 
 #[deriving(Clone)]
 pub struct FNodeInfo {
-    ident:Option<ast::Ident>,       //.. TODO - does it make sense to cache an ident here? not all nodes have..
-    kind:~str,
-    span:codemap::Span,
-    node:AstNode,
-    parent_id:ast::NodeId,
+    pub ident:Option<ast::Ident>,       //.. TODO - does it make sense to cache an ident here? not all nodes have..
+    pub kind:~str,
+    pub span:codemap::Span,
+    pub node:AstNode,
+    pub parent_id:ast::NodeId,
 }
 pub type FNodeInfoMap= HashMap<ast::NodeId,FNodeInfo>;
 
@@ -505,7 +505,7 @@ impl AstNodeAccessors for ast::StructField_ {
     fn get_ident(&self)->Option<ast::Ident> {
         match self.kind{
             ast::NamedField(ident,_)=>Some(ident),
-            ast::UnnamedField => None
+            ast::UnnamedField(_) => None
         }
     }
 }
@@ -890,8 +890,13 @@ pub fn get_node_info_str(dc:&RFindCtx,node:&NodeTreeLoc)->~str
         match p.node {
             ast::PatIdent(_, ref path, _)=>~"pat_ident:"+path_to_str(path),
             ast::PatEnum(ref path, _)=>~"pat_enum:"+path_to_str(path),//    `todo-fields..
-            ast::PatStruct(ref path,ref sfields,_)=>~"pat_struct:"+path_to_str(path)+"{"+sfields.map(|x|pat_to_str(dc,x.pat)+",").to_str()+"}",
-            ast::PatTup(ref elems)=>~"pat_tupl:"+elems.map(|&x|pat_to_str(dc,x)).to_str(),
+            ast::PatStruct(ref path,ref sfields,_) => {
+                ~"pat_struct:" + path_to_str(path) + "{" + 
+                    sfields.iter().map(|x| pat_to_str(dc,x.pat) + ",").collect::<Vec<~str>>().to_str() + "}"
+            },
+            ast::PatTup(ref elems) => {
+                ~"pat_tupl:" + elems.iter().map(|&x| pat_to_str(dc, x)).collect::<Vec<~str>>().to_str()
+            },
             //ast::pat_box(ref box)=>~"box",
             ast::PatUniq(..)=>~"uniq",
             ast::PatRegion(..)=>~"rgn",
@@ -910,7 +915,9 @@ pub fn get_node_info_str(dc:&RFindCtx,node:&NodeTreeLoc)->~str
             ast::TyFixedLengthVec(..)=>~"[T,..N]",
             ast::TyPtr(..)=>~"*",
             ast::TyRptr(..)=>~"&",
-            ast::TyTup(ref types)=>~"("+types.map(|x|ty_to_str(dc,*x)).to_str()+")", //todo: factor this out, map..
+            ast::TyTup(ref types) => {
+                ~"(" + types.iter().map(|x| ty_to_str(dc, *x)).collect::<Vec<~str>>().to_str() + ")" //todo: factor this out, map..
+            },
             ast::TyPath(ref path, _, node_id)=>~"path:id="+node_id.to_str()+" "+path_to_str(path)
             ,
 
@@ -921,8 +928,15 @@ pub fn get_node_info_str(dc:&RFindCtx,node:&NodeTreeLoc)->~str
     fn expr_to_str(dc:&RFindCtx, x:&ast::Expr_)->~str {
         match *x {
             ast::ExprStruct(ref p,_,_)=>~"(expr_struct "+ path_to_str(p) +")",
-            ast::ExprCall(ref e,ref args)=>~"(expr_call("+expr_to_str(dc,&e.node)+args.map(|x|expr_to_str(dc,&x.node)).to_str()+")",
-            ast::ExprField(ref e, ref i, ref tys)=>~"(expr_field("+expr_to_str(dc,&e.node)+")"+token::get_ident(*i).get()+tys.map(|x|ty_to_str(dc,*x)).to_str()+")",
+            ast::ExprCall(ref e,ref args) => {
+                ~"(expr_call(" + expr_to_str(dc,&e.node) +
+                    args.iter().map(|x| expr_to_str(dc, &x.node)).collect::<Vec<~str>>().to_str() + ")"
+            },
+            ast::ExprField(ref e, ref i, ref tys) => {
+                ~"(expr_field(" + expr_to_str(dc, &e.node) + ")" +
+                    token::get_ident(*i).get() + 
+                    tys.iter().map(|x| ty_to_str(dc, *x)).collect::<Vec<~str>>().to_str() + ")"
+            },
             _=>~"expr"
         }
     }

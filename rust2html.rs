@@ -34,9 +34,9 @@ mod htmlwriter;
 
 // todo: options struct.
 pub struct Options {
-    write_file_path: bool,
-    write_references: bool,
-    output_dir: Path
+    pub write_file_path: bool,
+    pub write_references: bool,
+    pub output_dir: Path
 }
 
 impl Options {
@@ -290,13 +290,13 @@ impl NodesPerLinePerFile {
                     None=>{ },
                     Some(ifpe)=>{
 
-                        let f = &mut npl.file[ifp.file_index];
-                        f.def_nodes_per_line[ifp.line].push(*k);
+                        let f = &mut npl.file [ifp.file_index as uint];
+                        f.def_nodes_per_line [ifp.line as uint].push(*k);
 //                      dump!(ifp, f.nodes_per_line.len());
                         for li in range(ifp.line,ifpe.line+1) {
                             if li < f.nodes_per_line.len() as u32 {
 //                              dump!(li, *k)
-                                f.nodes_per_line[li].push(*k)
+                                f.nodes_per_line[li as uint].push(*k)
                             };
                         };
                     }

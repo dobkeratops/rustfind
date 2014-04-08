@@ -8,7 +8,7 @@ pub fn text_line_pos_to_offset(text: &[u8], (line, ofs_in_line): (u32, u32))->Op
     let mut tline=0;
     let mut line_start_pos = 0;
     while pos<tlen{
-        match text[pos] as char{
+        match text[pos as uint] as char{
             '\n' => {tline+=1; line_start_pos=pos;},
 //          "\a" => {tpos=0;line_pos=pos;},
             _ => {}
@@ -35,7 +35,7 @@ pub fn text_offset_to_line_pos(text:&[u8], src_ofs: u32)-> Option<(u32, u32)> {
     let mut tline=0;
     let mut line_start_pos=0;
     while pos<tlen{
-        match text[pos] as char{
+        match text[pos as uint] as char{
             '\n' => {
                 if src_ofs<=pos && src_ofs>line_start_pos {
                     return Some((tline+1,src_ofs-line_start_pos));

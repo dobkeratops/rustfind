@@ -2,9 +2,9 @@ use rf_common::*;
 use std::iter::range_inclusive;
 
 pub struct HtmlWriter {
-    doc:~str,
-    tag_stack:~[~str],
-    xlat:HashMap<char, ~str>,
+    pub doc:~str,
+    pub tag_stack:~[~str],
+    pub xlat:HashMap<char, ~str>,
 }
 
 /// convert u8 into html char.

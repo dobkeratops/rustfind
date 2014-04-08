@@ -113,7 +113,7 @@ fn main() {
 
     let opts = optgroups();
 	let matches = getopts(args, opts).unwrap();
-    let libs1 = matches.opt_strs("L").map(|s| Path::new(s.as_slice()));
+    let libs1 = matches.opt_strs("L").iter().map(|s| Path::new(s.as_slice())).collect::<Vec<Path>>();
     let libs= if libs1.len() > 0 {
         libs1
     } else {
@@ -273,7 +273,7 @@ fn debug_test(dc:&RFindCtx) {
         let nodetloc = find_node_tree_loc_at_byte_pos(dc.crate_,codemap::BytePos(test_cursor as u32));
         let node_info =  get_node_info_str(dc,&nodetloc);
         dump!(node_info);
-        println("node ast loc:"+(nodetloc.map(|x| { x.get_id().to_str() })).to_str());
+        println("node ast loc:"+(nodetloc.iter().map(|x| { x.get_id().to_str() })).collect::<Vec<~str>>().to_str());
 
 
         if_some!(id in nodetloc.last().get_ref().ty_node_id() then {
