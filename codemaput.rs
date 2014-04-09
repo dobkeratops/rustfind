@@ -30,9 +30,9 @@ pub macro_rules! if_some {
 
 //pub type ZeroBasedIndex=uint;
 pub struct ZTextFilePos {
-    name: ~str,
-    line: u32,
-    col: u32
+    pub name: ~str,
+    pub line: u32,
+    pub col: u32
 }
 
 pub trait ToZTextFilePos {
@@ -164,8 +164,8 @@ impl ZTextFilePos {
 }
 
 pub struct ZTextFilePosLen {
-    tfp: ZTextFilePos,
-    len: u32
+    pub tfp: ZTextFilePos,
+    pub len: u32
 }
 
 impl ZTextFilePosLen {
@@ -246,9 +246,9 @@ pub fn byte_pos_to_text_file_pos(c:ty::ctxt, pos:codemap::BytePos)->Option<ZText
 */
 
 pub struct ZIndexFilePos {
-    file_index: u32,
-    line: u32,
-    col: u32
+    pub file_index: u32,
+    pub line: u32,
+    pub col: u32
 }
 pub trait ToZIndexFilePos {
     fn to_index_file_pos(&self, c: &ty::ctxt) -> Option<ZIndexFilePos>;

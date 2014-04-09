@@ -49,11 +49,11 @@ pub enum AstNode {
 
 #[deriving(Clone)]
 pub struct FNodeInfo {
-    ident:Option<ast::Ident>,       //.. TODO - does it make sense to cache an ident here? not all nodes have..
-    kind:~str,
-    span:codemap::Span,
-    node:AstNode,
-    parent_id:ast::NodeId,
+    pub ident:Option<ast::Ident>,       //.. TODO - does it make sense to cache an ident here? not all nodes have..
+    pub kind:~str,
+    pub span:codemap::Span,
+    pub node:AstNode,
+    pub parent_id:ast::NodeId,
 }
 pub type FNodeInfoMap= HashMap<ast::NodeId,FNodeInfo>;
 
@@ -223,7 +223,7 @@ impl KindToStr for ast::Expr {
     fn kind_to_str(&self)->&'static str {
         match self.node {
         ast::ExprVstore(_,_)=>"vstore",
-        ast::ExprVec(_,_)=>"vec",
+        ast::ExprVec(_)=>"vec",
         ast::ExprCall(_,_)=>"call",
         ast::ExprMethodCall(_,_,_)=>"method_call",
         ast::ExprTup(_)=>"tup",
@@ -299,7 +299,7 @@ impl KindToStr for ast::Expr {
         ast::ExprInlineAsm(_)=>"inline_asm",
         ast::ExprMac(_)=>"mac",
         ast::ExprStruct(_,_,_)=>"expr_struct",
-        ast::ExprRepeat(_,_,_)=>"repeat",
+        ast::ExprRepeat(_,_)=>"repeat",
         ast::ExprParen(_)=>"paren",
         ast::ExprBox(_, _) => "box",
         }
@@ -505,7 +505,7 @@ impl AstNodeAccessors for ast::StructField_ {
     fn get_ident(&self)->Option<ast::Ident> {
         match self.kind{
             ast::NamedField(ident,_)=>Some(ident),
-            ast::UnnamedField => None
+            ast::UnnamedField(_) => None
         }
     }
 }
@@ -890,8 +890,13 @@ pub fn get_node_info_str(dc:&RFindCtx,node:&NodeTreeLoc)->~str
         match p.node {
             ast::PatIdent(_, ref path, _)=>~"pat_ident:"+path_to_str(path),
             ast::PatEnum(ref path, _)=>~"pat_enum:"+path_to_str(path),//    `todo-fields..
-            ast::PatStruct(ref path,ref sfields,_)=>~"pat_struct:"+path_to_str(path)+"{"+sfields.map(|x|pat_to_str(dc,x.pat)+",").to_str()+"}",
-            ast::PatTup(ref elems)=>~"pat_tupl:"+elems.map(|&x|pat_to_str(dc,x)).to_str(),
+            ast::PatStruct(ref path,ref sfields,_) => {
+                ~"pat_struct:" + path_to_str(path) + "{" + 
+                    sfields.iter().map(|x| pat_to_str(dc,x.pat) + ",").collect::<Vec<~str>>().to_str() + "}"
+            },
+            ast::PatTup(ref elems) => {
+                ~"pat_tupl:" + elems.iter().map(|&x| pat_to_str(dc, x)).collect::<Vec<~str>>().to_str()
+            },
             //ast::pat_box(ref box)=>~"box",
             ast::PatUniq(..)=>~"uniq",
             ast::PatRegion(..)=>~"rgn",
@@ -910,7 +915,9 @@ pub fn get_node_info_str(dc:&RFindCtx,node:&NodeTreeLoc)->~str
             ast::TyFixedLengthVec(..)=>~"[T,..N]",
             ast::TyPtr(..)=>~"*",
             ast::TyRptr(..)=>~"&",
-            ast::TyTup(ref types)=>~"("+types.map(|x|ty_to_str(dc,*x)).to_str()+")", //todo: factor this out, map..
+            ast::TyTup(ref types) => {
+                ~"(" + types.iter().map(|x| ty_to_str(dc, *x)).collect::<Vec<~str>>().to_str() + ")" //todo: factor this out, map..
+            },
             ast::TyPath(ref path, _, node_id)=>~"path:id="+node_id.to_str()+" "+path_to_str(path)
             ,
 
@@ -921,8 +928,15 @@ pub fn get_node_info_str(dc:&RFindCtx,node:&NodeTreeLoc)->~str
     fn expr_to_str(dc:&RFindCtx, x:&ast::Expr_)->~str {
         match *x {
             ast::ExprStruct(ref p,_,_)=>~"(expr_struct "+ path_to_str(p) +")",
-            ast::ExprCall(ref e,ref args)=>~"(expr_call("+expr_to_str(dc,&e.node)+args.map(|x|expr_to_str(dc,&x.node)).to_str()+")",
-            ast::ExprField(ref e, ref i, ref tys)=>~"(expr_field("+expr_to_str(dc,&e.node)+")"+token::get_ident(*i).get()+tys.map(|x|ty_to_str(dc,*x)).to_str()+")",
+            ast::ExprCall(ref e,ref args) => {
+                ~"(expr_call(" + expr_to_str(dc,&e.node) +
+                    args.iter().map(|x| expr_to_str(dc, &x.node)).collect::<Vec<~str>>().to_str() + ")"
+            },
+            ast::ExprField(ref e, ref i, ref tys) => {
+                ~"(expr_field(" + expr_to_str(dc, &e.node) + ")" +
+                    token::get_ident(*i).get() + 
+                    tys.iter().map(|x| ty_to_str(dc, *x)).collect::<Vec<~str>>().to_str() + ")"
+            },
             _=>~"expr"
         }
     }
@@ -969,7 +983,7 @@ pub fn get_node_info_str(dc:&RFindCtx,node:&NodeTreeLoc)->~str
 
 pub fn safe_node_id_to_type(cx: &ty::ctxt, id: ast::NodeId) -> Option<ty::t> {
     //io::println!(fmt!("%?/%?", id, cx.node_types.len()));
-    match cx.node_types.get().find(&(id as uint)) {
+    match cx.node_types.borrow().find(&(id as uint)) {
        Some(&t) => Some(t),
        None => None
     }
@@ -1041,9 +1055,9 @@ pub fn build_node_def_node_table(dc:&RFindCtx)->~HashMap<ast::NodeId, ast::DefId
     let mut r=~HashMap::new();
     let curr_crate_id_hack=0;   // TODO WHAT IS CRATE ID REALLY?!
 
-    for (id, _t) in dc.tycx_ref().node_types.get().iter() { //range(0, dc.tycx.next_id.get() as uint) { 
+    for (id, _t) in dc.tycx_ref().node_types.borrow().iter() { //range(0, dc.tycx.next_id.get() as uint) { 
         //let id = id as ast::NodeId;
-        if_some!(def in dc.tycx_ref().def_map.get().find(&(*id as u32)) then { // finds a def..
+        if_some!(def in dc.tycx_ref().def_map.borrow().find(&(*id as u32)) then { // finds a def..
             if_some!(did in get_def_id(curr_crate_id_hack,*def) then {
                 r.insert(*id as ast::NodeId,did);
             })
@@ -1055,7 +1069,7 @@ pub fn build_node_def_node_table(dc:&RFindCtx)->~HashMap<ast::NodeId, ast::DefId
 
 pub fn def_node_id_from_node_id(dc:&RFindCtx, id:ast::NodeId)->ast::NodeId {
     let crate_num=0;    // TODO - whats crate Id really???
-    match dc.tycx_ref().def_map.get().find(&id) { // finds a def..
+    match dc.tycx_ref().def_map.borrow().find(&id) { // finds a def..
         Some(a)=>{
             match get_def_id(crate_num,*a) {
                 Some(b)=>b.node,

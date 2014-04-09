@@ -18,10 +18,10 @@ pub type ZeroBasedIndex=uint;
 /// specificially we need node->span info
 #[deriving(Clone)]
 pub struct CrossCrateMapItem {
-    fname:~str,
-    line:ZeroBasedIndex,
-    col:uint,
-    len:uint
+    pub fname:~str,
+    pub line:ZeroBasedIndex,
+    pub col:uint,
+    pub len:uint
 }
 
 pub type CrossCrateMap = HashMap<ast::DefId,CrossCrateMapItem>;

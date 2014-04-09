@@ -1,10 +1,10 @@
-#[macro_escape];
+#![macro_escape]
 
 use std::io::{File, UserDir};
 use std::io::fs::{mkdir_recursive,copy,walk_dir};
 use std::cast;
 pub use std::io::{stdout, stdin};
-pub use std::libc::{fwrite, fread, fseek, fopen, ftell, fclose, FILE, c_void, c_char, SEEK_END,
+pub use libc::{fwrite, fread, fseek, fopen, ftell, fclose, FILE, c_void, c_char, SEEK_END,
     SEEK_SET};
 pub use std::mem::size_of;  // for size_of
 pub use std::slice::from_elem;

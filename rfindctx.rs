@@ -7,10 +7,10 @@ use rustc::{driver, middle};
 use rustc::metadata::cstore;
 
 pub struct RFindCtx {
-     crate_: @ast::Crate,
+     pub crate_: @ast::Crate,
 //     tycx: middle::ty::ctxt, // todo: lazy and make an Rc<T>, or propogate the lifetimes needed for &..
 //     sess: driver::session::Session,
-     ca: driver::driver::CrateAnalysis	//todo: tycx is in here!
+     pub ca: driver::driver::CrateAnalysis	//todo: tycx is in here!
 }
 impl RFindCtx {
 	pub fn codemap<'a>(&'a self)->&'a codemap::CodeMap { self.ca.ty_cx.sess.codemap() }
