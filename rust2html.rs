@@ -69,7 +69,7 @@ pub fn make_html(dc: &RFindCtx, fm: &codemap::FileMap, nmaps: &NodeMaps,
 //    let bg_tag=doc.begin_tag_check("bg"+(hash&15).to_str()); - todo -we had tinted different pages, doesn't seem to work well
     let maintext=doc.begin_tag_check("maintext");
     let fstart = fm.start_pos;
-    let max_digits=num_digits(fm.lines.get().len());
+    let max_digits=num_digits(fm.lines.borrow().len());
 
     if options.write_file_path {
         let t0=doc.begin_tag_check("div");//,&[(~"style",~"background-color:#"+bg+";")]);
@@ -80,18 +80,18 @@ pub fn make_html(dc: &RFindCtx, fm: &codemap::FileMap, nmaps: &NodeMaps,
     }
     {
         let mut scw=SourceCodeWriter::new(&mut doc);
-        for line in range(0, fm.lines.get().len()) {
+        for line in range(0, fm.lines.borrow().len()) {
             scw.line_index=line;
             // todo: line numbers want to go in a seperate column so they're unselectable..
             scw.doc.write_tagged("ln",pad_to_length((line+1).to_str(),max_digits," "));
             scw.doc.begin_tag_anchor((line+1).to_str()); 
-            let lend = if line < (fm.lines.get().len()-1) {
-                (fm.lines.get().get(line+1) - fstart).to_uint()
+            let lend = if line < (fm.lines.borrow().len()-1) {
+                (fm.lines.borrow().get(line+1) - fstart).to_uint()
             } else {
                 fm.src.len()
             };
             scw.doc.write(" ");
-            let line_str = fm.src.slice((fm.lines.get().get(line) - fstart).to_uint(), lend);
+            let line_str = fm.src.slice((fm.lines.borrow().get(line) - fstart).to_uint(), lend);
             //doc.writeln(line_str);
 			
             scw.doc.end_tag();

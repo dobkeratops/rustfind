@@ -223,7 +223,7 @@ impl KindToStr for ast::Expr {
     fn kind_to_str(&self)->&'static str {
         match self.node {
         ast::ExprVstore(_,_)=>"vstore",
-        ast::ExprVec(_,_)=>"vec",
+        ast::ExprVec(_)=>"vec",
         ast::ExprCall(_,_)=>"call",
         ast::ExprMethodCall(_,_,_)=>"method_call",
         ast::ExprTup(_)=>"tup",
@@ -299,7 +299,7 @@ impl KindToStr for ast::Expr {
         ast::ExprInlineAsm(_)=>"inline_asm",
         ast::ExprMac(_)=>"mac",
         ast::ExprStruct(_,_,_)=>"expr_struct",
-        ast::ExprRepeat(_,_,_)=>"repeat",
+        ast::ExprRepeat(_,_)=>"repeat",
         ast::ExprParen(_)=>"paren",
         ast::ExprBox(_, _) => "box",
         }
@@ -983,7 +983,7 @@ pub fn get_node_info_str(dc:&RFindCtx,node:&NodeTreeLoc)->~str
 
 pub fn safe_node_id_to_type(cx: &ty::ctxt, id: ast::NodeId) -> Option<ty::t> {
     //io::println!(fmt!("%?/%?", id, cx.node_types.len()));
-    match cx.node_types.get().find(&(id as uint)) {
+    match cx.node_types.borrow().find(&(id as uint)) {
        Some(&t) => Some(t),
        None => None
     }
@@ -1055,9 +1055,9 @@ pub fn build_node_def_node_table(dc:&RFindCtx)->~HashMap<ast::NodeId, ast::DefId
     let mut r=~HashMap::new();
     let curr_crate_id_hack=0;   // TODO WHAT IS CRATE ID REALLY?!
 
-    for (id, _t) in dc.tycx_ref().node_types.get().iter() { //range(0, dc.tycx.next_id.get() as uint) { 
+    for (id, _t) in dc.tycx_ref().node_types.borrow().iter() { //range(0, dc.tycx.next_id.get() as uint) { 
         //let id = id as ast::NodeId;
-        if_some!(def in dc.tycx_ref().def_map.get().find(&(*id as u32)) then { // finds a def..
+        if_some!(def in dc.tycx_ref().def_map.borrow().find(&(*id as u32)) then { // finds a def..
             if_some!(did in get_def_id(curr_crate_id_hack,*def) then {
                 r.insert(*id as ast::NodeId,did);
             })
@@ -1069,7 +1069,7 @@ pub fn build_node_def_node_table(dc:&RFindCtx)->~HashMap<ast::NodeId, ast::DefId
 
 pub fn def_node_id_from_node_id(dc:&RFindCtx, id:ast::NodeId)->ast::NodeId {
     let crate_num=0;    // TODO - whats crate Id really???
-    match dc.tycx_ref().def_map.get().find(&id) { // finds a def..
+    match dc.tycx_ref().def_map.borrow().find(&id) { // finds a def..
         Some(a)=>{
             match get_def_id(crate_num,*a) {
                 Some(b)=>b.node,
