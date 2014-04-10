@@ -33,18 +33,20 @@ mod htmlwriter;
 // we could give the whole generator a root dir to look for crates? ... and assume html is generated in there..
 
 // todo: options struct.
-pub struct Options {
+pub struct RhOptions {
     pub write_file_path: bool,
     pub write_references: bool,
-    pub output_dir: Path
+    pub output_dir: Path,
+	pub rustdoc_url: Option<Path>,		// optional where to place links back to rustdoc pages
 }
 
-impl Options {
-    pub fn default() -> Options {
-        Options {
+impl RhOptions {
+    pub fn default() -> RhOptions {
+        RhOptions {
             write_file_path: true,
             write_references: true,
-            output_dir: Path::new("")
+            output_dir: Path::new(""),
+            rustdoc_url: None
         }
     }
 }
@@ -53,7 +55,7 @@ impl Options {
 //nim:&FNodeInfoMap,jdm:&JumpToDefMap, jrm:&JumpToRefMap
 pub fn make_html(dc: &RFindCtx, fm: &codemap::FileMap, nmaps: &NodeMaps,
                  xcm: &CrossCrateMap, fln: &FileLineNodes, lib_path: &str, 
-                 out_file: &Path, options: &Options) -> ~str {
+                 out_file: &Path, options: &RhOptions) -> ~str {
     // todo - Rust2HtmlCtx { fm,nim,jdm,jrm } .. cleanup common intermediates
 	let mut p=Profiler::new("make_html");
 
@@ -117,7 +119,7 @@ pub fn make_html(dc: &RFindCtx, fm: &codemap::FileMap, nmaps: &NodeMaps,
         }
     }
     if options.write_references {
-        write_references(&mut doc,dc,fm,lib_path,nmaps, fln.nodes_per_line);
+        write_symbol_references(&mut doc,dc,fm,lib_path,nmaps, fln.nodes_per_line);
     }
 
     doc.end_tag_check(maintext);
@@ -128,7 +130,7 @@ pub fn make_html(dc: &RFindCtx, fm: &codemap::FileMap, nmaps: &NodeMaps,
     doc.doc
 }
 
-pub fn write_source_as_html_sub(dc:&RFindCtx, nim:&FNodeInfoMap, jdm:&JumpToDefMap,xcm:&CrossCrateMap,lib_path:&str, options: &Options) {
+pub fn write_source_as_html_sub(dc:&RFindCtx, nim:&FNodeInfoMap, jdm:&JumpToDefMap,xcm:&CrossCrateMap,lib_path:&str, options: &RhOptions) {
 
     let npl=NodesPerLinePerFile::new(dc,nim);
 
@@ -190,7 +192,7 @@ fn is_valid_filename(f:&str) ->bool{
     }
 }
 
-fn write_head(doc:&mut htmlwriter::HtmlWriter, out_file: &Path, options: &Options) {
+fn write_head(doc:&mut htmlwriter::HtmlWriter, out_file: &Path, options: &RhOptions) {
     let css_rel_path = &options.output_dir
                         .path_relative_from(&out_file.dir_path())
                         .unwrap_or(Path::new(""));
@@ -660,9 +662,11 @@ fn resolve_link(link:i64, dc:&RFindCtx,fm:&codemap::FileMap,lib_path:&str, nmaps
     } else
     */
     if link !=no_link {
-        if (link as i32)<0{// link to refs block,value is -(this node index)
+		// If this node is a definition, we write a link to references block(todo-page)-or TODO rustdoc page.
+		// link to refs block with link = neg(node_id)
+        if (link as i32)<0{
             let ifp= (nmaps.nim,-((link as i32) as u32)).to_index_file_pos(dc.tycx_ref()).unwrap();
-            "#"+(ifp.line+1).to_str()+"_"+ifp.col.to_str()+"_refs"
+            "#line"+(ifp.line+1).to_str()+"_col"+ifp.col.to_str()+"_refs"
         } else
         {
             let def_crate = (link>>48) as u32;
@@ -677,7 +681,8 @@ fn resolve_link(link:i64, dc:&RFindCtx,fm:&codemap::FileMap,lib_path:&str, nmaps
                             make_html_name_rel(files.get(ifp.file_index as uint).name, fm.name) +
                                 "#" + (ifp.line + 1).to_str()
                         },
-                        None=>~"c="+def_crate.to_str()+" n="+def_node.to_str()
+						// Broken link. However, write out the create & node index for debug.
+                        None=>~"crate_id="+def_crate.to_str()+" node_id="+def_node.to_str()
                     }
 
                 },
@@ -771,6 +776,36 @@ pub type JumpToRefMap = MultiMap<ast::NodeId, ast::NodeId>;
 // 'this function, called from these locations'
 // 'this function, called fromm these functions ... <<< BETTER
 // 'this type, used in these functions ... '
+/// Get a line from sourcecode, but step past items and blank lines. return the line and next line index
+fn is_whitespace(c:&char)->bool {
+	match *c {
+		' '|'\t'|'\n'=>true,
+		_=>false
+	}
+}
+fn get_source_line_filtered(fm:&codemap::FileMap, line_index:uint)-> (~str, uint) {
+	
+	let mut i=line_index;
+	while i < num_source_lines(fm) {
+		let line_str = get_source_line(fm, i);
+		if line_str.chars().nth(0).unwrap_or('\0')!='#' {// not a 'lang item'
+			if line_str.chars().filter(|x|!is_whitespace(x)).len()>0{ // not all whitespace
+				return (line_str,i);
+			}
+		};
+		i+=1;
+	}
+	return (~"",i);
+}
+#[test]
+fn test_whitespace() {
+	let str0="foo bar baz";
+	let str1="\t   \t";
+	let str2="\t foo\t";
+	assert!(str0.chars().filter(|x|!is_whitespace(x)).len()>0)
+	assert!(str1.chars().filter(|x|!is_whitespace(x)).len()==0)
+	assert!(str2.chars().filter(|x|!is_whitespace(x)).len()>0)
+}
 
 fn get_source_line(fm:&codemap::FileMap, i: uint) -> ~str {
 
@@ -850,8 +885,8 @@ impl<T:Ord+Clone> Extents<T> {
 }
 
 
-
-fn write_references(doc:&mut htmlwriter::HtmlWriter,dc:&RFindCtx, fm:&codemap::FileMap, _:&str,  nmaps:&NodeMaps, _: &[~[ast::NodeId]]) {
+/// Write a block of links to symbol references. Workaround to not having popup menus when you click on a symbol.
+fn write_symbol_references(doc:&mut htmlwriter::HtmlWriter,dc:&RFindCtx, fm:&codemap::FileMap, _:&str,  nmaps:&NodeMaps, _: &[~[ast::NodeId]]) {
 
 
     let depth=doc.depth();
@@ -937,7 +972,7 @@ fn write_references(doc:&mut htmlwriter::HtmlWriter,dc:&RFindCtx, fm:&codemap::F
                         if newline==false {doc.writeln("");}
                         header_written=true;
                         doc.write_refs_header(dc,nmaps.nim,fm,dn);
-                        doc.writeln_tagged("c40","references:-");
+                        doc.writeln_tagged("c43","references:-");
                         newline=true;
                     };
                     // Write a reference to the file, if we're looking a new file now
@@ -963,12 +998,13 @@ fn write_references(doc:&mut htmlwriter::HtmlWriter,dc:&RFindCtx, fm:&codemap::F
                         	// Display a line from the referenced location, but
                             // step past any #[lang items] - we want to show a meaningful definition.
                             let  mut ref_line_index = ref_ifp.line as uint;
-                            let mut src_line=get_source_line(&***rfm, ref_line_index);
-                            while ref_line_index < num_source_lines(&***rfm){ 
+/*                            let mut src_line=get_source_line(&***rfm, ref_line_index);
+                            while ref_line_index < num_source_lines(&***rfm){
                             	src_line = get_source_line(&***rfm, ref_line_index);
                             	if src_line.chars().nth(0).unwrap_or('\0')!='#' {break};
                             	ref_line_index+=1;
                             }
+*/							let (src_line,_)=get_source_line_filtered(&***rfm,ref_line_index);
                             if last_link_line !=ref_line_index { // dont write multiple links on the same line.
 	                            doc.write_tagged("c40",(ref_ifp.line+1).to_str()+&": ");
                             	last_link_line=ref_line_index;
@@ -1000,6 +1036,7 @@ fn write_references(doc:&mut htmlwriter::HtmlWriter,dc:&RFindCtx, fm:&codemap::F
 }
 
 impl htmlwriter::HtmlWriter{
+	// todo - i dont think these are really methods of 'htmlwriter'. 
     fn write_refs_header(&mut self,dc:&RFindCtx,nim:&FNodeInfoMap, fm:&codemap::FileMap, nid:ast::NodeId) {
     	let depth=self.depth();
         self.writeln("");
@@ -1012,16 +1049,20 @@ impl htmlwriter::HtmlWriter{
     //      let def_info=nim.find(&nid).unwrap();
     //      let ifpe=get_node_index_file_pos(dc		,nim,nid).unwrap();
 
-                self.begin_tag_anchor((ifp.line+1).to_str()+"_"+ifp.col.to_str() + "_refs" );
+                self.begin_tag_anchor("line"+(ifp.line+1).to_str()+"_col"+ifp.col.to_str() + "_refs" );
                 self.begin_tag_link( "#"+(ifp.line+1).to_str());
-                self.begin_tag("c40");
+                self.begin_tag("c43");
                 self.writeln(dc.codemap().files.borrow().get(ifp.file_index as uint).name + ":" + (ifp.line + 1).to_str() + ":" + ifp.col.to_str()
                             +"-"+(ifpe.line+1).to_str()+":"+ifpe.col.to_str() +" -" +info.kind + "- definition:");
                 self.end_tag();
                 self.begin_tag("pr");
             //          dump!(def_tfp);
-                self.writeln(get_source_line(fm,ifp.line as uint) );
-                self.writeln(get_source_line(fm,ifp.line  as uint+1) );
+				let (linestr1,l1)=get_source_line_filtered(fm,ifp.line as uint);
+				let (linestr2,l2)=get_source_line_filtered(fm,l1 as uint+1);
+				let (linestr3,_)=get_source_line_filtered(fm,l2 as uint+1);
+                self.writeln(linestr1 );
+                self.writeln(linestr2 );
+                self.writeln(linestr3 );
                 self.end_tag();
                 self.end_tag();
                 self.end_tag();
@@ -1055,8 +1096,8 @@ impl htmlwriter::HtmlWriter{
 
         for _ in range(0,num_dirs) {link_target.push_str("../");}
         self.write("    ");
-        let t0=self.begin_tag_link(link_target+"index.html"); self.write("(index<- )"); self.end_tag_check(t0); self.write("    ");
-        let t1=self.begin_tag_link(link_target); self.write("    ./"); self.end_tag_check(t1);
+        let t0=self.begin_tag_link(link_target+"index.html").depth(); self.write("(index<- )"); self.end_tag_check(t0); self.write("    ").depth();
+        let t1=self.begin_tag_link(link_target).depth(); self.write("    ./"); self.end_tag_check(t1);
 
         for (i,x) in name_parts.iter().enumerate() {
             let is_dir = i < num_dirs;
@@ -1064,8 +1105,8 @@ impl htmlwriter::HtmlWriter{
             if is_dir {link_target.push_str("/");}
             else { link_target.push_str(".html");}
             
-            let fpc=self.begin_tag_check(file_path_col);
-            let fpl=self.begin_tag_link(link_target); self.write(*x);
+            let fpc=self.begin_tag(file_path_col).depth();
+            let fpl=self.begin_tag_link(link_target).depth(); self.write(*x);
             self.end_tag_check(fpl);/*link*/
 			self.end_tag_check(fpc);/*file_path_col*/
             if is_dir {self.write_tagged(file_delim_col,"/");}
@@ -1110,7 +1151,6 @@ fn make_html_name_reloc(f:&str, origin:&str, reloc:&str)->~str {
     if reloc.len()>0 {
 //		printf("relocating path to %s"+str);
         acc=reloc.to_owned();
-		acc.push_str("FOOBARBAZ");
         if acc.chars().last().unwrap()!='/' { acc.push_char('/');}
     }else {
         for _ in range(0,count_chars_in(origin,'/')) {

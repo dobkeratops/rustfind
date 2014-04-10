@@ -1,7 +1,7 @@
-#[feature(managed_boxes)];
-#[feature(globs)];
-#[feature(macro_rules)];
-#[feature(log_syntax)];
+#![feature(managed_boxes)]
+#![feature(globs)]
+#![feature(macro_rules)]
+#![feature(log_syntax)]
 
 extern crate syntax;
 extern crate rustc;
@@ -19,6 +19,7 @@ use std::{os,local_data};
 use std::cell::RefCell;
 use collections::{HashMap,HashSet};
 use std::path::Path;
+use rust2html::RhOptions;
 
 use getopts::{optmulti, optopt, optflag, getopts};
 
@@ -85,7 +86,7 @@ pub macro_rules! if_some {
 fn optgroups () -> ~[getopts::OptGroup] {
     ~[
         optmulti("L", "", "Path to search for libraries", "<lib path>"),
-        optflag("d", "", "Debug for this tool (DEBUG)"),
+        optflag("D", "", "Debug for this tool (DEBUG)"),
         optflag("r", "", "Dump .rfx `crosscratemap` containing ast nodes and jump definitions"),
         optflag("j", "", "Dump json map of the ast nodes & definitions (DEBUG)"),
         optflag("h", "help", "Print this help menu and exit"),
@@ -94,6 +95,7 @@ fn optgroups () -> ~[getopts::OptGroup] {
         optflag("w", "", "Dump as html"),
         optflag("f", "", "Return definition reference of symbol at given position"),
         optopt("x", "external_crates", "Path to html of external crates, or '-x .' to emit relative ", "$RUST_PATH/src"),
+        optflag("d", "", "TODO url for rustdoc pages to link to, default=unused"),
         optopt("o", "", "Directory to output the html / rfx files to", "OUTDIR")
     ]
 }
@@ -139,7 +141,8 @@ fn main() {
         let dc = @get_ast_and_resolve(&Path::new(filename), libs.move_iter().collect());
         local_data::set(ctxtkey, dc);
 
-        if matches.opt_present("d") {
+        let mut html_options = rust2html::RhOptions::default();
+        if matches.opt_present("D") {
             debug_test(dc);
             done=true;
         } else if matches.opt_present("j"){
@@ -170,11 +173,14 @@ fn main() {
                 done=true;
             }
         }
+        if matches.opt_present("d") {
+			html_options.rustdoc_url = Some(Path::new(matches.opt_str("d").unwrap_or(~"")));
+			println!("TODO:linking to rustdoc pages at {}",html_options.rustdoc_url.clone().unwrap().as_str());
+        }
         if matches.opt_present("i") {
             rfserver::run_server(dc);
             done=true;
         }
-        let mut html_options = rust2html::Options::default();
         if matches.opt_present("o") {
             let out_dir = matches.opt_str("o").unwrap();
             let mut out_path = Path::new("./");
@@ -328,7 +334,7 @@ fn debug_test(dc:&RFindCtx) {
 }
 
 
-pub fn write_source_as_html_and_rfx(dc:&RFindCtx,lib_html_path:&str,opts: &rust2html::Options, write_html:bool) {
+pub fn write_source_as_html_and_rfx(dc:&RFindCtx,lib_html_path:&str,opts: &RhOptions, write_html:bool) {
     let mut xcm:~CrossCrateMap=~HashMap::new();
 	let tm=Profiler::new("write_source_as_html_and_rfx");
 
@@ -347,5 +353,4 @@ pub fn write_source_as_html_and_rfx(dc:&RFindCtx,lib_html_path:&str,opts: &rust2
 
     }
 }
-
 

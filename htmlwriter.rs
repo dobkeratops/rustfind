@@ -115,14 +115,13 @@ impl<'a> HtmlWriter {
         self.doc.push_str(self.xlat.get(&(x as char)).to_owned());
         self
     }
-    pub fn begin_tag_anchor(&'a mut self, anchor:&str)->int {
+    pub fn begin_tag_anchor(&'a mut self, anchor:&str)->&'a mut HtmlWriter {
         self.begin_tag_ext("a",[(~"id",anchor.to_owned())]);
-        self.depth()
-        
-    }
-    pub fn begin_tag_link(&'a mut self, link:&str)->int {
+		self
+	}
+    pub fn begin_tag_link(&'a mut self, link:&str)->&'a mut HtmlWriter {
         self.begin_tag_ext("a",[(~"href",link.to_owned())]);
-        self.depth()
+        self
     }
     #[allow(dead_code)]
     pub fn write_space(&'a mut self)->&'a mut HtmlWriter {

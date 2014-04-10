@@ -47,7 +47,7 @@ pub fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, nodeinfomap:&FNodeInf
 
                 let method_map =dc.ca.maps.method_map;
 				let method_call=typeck::MethodCall{expr_id:e.id,  autoderef:0}; // TODO is that e.id or call_ident...
-				io::println(format!("e.id={:?} call_ident={:?}", e.id, call_ident.name));
+				//cfg[DEBUG] io::println(format!("e.id={:?} call_ident={:?}", e.id, call_ident.name));
                 match method_map.borrow().get(&method_call).origin {
                     typeck::MethodStatic(def_id)=>
 							return Some(def_id),
