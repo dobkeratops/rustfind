@@ -1,5 +1,5 @@
-use rfindctx::{RFindCtx,find_file_name_in,first_file_name};
-use jumptodefmap::{dump_json,lookup_def_at_text_file_pos_str, make_jdm};
+use rfindctx::{RustFindCtx,find_file_name_in,first_file_name};
+use jumptodefmap::{dump_json,lookup_def_at_text_file_pos_str, make_jump_to_def_map};
 use find_ast_node::def_of_symbol_to_str;
 use std::io;
 use std::io::BufferedReader;
@@ -9,12 +9,12 @@ use ioutil::ResultUtil;
 interactive mode, also server for IDE integration with command interface
 */
 
-pub fn run_server(dc:&RFindCtx) {
+pub fn run_server(dc:&RustFindCtx) {
     // TODO - check if RUSTI can already do this.. it would be better there IMO
     // todo _ why is super needed here?!
 
     // Currently unused
-    let (node_spans,node_def_node,_)=make_jdm(dc);
+    let (node_spans,node_def_node,_)=make_jump_to_def_map(dc);
 
     let mut curr_file=first_file_name(dc);
 

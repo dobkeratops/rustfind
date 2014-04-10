@@ -26,10 +26,10 @@ use getopts::{optmulti, optopt, optflag, getopts};
 use syntax::{parse,ast,codemap};
 use syntax::codemap::Pos;
 use find_ast_node::{safe_node_id_to_type,get_node_info_str,find_node_tree_loc_at_byte_pos,ToJsonStr,ToJsonStrFc,AstNodeAccessors,get_node_source};
-use jumptodefmap::{lookup_def_at_text_file_pos_str, make_jdm, def_info_from_node_id,
+use jumptodefmap::{lookup_def_at_text_file_pos_str, make_jump_to_def_map, def_info_from_node_id,
     lookup_def_at_text_file_pos, dump_json};
 
-use rfindctx::{RFindCtx,ctxtkey};
+use rfindctx::{RustFindCtx,ctxtkey};
 pub use codemaput::{ZTextFilePos,ZTextFilePosLen,get_span_str,ToZTextFilePos,ZIndexFilePos,ToZIndexFilePos};
 use rsfind::{SDM_LineCol,SDM_Source,SDM_GeditCmd};
 use crosscratemap::CrossCrateMap;
@@ -93,6 +93,7 @@ fn optgroups () -> ~[getopts::OptGroup] {
         optflag("i", "", "Run interactive server"),
         optflag("g", "", "Format output as gedit `filepos +line filename` (use with -f)"),
         optflag("w", "", "Dump as html"),
+        optflag("n", "no-refs", "Dont write references block at the end (default is yes)"),
         optflag("f", "", "Return definition reference of symbol at given position"),
         optopt("x", "external_crates", "Path to html of external crates, or '-x .' to emit relative ", "$RUST_PATH/src"),
         optflag("d", "", "TODO url for rustdoc pages to link to, default=unused"),
@@ -177,6 +178,9 @@ fn main() {
 			html_options.rustdoc_url = Some(Path::new(matches.opt_str("d").unwrap_or(~"")));
 			println!("TODO:linking to rustdoc pages at {}",html_options.rustdoc_url.clone().unwrap().as_str());
         }
+        if matches.opt_present("n") {
+			html_options.write_references=false;
+		}
         if matches.opt_present("i") {
             rfserver::run_server(dc);
             done=true;
@@ -212,7 +216,7 @@ fn main() {
 fn get_ast_and_resolve(
     cpath: &std::path::Path,
     libs: HashSet<std::path::Path>)
-    -> RFindCtx {
+    -> RustFindCtx {
 
     let parsesess = parse::new_parse_sess();
     let sessopts = driver::session::Options {
@@ -255,15 +259,15 @@ fn get_ast_and_resolve(
 //		 = driver::driver::phase_3_run_analysis_passes(sess, &crate2, ast_map);
 //    RFindCtx { crate_: @crate2, tycx: ty_cx,/* sess: sess,*/ /*ca:ca*/ }
 	let ca= driver::driver::phase_3_run_analysis_passes(sess, &crate2, ast_map);
-    RFindCtx { crate_: @crate2, /*tycx: ca.ty_cx, sess: sess,*/ ca:ca }
+    RustFindCtx { crate_: @crate2, /*tycx: ca.ty_cx, sess: sess,*/ ca:ca }
 }
 
-fn debug_test(dc:&RFindCtx) {
+fn debug_test(dc:&RustFindCtx) {
 
     // TODO: parse commandline source locations,convert to codemap locations
     //dump!(ctxt.tycx);
     logi!("==== Get tables of node-spans,def_maps,JumpToDefTable..===")
-    let (node_info_map,node_def_node,jdm)=jumptodefmap::make_jdm(dc);
+    let (node_info_map,node_def_node,jdm)=make_jump_to_def_map(dc);
     println(node_info_map.to_json_str(dc));
 
     logi!("==== Node Definition mappings...===")
@@ -334,7 +338,7 @@ fn debug_test(dc:&RFindCtx) {
 }
 
 
-pub fn write_source_as_html_and_rfx(dc:&RFindCtx,lib_html_path:&str,opts: &RF_Options, write_html:bool) {
+pub fn write_source_as_html_and_rfx(dc:&RustFindCtx,lib_html_path:&str,opts: &RF_Options, write_html:bool) {
     let mut xcm:~CrossCrateMap=~HashMap::new();
 	let tm=Profiler::new("write_source_as_html_and_rfx");
 
@@ -345,7 +349,7 @@ pub fn write_source_as_html_and_rfx(dc:&RFindCtx,lib_html_path:&str,opts: &RF_Op
         for (k,v) in xcm_sub.iter() {xcm.insert(*k,(*v).clone());}
     });
 
-    let (info_map,def_map,jump_map) = make_jdm(dc);
+    let (info_map,def_map,jump_map) = make_jump_to_def_map(dc);
     crosscratemap::write_cross_crate_map(dc,lib_html_path, &info_map,def_map,jump_map);
     if write_html {
 		let mut tm=::timer::Profiler::new("write_source_as_html_and_rfx");

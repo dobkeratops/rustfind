@@ -9,7 +9,7 @@ use std::slice;
 use std::cmp;
 use codemaput::{ZIndexFilePos,ToZIndexFilePos};
 use find_ast_node::{FNodeInfoMap,FNodeInfo};
-use rfindctx::{RFindCtx};
+use rfindctx::{RustFindCtx};
 use crosscratemap::{CrossCrateMap};
 use jumptodefmap::{JumpToDefMap};
 use rsfind::MyOption;
@@ -55,7 +55,7 @@ impl RF_Options {
 }
 
 //nim:&FNodeInfoMap,jdm:&JumpToDefMap, jrm:&JumpToRefMap
-pub fn make_html(dc: &RFindCtx, fm: &codemap::FileMap, nmaps: &NodeMaps,
+pub fn make_html(dc: &RustFindCtx, fm: &codemap::FileMap, nmaps: &NodeMaps,
                  xcm: &CrossCrateMap, fln: &FileLineNodes, lib_path: &str, 
                  out_file: &Path, options: &RF_Options) -> ~str {
     // todo - Rust2HtmlCtx { fm,nim,jdm,jrm } .. cleanup common intermediates
@@ -132,7 +132,7 @@ pub fn make_html(dc: &RFindCtx, fm: &codemap::FileMap, nmaps: &NodeMaps,
     doc.doc
 }
 
-pub fn write_source_as_html_sub(dc:&RFindCtx, nim:&FNodeInfoMap, jdm:&JumpToDefMap,xcm:&CrossCrateMap,lib_path:&str, options: &RF_Options) {
+pub fn write_source_as_html_sub(dc:&RustFindCtx, nim:&FNodeInfoMap, jdm:&JumpToDefMap,xcm:&CrossCrateMap,lib_path:&str, options: &RF_Options) {
 
     let npl=NodesPerLinePerFile::new(dc,nim);
 
@@ -144,7 +144,7 @@ pub fn write_source_as_html_sub(dc:&RFindCtx, nim:&FNodeInfoMap, jdm:&JumpToDefM
         }
     };
 
-    let nmaps=NodeMaps { nim:nim, jdm:jdm, jrm:def2refs};
+    let nmaps=NodeMaps { node_info_map:nim, jump_def_map:jdm, jump_ref_map:def2refs};
     let files=&dc.codemap().files;
     let files = files.borrow();
     for (fi,fm) in files.iter().enumerate() {
@@ -247,7 +247,7 @@ struct NodesPerLinePerFile {
 }
 //type NodesPerLine=&[~[ast::NodeId]];
 
-pub fn get_file_index(dc:&RFindCtx,fname:&str)->Option<uint> {
+pub fn get_file_index(dc:&RustFindCtx,fname:&str)->Option<uint> {
     // todo - functional
     let mut index=0;
     let files = dc.codemap().files.borrow();
@@ -259,13 +259,13 @@ pub fn get_file_index(dc:&RFindCtx,fname:&str)->Option<uint> {
     }
     None
 }
-pub fn get_crate_name(dc:&RFindCtx,ci:ast::CrateNum)->~str {
+pub fn get_crate_name(dc:&RustFindCtx,ci:ast::CrateNum)->~str {
     super::codemaput::get_crate_name(dc.tycx_ref(),ci)
 }
 
 
 impl NodesPerLinePerFile {
-    fn new(dc:&RFindCtx, nim:&FNodeInfoMap)->~NodesPerLinePerFile {
+    fn new(dc:&RustFindCtx, nim:&FNodeInfoMap)->~NodesPerLinePerFile {
         // todo, figure this out functionally?!
         //      dc.sess.codemap.files.map(
         //              |fm:&@codemap::FileMap|{ slice::from_elem(fm.lines.len(), ~[]) }
@@ -417,9 +417,9 @@ fn sub_match(line:&str,x:uint,opts:&[&str])->Option<(uint,uint)>{
 }
 
 pub struct NodeMaps<'a>  {
-    nim:&'a FNodeInfoMap,
-    jdm:&'a JumpToDefMap,
-    jrm:&'a JumpToRefMap
+    node_info_map:&'a FNodeInfoMap,
+    jump_def_map:&'a JumpToDefMap,
+    jump_ref_map:&'a JumpToRefMap
 }
 
 /// interface for emitting source code serially
@@ -447,7 +447,7 @@ static link_to_refs:bool    =true;
 static link_debug:bool      =true;
 
 
-fn write_line_with_links(dst:&mut SourceCodeWriter<HtmlWriter>,dc:&RFindCtx,fm:&codemap::FileMap,lib_path:&str, nmaps:&NodeMaps,xcm:&CrossCrateMap, line:&str, nodes:&[ast::NodeId]) {
+fn write_line_with_links(dst:&mut SourceCodeWriter<HtmlWriter>,dc:&RustFindCtx,fm:&codemap::FileMap,lib_path:&str, nmaps:&NodeMaps,xcm:&CrossCrateMap, line:&str, nodes:&[ast::NodeId]) {
     // todo ... BREAK THIS FUNCTION UP!!!!
     // and there is a load of messy cut paste too.
 
@@ -459,18 +459,18 @@ fn write_line_with_links(dst:&mut SourceCodeWriter<HtmlWriter>,dc:&RFindCtx,fm:&
     let mut color:~[int] = slice::from_elem(line.len(),0 as int);
     let mut depth:~[uint]= slice::from_elem(line.len(),0x7fffffff as uint);
 
-    for n in nodes.iter() {
+    for node in nodes.iter() {
 
-        match nmaps.nim.find(n) {
+        match nmaps.node_info_map.find(node) {
             None=>{},
-            Some(ni)=>{
+            Some(node_info)=>{
                 // link_id >0 = node def link. link_id<0 = node ref link
 
-                let link_id= match nmaps.jdm.find(n) {
+                let link_id= match nmaps.jump_def_map.find(node) {
                     None=>
                         if link_to_refs{
-                            if nmaps.jrm.find(*n  ).len()>0 {
-                                - *n as i64
+                            if nmaps.jump_ref_map.find(*node).len()>0 {
+                                - *node as i64
                             } else {
                                 no_link
                             }
@@ -485,11 +485,11 @@ fn write_line_with_links(dst:&mut SourceCodeWriter<HtmlWriter>,dc:&RFindCtx,fm:&
 //              let link_id=(x.node as i64)|(x.crate as i64<<48);
 //              let link_id=*n as i64 &15;
 
-                let os=ni.span.lo.to_index_file_pos(dc.tycx_ref());
-                let oe=ni.span.hi.to_index_file_pos(dc.tycx_ref());
+                let os=node_info.span.lo.to_index_file_pos(dc.tycx_ref());
+                let oe=node_info.span.hi.to_index_file_pos(dc.tycx_ref());
                 if os.is_some() && oe.is_some() {
                     let e=oe.unwrap(); let s=os.unwrap();
-                    let d = ni.span.hi.to_uint() - ni.span.lo.to_uint();    // todo - get the actual hrc node depth in here!
+                    let d = node_info.span.hi.to_uint() - node_info.span.lo.to_uint();    // todo - get the actual hrc node depth in here!
                     let xs = if dst.line_index <= s.line as uint {
                         s.col
                     } else {
@@ -506,7 +506,7 @@ fn write_line_with_links(dst:&mut SourceCodeWriter<HtmlWriter>,dc:&RFindCtx,fm:&
                     }else{
                         e.col as uint
                     };
-                    let ci = node_color_index(ni);
+                    let ci = node_color_index(node_info);
                     for x in range(xs as uint, cmp::min(xe, line.len())) {
                         if d <= depth[x] {
                             color[x]=ci;
@@ -631,7 +631,7 @@ fn write_line_with_links(dst:&mut SourceCodeWriter<HtmlWriter>,dc:&RFindCtx,fm:&
     write_line_attr_links(dst,line,color,link, resolver );
 }
 
-fn resolve_link(link:i64, dc:&RFindCtx,fm:&codemap::FileMap,lib_path:&str, nmaps:&NodeMaps,xcm:&CrossCrateMap)->~str {
+fn resolve_link(link:i64, dc:&RustFindCtx,fm:&codemap::FileMap,lib_path:&str, nmaps:&NodeMaps,xcm:&CrossCrateMap)->~str {
 /*
     if link_debug==false {
         if link!=no_link {
@@ -667,7 +667,7 @@ fn resolve_link(link:i64, dc:&RFindCtx,fm:&codemap::FileMap,lib_path:&str, nmaps
 		// If this node is a definition, we write a link to references block(todo-page)-or TODO rustdoc page.
 		// link to refs block with link = neg(node_id)
         if (link as i32)<0{
-            let ifp= (nmaps.nim,-((link as i32) as u32)).to_index_file_pos(dc.tycx_ref()).unwrap();
+            let ifp= (nmaps.node_info_map,-((link as i32) as u32)).to_index_file_pos(dc.tycx_ref()).unwrap();
             "#line"+(ifp.line+1).to_str()+"_col"+ifp.col.to_str()+"_refs"
         } else
         {
@@ -677,11 +677,11 @@ fn resolve_link(link:i64, dc:&RFindCtx,fm:&codemap::FileMap,lib_path:&str, nmaps
 				// Write a LOCAL link in the same crate, but not necaserily the same page. we know line filename, index
                 None=>//"#n"+def_node.to_str(), by node linnk
                 {
-                    match (nmaps.nim,def_node).to_index_file_pos(dc.tycx_ref()) {
-                        Some(ifp)=>{
+                    match (nmaps.node_info_map,def_node).to_index_file_pos(dc.tycx_ref()) {
+                        Some(node_file_pos)=>{
                             let files = dc.codemap().files.borrow();
-                            make_html_name_rel(files.get(ifp.file_index as uint).name, fm.name) +
-                                "#" + (ifp.line + 1).to_str()
+                            make_html_name_rel(files.get(node_file_pos.file_index as uint).name, fm.name) +
+                                "#" + (node_file_pos.line + 1).to_str()
                         },
 						// Broken link. However, write out the create & node index for debug.
                         None=>~"crate_id="+def_crate.to_str()+" node_id="+def_node.to_str()
@@ -734,6 +734,7 @@ fn write_line_attr_links(dst:&mut SourceCodeWriter<HtmlWriter>,text_line:&str,co
     assert!(tag_depth==dst.doc.depth());
 }
 
+/// gather all the nodes within the file specified by 'FileMap'
 fn find_defs_in_file(fm:&codemap::FileMap, nim:&FNodeInfoMap)->~[ast::NodeId] {
     // todo - functional way..
     let mut acc=~[];
@@ -887,25 +888,23 @@ impl<T:Ord+Clone> Extents<T> {
 }
 
 
-/// Write a block of links to symbol references. Workaround to not having popup menus when you click on a symbol.
-fn write_symbol_references(doc:&mut HtmlWriter,dc:&RFindCtx, fm:&codemap::FileMap, _:&str,  nmaps:&NodeMaps, _: &[~[ast::NodeId]]) {
+/// Write a block of links to symbol references.
+/// Workaround for not having popup menus when you click on a symbol.
+fn write_symbol_references(doc:&mut HtmlWriter,dc:&RustFindCtx, fm:&codemap::FileMap, _:&str,  nmaps:&NodeMaps, _: &[~[ast::NodeId]]) {
 
 
     let depth=doc.depth();
     doc.begin_tag_ext("div",[(~"class",~"refblock")]);
 
-//  let (nim,jdm,jrm)=(nmaps.nim, nmaps.jdm, nmaps.jrm);
-    let file_def_nodes = find_defs_in_file(fm,nmaps.nim);
-    //let mut defs_to_refs=MultiMap::new::<ast::NodeId, ast::NodeId>();
+    let file_def_nodes = find_defs_in_file(fm,nmaps.node_info_map);
 
-
-    for &dn in file_def_nodes.iter() {
-        let opt_def_info = nmaps.nim.find(&dn);
+    for &def_node in file_def_nodes.iter() {
+        let opt_def_info = nmaps.node_info_map.find(&def_node);
         if !opt_def_info.is_some() {continue;}
         let def_info = opt_def_info.unwrap();
         if !(def_info.kind==~"fn" || def_info.kind==~"struct" || def_info.kind==~"trait" || def_info.kind==~"enum" || def_info.kind==~"ty") { continue; }
 
-        let refs = nmaps.jrm.find(dn);
+        let refs = nmaps.jump_ref_map.find(def_node);
         let max_links=30;   // todo - sort..
         let max_short_links=60; // todo - sort..
 
@@ -914,33 +913,21 @@ fn write_symbol_references(doc:&mut HtmlWriter,dc:&RFindCtx, fm:&codemap::FileMa
             let mut header_written=false;
             let opt_def_tfp = def_info.span.lo.to_index_file_pos(dc.tycx_ref());
             if !opt_def_tfp.is_some() { continue;}
-            let def_tfp=opt_def_tfp.unwrap();
+            let def_file_pos=opt_def_tfp.unwrap();
             let mut links_written=0 as uint;
 
-            // sort references by file [(file_index, [...])]
-
-//          let s2=refs_by(|x|{ let
-//          let rf=refs.map(|x|{  })
-//          let refs1:~[&ast::NodeId]=refs.iter().filter(|&x|{nim.find(x).is_some()}).collect();
-//          let  refs1:() = refs.iter().filter(|&x|{true});
-
-//          let  refs1:~[int] = refs.iter().filter(|x|{true}).collect();
-//          dump!(refs1);
-            // just cannot get filter working here :(
-
-
-            let mut curr_file=def_tfp.file_index;
-            let mut refs2=refs.iter()
-                .filter(|&id|{nmaps.nim.find(id).is_some()})
+            let mut curr_file=def_file_pos.file_index;
+            let mut refs_iter=refs.iter()
+                .filter(|&id|{nmaps.node_info_map.find(id).is_some()})
                 .map(|&id|{
-                    let oni=nmaps.nim.find(&id); assert!(oni.is_some());
+                    let oni=nmaps.node_info_map.find(&id); assert!(oni.is_some());
                     let ni=oni.unwrap();
                     let oifp=ni.span.lo.to_index_file_pos(dc.tycx_ref());
                     assert!(oifp.is_some()); let ifp=oifp.unwrap();
                     (ni,ifp,id)})
                 .collect::<~[(&FNodeInfo,ZIndexFilePos,u32)]>();
 
-            let l=refs2.len();
+            let l=refs_iter.len();
             fn pri_of(x:&FNodeInfo) -> uint { 
                 if &"impl" == x.kind {
                     0
@@ -949,7 +936,7 @@ fn write_symbol_references(doc:&mut HtmlWriter,dc:&RFindCtx, fm:&codemap::FileMa
                 }
             }
             // todo: we want to sort based on node type to find impls, but we dont quite find what we want..
-            refs2.mut_slice_to(l - 1).sort_by(|&(ni1, ref ifp1, _), &(ni2, ref ifp2, _)| {
+            refs_iter.mut_slice_to(l - 1).sort_by(|&(ni1, ref ifp1, _), &(ni2, ref ifp2, _)| {
                 use std::cmp::{Less, Greater};
                 if ((ifp1.file_index - curr_file) & 0x7fff) as uint +
                         pri_of(ni1) <= ((ifp2.file_index - curr_file) & 0x7fff) as uint +
@@ -961,8 +948,8 @@ fn write_symbol_references(doc:&mut HtmlWriter,dc:&RFindCtx, fm:&codemap::FileMa
             });
             let mut newline=true;
             let mut last_link_line=0;
-            for &(_, ref ref_ifp,ref id) in refs2.iter() {
-                if *id!=dn {
+            for &(_, ref ref_ifp,ref id) in refs_iter.iter() {
+                if *id!=def_node {
                     //let opt_ref_info = nim.find(r);
                     //if !opt_ref_info.is_some() {loop;}
                     //let ref_info = opt_ref_info.unwrap();
@@ -973,7 +960,7 @@ fn write_symbol_references(doc:&mut HtmlWriter,dc:&RFindCtx, fm:&codemap::FileMa
                     if header_written==false {
                         if newline==false {doc.writeln("");}
                         header_written=true;
-                        doc.write_refs_header(dc,nmaps.nim,fm,dn);
+                        doc.write_refs_header(dc,nmaps.node_info_map,fm,def_node);
                         doc.writeln_tagged("c43","references:-");
                         newline=true;
                     };
@@ -1054,11 +1041,10 @@ fn write_symbol_references(doc:&mut HtmlWriter,dc:&RFindCtx, fm:&codemap::FileMa
                     }
                 }
             }
-            if links_written < refs2.len() {
-                doc.begin_tag("c40").writeln(".."+(refs2.len()-links_written).to_str()+"more..").end_tag();
+            if links_written < refs_iter.len() {
+                doc.begin_tag("c40").writeln(".."+(refs_iter.len()-links_written).to_str()+"more..").end_tag();
             }
             if header_written {doc.writeln("");}
-    //      info=nim.find(dn);
         }
     }
     doc.end_tag();
@@ -1067,28 +1053,29 @@ fn write_symbol_references(doc:&mut HtmlWriter,dc:&RFindCtx, fm:&codemap::FileMa
 
 impl ::rust2html::htmlwriter::HtmlWriter{ // todo, why doesn't that allow path reuse
 	// todo - i dont think these are really methods of 'htmlwriter'. 
-    fn write_refs_header(&mut self,dc:&RFindCtx,nim:&FNodeInfoMap, fm:&codemap::FileMap, nid:ast::NodeId) {
+    fn write_refs_header(&mut self,dc:&RustFindCtx,infomap:&FNodeInfoMap, fm:&codemap::FileMap, node_id:ast::NodeId) {
     	let depth=self.depth();
         self.writeln("");
-        nim.find(&nid).for_some( |info| {
+        infomap.find(&node_id).for_some( |info| {
+			// Get the extents of this node in the file.. TODO: a ranged filepos, surely?
             let oifp=info.span.lo.to_index_file_pos(dc.tycx_ref());//.unwrap();
             let oifpe=info.span.hi.to_index_file_pos(dc.tycx_ref());//.unwrap();
             if (oifp.is_some() && oifpe.is_some())==true {
-                let ifp=oifp.unwrap();
-                let ifpe=oifp.unwrap();
+                let node_file_pos=oifp.unwrap();
+                let node_end_file_pos=oifp.unwrap();
     //      let def_info=nim.find(&nid).unwrap();
     //      let ifpe=get_node_index_file_pos(dc		,nim,nid).unwrap();
 
-                self.begin_tag_anchor("line"+(ifp.line+1).to_str()+"_col"+ifp.col.to_str() + "_refs" );
+                self.begin_tag_anchor("line"+(node_file_pos.line+1).to_str()+"_col"+node_file_pos.col.to_str() + "_refs" );
                 self.begin_tag("c43");
-                self.writeln(dc.codemap().files.borrow().get(ifp.file_index as uint).name + ":" + (ifp.line + 1).to_str() + ":" + ifp.col.to_str()
-                            +"-"+(ifpe.line+1).to_str()+":"+ifpe.col.to_str() +" -" +info.kind + "- definition:");
+                self.writeln(dc.codemap().files.borrow().get(node_file_pos.file_index as uint).name + ":" + (node_file_pos.line + 1).to_str() + ":" + node_file_pos.col.to_str()
+                            +"-"+(node_end_file_pos.line+1).to_str()+":"+node_file_pos.col.to_str() +" -" +info.kind + "- definition:");
                 self.end_tag();
 
-                self.begin_tag_link( "#"+(ifp.line+1).to_str());
+                self.begin_tag_link( "#"+(node_file_pos.line+1).to_str());
                 self.begin_tag("pr");
             //          dump!(def_tfp);
-				let (linestr1,l1)=get_source_line_filtered(fm,ifp.line as uint);
+				let (linestr1,l1)=get_source_line_filtered(fm,node_file_pos.line as uint);
 				let (linestr2,l2)=get_source_line_filtered(fm,l1 as uint+1);
 				let (linestr3,_)=get_source_line_filtered(fm,l2 as uint+1);
                 self.writeln(linestr1 );
@@ -1102,7 +1089,7 @@ impl ::rust2html::htmlwriter::HtmlWriter{ // todo, why doesn't that allow path r
         self.check_depth(depth);
     }
 
-    fn write_file_ref(&mut self, dc:&RFindCtx,origin_fm:&codemap::FileMap, fi:uint) {
+    fn write_file_ref(&mut self, dc:&RustFindCtx,origin_fm:&codemap::FileMap, fi:uint) {
         let fname = dc.codemap().files.borrow();
         let fname = fname.get(fi).name.as_slice();
         self

@@ -7,7 +7,7 @@ use syntax::codemap;
 use syntax::codemap::BytePos;
 //use rustc::middle::mem_categorization::ast_node;
 use rustc::middle::ty;
-use rfindctx::{RFindCtx,};
+use rfindctx::{RustFindCtx,};
 use codemaput::{ZTextFilePos,ToZIndexFilePos,dump_span,get_span_str};
 
 /*
@@ -132,9 +132,9 @@ pub fn build_node_info_map(c:@ast::Crate)-> FNodeInfoMap {
 }
 
 
-pub trait ToJsonStrFc {fn to_json_str(&self,c:&RFindCtx)->~str;}
+pub trait ToJsonStrFc {fn to_json_str(&self,c:&RustFindCtx)->~str;}
 
-pub fn node_spans_table_to_json_sub(dc:&RFindCtx,ns:&FNodeInfoMap)->~str {
+pub fn node_spans_table_to_json_sub(dc:&RustFindCtx,ns:&FNodeInfoMap)->~str {
     // TODO - is there a cleaner functional way,
     // map (|x| fmt...).flatten_to_str() or something like that..
 
@@ -165,7 +165,7 @@ pub fn node_spans_table_to_json_sub(dc:&RFindCtx,ns:&FNodeInfoMap)->~str {
 }
 
 impl ToJsonStrFc for FNodeInfoMap {
-    fn to_json_str(&self,dc:&RFindCtx)->~str {
+    fn to_json_str(&self,dc:&RustFindCtx)->~str {
         ~"[\n"+node_spans_table_to_json_sub(dc,self)+"]\n"
     }
 }
@@ -871,7 +871,7 @@ impl Visitor<()> for Finder {
     }
 }
 
-pub fn get_node_info_str(dc:&RFindCtx,node:&NodeTreeLoc)->~str
+pub fn get_node_info_str(dc:&RustFindCtx,node:&NodeTreeLoc)->~str
 {
     fn path_to_str(path:&ast::Path)->~str {
         let mut acc=~"";
@@ -885,7 +885,7 @@ pub fn get_node_info_str(dc:&RFindCtx,node:&NodeTreeLoc)->~str
         acc
         // typeparams too... path.types?
     }
-    fn pat_to_str(dc:&RFindCtx,p:&ast::Pat)->~str{
+    fn pat_to_str(dc:&RustFindCtx,p:&ast::Pat)->~str{
         // todo -factor out and recurse
         match p.node {
             ast::PatIdent(_, ref path, _)=>~"pat_ident:"+path_to_str(path),
@@ -906,7 +906,7 @@ pub fn get_node_info_str(dc:&RFindCtx,node:&NodeTreeLoc)->~str
             _=>~"?"
         }
     };
-    fn ty_to_str(dc:&RFindCtx,t:&ast::Ty)->~str{
+    fn ty_to_str(dc:&RustFindCtx,t:&ast::Ty)->~str{
         match t.node{
             ast::TyNil=> ~"nil",
             ast::TyBot=>~"bottomtype",
@@ -925,7 +925,7 @@ pub fn get_node_info_str(dc:&RFindCtx,node:&NodeTreeLoc)->~str
             _ =>~"?"
         }
     }
-    fn expr_to_str(dc:&RFindCtx, x:&ast::Expr_)->~str {
+    fn expr_to_str(dc:&RustFindCtx, x:&ast::Expr_)->~str {
         match *x {
             ast::ExprStruct(ref p,_,_)=>~"(expr_struct "+ path_to_str(p) +")",
             ast::ExprCall(ref e,ref args) => {
@@ -1029,7 +1029,7 @@ impl ToJsonStr for JumpToDefMap {
 }
 */
 
-pub fn byte_pos_from_text_file_pos_str(dc:&RFindCtx,filepos:&str)->Option<codemap::BytePos> {
+pub fn byte_pos_from_text_file_pos_str(dc:&RustFindCtx,filepos:&str)->Option<codemap::BytePos> {
     let toks=filepos.split(':').collect::<~[_]>();
     if toks.len()<3 { return None; }
 //  let t0:()=toks[0];
@@ -1050,7 +1050,7 @@ pub fn byte_pos_from_text_file_pos_str(dc:&RFindCtx,filepos:&str)->Option<codema
 }
 
 
-pub fn build_node_def_node_table(dc:&RFindCtx)->~HashMap<ast::NodeId, ast::DefId>
+pub fn build_node_def_node_table(dc:&RustFindCtx)->~HashMap<ast::NodeId, ast::DefId>
 {
     let mut r=~HashMap::new();
     let curr_crate_id_hack=0;   // TODO WHAT IS CRATE ID REALLY?!
@@ -1067,7 +1067,7 @@ pub fn build_node_def_node_table(dc:&RFindCtx)->~HashMap<ast::NodeId, ast::DefId
 }
 
 
-pub fn def_node_id_from_node_id(dc:&RFindCtx, id:ast::NodeId)->ast::NodeId {
+pub fn def_node_id_from_node_id(dc:&RustFindCtx, id:ast::NodeId)->ast::NodeId {
     let crate_num=0;    // TODO - whats crate Id really???
     match dc.tycx_ref().def_map.borrow().find(&id) { // finds a def..
         Some(a)=>{
@@ -1081,7 +1081,7 @@ pub fn def_node_id_from_node_id(dc:&RFindCtx, id:ast::NodeId)->ast::NodeId {
 }
 
 
-pub fn def_of_symbol_to_str(_:&RFindCtx, _:&FNodeInfoMap, _:&HashMap<ast::NodeId, ast::DefId>, _:&str)->~str {
+pub fn def_of_symbol_to_str(_:&RustFindCtx, _:&FNodeInfoMap, _:&HashMap<ast::NodeId, ast::DefId>, _:&str)->~str {
     ~"TODO"
 }
 

@@ -11,7 +11,7 @@ use rsfind::ShowDefMode;
 use find_ast_node::{FNodeInfoMap, FNodeInfo, AstNode, NodeTreeLoc, find_node_tree_loc_at_byte_pos,
     build_node_def_node_table, build_node_info_map, get_node_source, astnode_expr,
     get_def_id, byte_pos_from_text_file_pos_str, ToJsonStr, ToJsonStrFc, AstNodeAccessors};
-use rfindctx::{RFindCtx,get_source_loc};
+use rfindctx::{RustFindCtx,get_source_loc};
 use codemaput::ZTextFilePos;
 use rf_ast_ut::{auto_deref_ty, find_named_struct_field};
 use util::flatten_to_str_ng; //todo - why is qualifying manually not working?!
@@ -35,7 +35,7 @@ pub macro_rules! if_some {
 pub type JumpToDefMap = HashMap<ast::NodeId,ast::DefId> ;
 
 
-pub fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, nodeinfomap:&FNodeInfoMap, _: &HashMap<ast::NodeId,ast::DefId>)->Option<ast::DefId> {
+pub fn lookup_def_node_of_node(dc:&RustFindCtx,node:&AstNode, nodeinfomap:&FNodeInfoMap, _: &HashMap<ast::NodeId,ast::DefId>)->Option<ast::DefId> {
 
     match *node {
         astnode_expr(e)=>match e.node {
@@ -108,7 +108,7 @@ pub fn lookup_def_node_of_node(dc:&RFindCtx,node:&AstNode, nodeinfomap:&FNodeInf
     return None;
 }
 
-pub fn build_jump_to_def_map(dc:&RFindCtx, nim: &FNodeInfoMap,nd:&HashMap<ast::NodeId,ast::DefId>)->~JumpToDefMap{
+pub fn build_jump_to_def_map(dc:&RustFindCtx, nim: &FNodeInfoMap,nd:&HashMap<ast::NodeId,ast::DefId>)->~JumpToDefMap{
 // todo: NodeId->AStNode  .. lookup_def_ inner functionality extracted
 	let prof=::timer::Profiler::new("build_jump_to_def_map");
     let mut jdm=~HashMap::new();
@@ -126,7 +126,7 @@ pub fn build_jump_to_def_map(dc:&RFindCtx, nim: &FNodeInfoMap,nd:&HashMap<ast::N
     jdm
 }
 
-pub fn def_info_from_node_id<'a,'b>(dc:&'a RFindCtx, node_info:&'b FNodeInfoMap, id:ast::NodeId)->(ast::DefId,Option<&'b FNodeInfo>) {
+pub fn def_info_from_node_id<'a,'b>(dc:&'a RustFindCtx, node_info:&'b FNodeInfoMap, id:ast::NodeId)->(ast::DefId,Option<&'b FNodeInfo>) {
     let crate_num=0;
     let def_map = dc.tycx_ref().def_map.borrow();
     match def_map.find(&id) { // finds a def..
@@ -147,7 +147,7 @@ pub fn def_info_from_node_id<'a,'b>(dc:&'a RFindCtx, node_info:&'b FNodeInfoMap,
 
 
 
-pub fn dump_json(dc:&RFindCtx) {
+pub fn dump_json(dc:&RustFindCtx) {
     // TODO: full/partial options - we currently wwrite out all the nodes we find.
     // need option to only write out nodes that map to definitons.
     io::println("{");
@@ -178,27 +178,27 @@ pub fn dump_json(dc:&RFindCtx) {
     io::println("}");
 }
 
-pub fn lookup_def_at_text_file_pos(dc:&RFindCtx, tfp:&ZTextFilePos, show_mode:ShowDefMode)->Option<~str> {
+pub fn lookup_def_at_text_file_pos(dc:&RustFindCtx, tfp:&ZTextFilePos, show_mode:ShowDefMode)->Option<~str> {
     match tfp.to_byte_pos(dc.tycx_ref()) {
         None=>None,
         Some(bp)=>lookup_def_at_byte_pos(dc,bp,show_mode)
     }
 }
 
-pub fn lookup_def_at_text_file_pos_str(dc:&RFindCtx,file_pos_str:&str, show_mode:ShowDefMode)->Option<~str> {
+pub fn lookup_def_at_text_file_pos_str(dc:&RustFindCtx,file_pos_str:&str, show_mode:ShowDefMode)->Option<~str> {
     match byte_pos_from_text_file_pos_str(dc,file_pos_str) {
         None=>None,
         Some(bp)=>lookup_def_at_byte_pos(dc,bp,show_mode),
     }
 }
 
-pub fn node_id_from_text_file_pos_str(dc:&RFindCtx, file_pos_str:&str)->Option<ast::NodeId> {
+pub fn node_id_from_text_file_pos_str(dc:&RustFindCtx, file_pos_str:&str)->Option<ast::NodeId> {
     match node_from_text_file_pos_str(dc, file_pos_str) {
         None=>None,
         Some(an)=>an.get_id()
     }
 }
-pub fn node_from_text_file_pos_str(dc:&RFindCtx, file_pos_str:&str)->Option<AstNode> {
+pub fn node_from_text_file_pos_str(dc:&RustFindCtx, file_pos_str:&str)->Option<AstNode> {
     match byte_pos_from_text_file_pos_str(dc,file_pos_str) {
         Some(bp)=>{let ndt=find_node_tree_loc_at_byte_pos(dc.crate_,bp); Some(*ndt.last().get_ref().clone())},
         None=>None
@@ -208,16 +208,16 @@ pub fn node_from_text_file_pos_str(dc:&RFindCtx, file_pos_str:&str)->Option<AstN
 
 
 
-pub fn lookup_def_at_byte_pos(dc:&RFindCtx, bp:BytePos, m:ShowDefMode)->Option<~str> {
+pub fn lookup_def_at_byte_pos(dc:&RustFindCtx, bp:BytePos, m:ShowDefMode)->Option<~str> {
     let ndt=find_node_tree_loc_at_byte_pos(dc.crate_,bp);
     lookup_def_of_node_tree_loc(dc,&ndt,m)
 }
 
-pub fn lookup_def_of_node_tree_loc(dc:&RFindCtx,node_tree_loc:&NodeTreeLoc,m:ShowDefMode)->Option<~str> {
+pub fn lookup_def_of_node_tree_loc(dc:&RustFindCtx,node_tree_loc:&NodeTreeLoc,m:ShowDefMode)->Option<~str> {
     lookup_def_of_node(dc,*node_tree_loc.last().get_ref(),m)
 }
 
-pub fn lookup_def_of_node(dc: &RFindCtx, node: &AstNode, m: ShowDefMode)->Option<~str> {
+pub fn lookup_def_of_node(dc: &RustFindCtx, node: &AstNode, m: ShowDefMode)->Option<~str> {
     io::println("def of node:"+node.get_id().unwrap_or(0).to_str());
     let node_spans=build_node_info_map(dc.crate_);
     let node_def_node = build_node_def_node_table(dc);
@@ -225,11 +225,11 @@ pub fn lookup_def_of_node(dc: &RFindCtx, node: &AstNode, m: ShowDefMode)->Option
 }
 
 
-pub fn lookup_def_of_node_sub(dc:&RFindCtx,node:&AstNode,m:ShowDefMode,nim:&FNodeInfoMap, node_def_node:&HashMap<ast::NodeId,ast::DefId>)->Option<~str> {
+pub fn lookup_def_of_node_sub(dc:&RustFindCtx,node:&AstNode,m:ShowDefMode,nim:&FNodeInfoMap, node_def_node:&HashMap<ast::NodeId,ast::DefId>)->Option<~str> {
     // TODO - cache outside?
 
 
-    fn mk_result(dc:&RFindCtx,  m:ShowDefMode, nim:&FNodeInfoMap, def_node_id:ast::DefId, _: &str)->Option<~str> {
+    fn mk_result(dc:&RustFindCtx,  m:ShowDefMode, nim:&FNodeInfoMap, def_node_id:ast::DefId, _: &str)->Option<~str> {
         if def_node_id.krate != 0 {
             Some(~"{cross-crate-def not implemented, "+def_node_id.to_str()+"}")
         }
@@ -257,7 +257,7 @@ pub fn lookup_def_of_node_sub(dc:&RFindCtx,node:&AstNode,m:ShowDefMode,nim:&FNod
     }
 }
 
-pub fn make_jdm(dc:&RFindCtx)->( FNodeInfoMap, ~HashMap<ast::NodeId,ast::DefId>,~JumpToDefMap)
+pub fn make_jump_to_def_map(dc:&RustFindCtx)->( FNodeInfoMap, ~HashMap<ast::NodeId,ast::DefId>,~JumpToDefMap)
 {
     let mut t = Profiler::new("make_jdm");
     let nim=build_node_info_map(dc.crate_);
