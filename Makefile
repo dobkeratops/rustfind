@@ -70,13 +70,14 @@ rust_lib_pre: rustfind
 	@echo $(CRATES)
 
 # compile the main rust sourcetree html, (compiler plus libraries)
-# brute force because the above wasn't working, we have extra options for rustc aswell.
+# brute force because the above wasn't working, we have extra extra options for rustc aswell.
 # any suggestions on how to make the makefile better welcome.
+# 'rust_src:' is a smarter target to do the same thing, but i couldn't get it to work
 rust: rust_lib_pre
 	@if [ ! -f /usr/local/bin/rustfind ];then  echo "run make install first"; /usr/local/bin/rustfind; fi ; 
 
 	cd $(RUST_PATH)/src;pwd;
-	
+
 	cd $(RUST_PATH)/src;pwd; rustfind libstd/lib.rs
 	cd $(RUST_PATH)/src;pwd; rustfind libgreen/lib.rs
 	cd $(RUST_PATH)/src;pwd; rustfind librustuv/lib.rs
@@ -108,6 +109,16 @@ rust: rust_lib_pre
 	cd $(RUST_PATH)/src;pwd; rustfind libfourcc/lib.rs
 	cd $(RUST_PATH)/src;pwd; rustfind libhexfloat/lib.rs
 
+help:
+	@echo "rustfind makefile:"
+	@echo " "
+	@echo "make rustfind - compile the rustfind tool"
+	@echo "make install - copy to /usr/local/bin"
+	@echo "make rust - run rustfind on the main rust sourcetree"
+	@echo "make html - run rustfind on its own sourcetree"
+	@echo " "
+	@echo "once compiled, you can invoke 'rustfind <cratefile.rs>' to build linked htmlview"
+	@echo "but its more useful if you build the main rust sourcetree first for reference"
 
 #Compile the main executable
 rustfind: rustfind.rs $(SRC) 

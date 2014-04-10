@@ -668,6 +668,7 @@ fn resolve_link(link:i64, dc:&RFindCtx,fm:&codemap::FileMap,lib_path:&str, nmaps
             let def_crate = (link>>48) as u32;
             let def_node=(link&((1<<48)-1)) as u32;
             match xcm.find(&ast::DefId{krate:def_crate,node:def_node}) {
+				// Write a LOCAL link in the same crate, but not necaserily the same page. we know line filename, index
                 None=>//"#n"+def_node.to_str(), by node linnk
                 {
                     match (nmaps.nim,def_node).to_index_file_pos(dc.tycx_ref()) {
@@ -680,6 +681,7 @@ fn resolve_link(link:i64, dc:&RFindCtx,fm:&codemap::FileMap,lib_path:&str, nmaps
                     }
 
                 },
+				// Write a CROSS CRATE link, to a different crate. We know the Node Index.
                 Some(a)=>{
     //                          "../gplsrc/rust/src/"+a.fname+".html"+
                     make_html_name_reloc(a.fname,fm.name,lib_path)+
@@ -1106,7 +1108,9 @@ fn count_chars_in(f:&str, x:char)->uint{
 fn make_html_name_reloc(f:&str, origin:&str, reloc:&str)->~str {
     let mut acc=~"";
     if reloc.len()>0 {
+//		printf("relocating path to %s"+str);
         acc=reloc.to_owned();
+		acc.push_str("FOOBARBAZ");
         if acc.chars().last().unwrap()!='/' { acc.push_char('/');}
     }else {
         for _ in range(0,count_chars_in(origin,'/')) {

@@ -93,7 +93,7 @@ fn optgroups () -> ~[getopts::OptGroup] {
         optflag("g", "", "Format output as gedit `filepos +line filename` (use with -f)"),
         optflag("w", "", "Dump as html"),
         optflag("f", "", "Return definition reference of symbol at given position"),
-        optopt("x", "external_crates", "Path to html of external crates", "$RUST_PATH/src"),
+        optopt("x", "external_crates", "Path to html of external crates, or '-x .' to emit relative ", "$RUST_PATH/src"),
         optopt("o", "", "Directory to output the html / rfx files to", "OUTDIR")
     ]
 }
@@ -106,9 +106,14 @@ fn usage(binary: &str) {
     println!("    - load cratename.rs; look for definition at anotherfile.rs:line:col");
     println!("    - where anotherfile.rs is assumed to be a module of the crate");
     println!(" Set RUST_LIBS for a default library search path");
+    println!(" ");
+    println!("example use:- ");
+    println!(" ");
+    println!("rustfind cratefile.rs  - generate html view of source");
 }
 
 fn main() {
+
     let mut args = os::args();
     let binary = args.shift().unwrap();
 
@@ -142,7 +147,11 @@ fn main() {
         }
         let mut i=0;
         let lib_html_path = if matches.opt_present("x") {
-            matches.opt_str("x").unwrap() + "/"
+            let given_path=matches.opt_str("x").unwrap();
+			if given_path!=~"." {given_path+"/"} 
+			else 
+				{~""}	// "-x ."we need this behaviour to emit relative pages we can publish
+			
         } else {
 			println!("No library path specified with -x, so using $RUST_PATH/src\n")
 			match os::getenv("RUST_PATH") {
