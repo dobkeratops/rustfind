@@ -13,10 +13,13 @@ use rfindctx::{RFindCtx};
 use crosscratemap::{CrossCrateMap};
 use jumptodefmap::{JumpToDefMap};
 use rsfind::MyOption;
-//use self::htmlwriter::HtmlWriter;
 use timer::Profiler;
+//use rust2html::HtmlWriter; TODO- why can't we just do this the recomended way?
+use rust2html::htmlwriter::HtmlWriter;
 
-mod htmlwriter;
+pub mod htmlwriter;	// TODO - this is wrong, will cause confusion!
+					// it just doesn't seem to work if we 'mod' in the cratefile
+					// and refer to ::htmlwriter::HtmlWriter, or try to 'use' it 
 
 
 // TODO: See how far we can decouple this from the link generation
@@ -33,16 +36,16 @@ mod htmlwriter;
 // we could give the whole generator a root dir to look for crates? ... and assume html is generated in there..
 
 // todo: options struct.
-pub struct RhOptions {
+pub struct RF_Options {
     pub write_file_path: bool,
     pub write_references: bool,
     pub output_dir: Path,
 	pub rustdoc_url: Option<Path>,		// optional where to place links back to rustdoc pages
 }
 
-impl RhOptions {
-    pub fn default() -> RhOptions {
-        RhOptions {
+impl RF_Options {
+    pub fn default() -> RF_Options {
+        RF_Options {
             write_file_path: true,
             write_references: true,
             output_dir: Path::new(""),
@@ -51,15 +54,14 @@ impl RhOptions {
     }
 }
 
-
 //nim:&FNodeInfoMap,jdm:&JumpToDefMap, jrm:&JumpToRefMap
 pub fn make_html(dc: &RFindCtx, fm: &codemap::FileMap, nmaps: &NodeMaps,
                  xcm: &CrossCrateMap, fln: &FileLineNodes, lib_path: &str, 
-                 out_file: &Path, options: &RhOptions) -> ~str {
+                 out_file: &Path, options: &RF_Options) -> ~str {
     // todo - Rust2HtmlCtx { fm,nim,jdm,jrm } .. cleanup common intermediates
 	let mut p=Profiler::new("make_html");
 
-    let mut doc= htmlwriter::HtmlWriter::new();
+    let mut doc= HtmlWriter::new();
     write_head(&mut doc, out_file, options);
 
     let hash=get_str_hash(fm.name);
@@ -130,7 +132,7 @@ pub fn make_html(dc: &RFindCtx, fm: &codemap::FileMap, nmaps: &NodeMaps,
     doc.doc
 }
 
-pub fn write_source_as_html_sub(dc:&RFindCtx, nim:&FNodeInfoMap, jdm:&JumpToDefMap,xcm:&CrossCrateMap,lib_path:&str, options: &RhOptions) {
+pub fn write_source_as_html_sub(dc:&RFindCtx, nim:&FNodeInfoMap, jdm:&JumpToDefMap,xcm:&CrossCrateMap,lib_path:&str, options: &RF_Options) {
 
     let npl=NodesPerLinePerFile::new(dc,nim);
 
@@ -192,11 +194,11 @@ fn is_valid_filename(f:&str) ->bool{
     }
 }
 
-fn write_head(doc:&mut htmlwriter::HtmlWriter, out_file: &Path, options: &RhOptions) {
+fn write_head(doc:&mut HtmlWriter, out_file: &Path, options: &RF_Options) {
     let css_rel_path = &options.output_dir
                         .path_relative_from(&out_file.dir_path())
                         .unwrap_or(Path::new(""));
-    fn write_css_link (doc: &mut htmlwriter::HtmlWriter, css_rel_path: &Path, stylesheet_name: &str) {
+    fn write_css_link (doc: &mut HtmlWriter, css_rel_path: &Path, stylesheet_name: &str) {
         let path = match css_rel_path.with_filename(stylesheet_name).as_str() {
             Some(s) => s,
             None => stylesheet_name
@@ -445,7 +447,7 @@ static link_to_refs:bool    =true;
 static link_debug:bool      =true;
 
 
-fn write_line_with_links(dst:&mut SourceCodeWriter<htmlwriter::HtmlWriter>,dc:&RFindCtx,fm:&codemap::FileMap,lib_path:&str, nmaps:&NodeMaps,xcm:&CrossCrateMap, line:&str, nodes:&[ast::NodeId]) {
+fn write_line_with_links(dst:&mut SourceCodeWriter<HtmlWriter>,dc:&RFindCtx,fm:&codemap::FileMap,lib_path:&str, nmaps:&NodeMaps,xcm:&CrossCrateMap, line:&str, nodes:&[ast::NodeId]) {
     // todo ... BREAK THIS FUNCTION UP!!!!
     // and there is a load of messy cut paste too.
 
@@ -701,7 +703,7 @@ fn resolve_link(link:i64, dc:&RFindCtx,fm:&codemap::FileMap,lib_path:&str, nmaps
 }
 
 
-fn write_line_attr_links(dst:&mut SourceCodeWriter<htmlwriter::HtmlWriter>,text_line:&str,color:&[int],links:&[i64], resolve_link: |i64| -> ~str) {
+fn write_line_attr_links(dst:&mut SourceCodeWriter<HtmlWriter>,text_line:&str,color:&[int],links:&[i64], resolve_link: |i64| -> ~str) {
     // emit a span..
     let no_color=-1;
     let mut curr_col=no_color;
@@ -886,7 +888,7 @@ impl<T:Ord+Clone> Extents<T> {
 
 
 /// Write a block of links to symbol references. Workaround to not having popup menus when you click on a symbol.
-fn write_symbol_references(doc:&mut htmlwriter::HtmlWriter,dc:&RFindCtx, fm:&codemap::FileMap, _:&str,  nmaps:&NodeMaps, _: &[~[ast::NodeId]]) {
+fn write_symbol_references(doc:&mut HtmlWriter,dc:&RFindCtx, fm:&codemap::FileMap, _:&str,  nmaps:&NodeMaps, _: &[~[ast::NodeId]]) {
 
 
     let depth=doc.depth();
@@ -992,19 +994,45 @@ fn write_symbol_references(doc:&mut htmlwriter::HtmlWriter,dc:&RFindCtx, fm:&cod
                         }
                         let files = dc.codemap().files.borrow();
                         let rfm = &files.get(ref_ifp.file_index as uint);
-                        doc.begin_tag_link(make_html_name_rel(rfm.name, fm.name) + "#" + (ref_ifp.line + 1).to_str());
+						let tagname=make_html_name_rel(rfm.name, fm.name) + "#" + (ref_ifp.line + 1).to_str();
+						let mut this_link_lines_shown=0;
 
                         if  links_written<max_links {
                         	// Display a line from the referenced location, but
-                            // step past any #[lang items] - we want to show a meaningful definition.
+                            // step past any #[lang items] - we want to show a meaningful item
+							// also show some context, N lines behind, N lines ahead, like grep does..
+							let lines_of_context:int=1;
+//                            let  mut ref_line_index = ref_ifp.line as uint;
+							// prefer signed numbers,we're dealing with offsets, they dont want to wrapround..
+							let mut ref_line_index = ::std::cmp::max(last_link_line+1 as int, ref_ifp.line as int-lines_of_context);
+							let end_line = ref_ifp.line as int + lines_of_context;
+
+							// if we skipped anything, write a seperator
+							if ref_line_index>last_link_line+1 as int && (last_link_line>0) {
+								doc.writeln("--");
+							}
+
+	                        doc.begin_tag_link(tagname);
+							while ref_line_index<=end_line {
+								// todo - we want to highlight the line of the definition, but
+								// we need to account for if we skipped it..
+								let (src_line,i)=get_source_line_filtered(&***rfm, ref_line_index as uint); 
+								if (i as int)<=end_line {
+		                            doc.write_tagged("c40",(i+1).to_str()+&": ");
+		                            doc.writeln(src_line);
+		                            last_link_line=i as int;
+									this_link_lines_shown+=1;
+								}
+								ref_line_index = i as int+1;
+								newline=true;
+								
+							}
+	                        doc.end_tag();
+							links_written+=this_link_lines_shown;
+
+/*
                             let  mut ref_line_index = ref_ifp.line as uint;
-/*                            let mut src_line=get_source_line(&***rfm, ref_line_index);
-                            while ref_line_index < num_source_lines(&***rfm){
-                            	src_line = get_source_line(&***rfm, ref_line_index);
-                            	if src_line.chars().nth(0).unwrap_or('\0')!='#' {break};
-                            	ref_line_index+=1;
-                            }
-*/							let (src_line,_)=get_source_line_filtered(&***rfm,ref_line_index);
+							let (src_line,_)=get_source_line_filtered(&***rfm,ref_line_index);
                             if last_link_line !=ref_line_index { // dont write multiple links on the same line.
 	                            doc.write_tagged("c40",(ref_ifp.line+1).to_str()+&": ");
                             	last_link_line=ref_line_index;
@@ -1012,15 +1040,17 @@ fn write_symbol_references(doc:&mut htmlwriter::HtmlWriter,dc:&RFindCtx, fm:&cod
 	                            newline=true;
 	                            links_written+=1;
 						   }
+*/
                         } else {
-                        	if last_link_line != ref_ifp.line as uint+1 {
+                        	if last_link_line != ref_ifp.line as int +1 {
+		                        doc.begin_tag_link(tagname);
 	                            doc.write_tagged("c40","("+(ref_ifp.line+1).to_str()+")");
     	                        newline=false;
     	                        links_written+=1;
-    	                        last_link_line=ref_ifp.line as uint+1;
+    	                        last_link_line=ref_ifp.line as int+1;
+		                        doc.end_tag();
 							}
                         }
-                        doc.end_tag();
                     }
                 }
             }
@@ -1035,7 +1065,7 @@ fn write_symbol_references(doc:&mut htmlwriter::HtmlWriter,dc:&RFindCtx, fm:&cod
     doc.check_depth(depth);
 }
 
-impl htmlwriter::HtmlWriter{
+impl ::rust2html::htmlwriter::HtmlWriter{ // todo, why doesn't that allow path reuse
 	// todo - i dont think these are really methods of 'htmlwriter'. 
     fn write_refs_header(&mut self,dc:&RFindCtx,nim:&FNodeInfoMap, fm:&codemap::FileMap, nid:ast::NodeId) {
     	let depth=self.depth();
@@ -1050,11 +1080,12 @@ impl htmlwriter::HtmlWriter{
     //      let ifpe=get_node_index_file_pos(dc		,nim,nid).unwrap();
 
                 self.begin_tag_anchor("line"+(ifp.line+1).to_str()+"_col"+ifp.col.to_str() + "_refs" );
-                self.begin_tag_link( "#"+(ifp.line+1).to_str());
                 self.begin_tag("c43");
                 self.writeln(dc.codemap().files.borrow().get(ifp.file_index as uint).name + ":" + (ifp.line + 1).to_str() + ":" + ifp.col.to_str()
                             +"-"+(ifpe.line+1).to_str()+":"+ifpe.col.to_str() +" -" +info.kind + "- definition:");
                 self.end_tag();
+
+                self.begin_tag_link( "#"+(ifp.line+1).to_str());
                 self.begin_tag("pr");
             //          dump!(def_tfp);
 				let (linestr1,l1)=get_source_line_filtered(fm,ifp.line as uint);

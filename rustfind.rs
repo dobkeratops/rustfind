@@ -19,7 +19,7 @@ use std::{os,local_data};
 use std::cell::RefCell;
 use collections::{HashMap,HashSet};
 use std::path::Path;
-use rust2html::RhOptions;
+use rust2html::RF_Options;
 
 use getopts::{optmulti, optopt, optflag, getopts};
 
@@ -39,7 +39,7 @@ pub mod rf_common;
 pub mod find_ast_node;
 pub mod text_formatting;
 pub mod ioutil;
-pub mod htmlwriter;
+//pub mod htmlwriter;
 pub mod rust2html;
 pub mod codemaput;
 pub mod rfindctx;
@@ -141,7 +141,7 @@ fn main() {
         let dc = @get_ast_and_resolve(&Path::new(filename), libs.move_iter().collect());
         local_data::set(ctxtkey, dc);
 
-        let mut html_options = rust2html::RhOptions::default();
+        let mut html_options = rust2html::RF_Options::default();
         if matches.opt_present("D") {
             debug_test(dc);
             done=true;
@@ -334,7 +334,7 @@ fn debug_test(dc:&RFindCtx) {
 }
 
 
-pub fn write_source_as_html_and_rfx(dc:&RFindCtx,lib_html_path:&str,opts: &RhOptions, write_html:bool) {
+pub fn write_source_as_html_and_rfx(dc:&RFindCtx,lib_html_path:&str,opts: &RF_Options, write_html:bool) {
     let mut xcm:~CrossCrateMap=~HashMap::new();
 	let tm=Profiler::new("write_source_as_html_and_rfx");
 

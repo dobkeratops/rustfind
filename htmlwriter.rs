@@ -27,6 +27,7 @@ fn mk_xlat_table()-> HashMap<char,~str>
     xlat
 }
 /// helper object for building html docs, puts tags in a stack for convinient close
+
 impl<'a> HtmlWriter {
     pub fn new()->HtmlWriter { HtmlWriter { doc:~"", tag_stack:~[], xlat:mk_xlat_table()}}
 
