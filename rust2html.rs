@@ -73,6 +73,7 @@ pub fn make_html_from_source(dc: &RustFindCtx, fm: &codemap::FileMap, nmaps: &No
     let mut doc= HtmlWriter::new();
 
 	let time_stamp=file_get_time_stamp_str(&Path::new(fm.name.clone()));	
+	let git_str = get_git_branch_info();	// yikes, where?! cwd
 
     write_head(&mut doc, out_file, options);
 
@@ -92,6 +93,8 @@ pub fn make_html_from_source(dc: &RustFindCtx, fm: &codemap::FileMap, nmaps: &No
         let t0=doc.begin_tag_check("div");//,&[(~"style",~"background-color:#"+bg+";")]);
         let t1=doc.begin_tag_check("fileblock");
         doc.write_path_links(fm.name);
+		
+		if git_str.len()>0 {doc.begin_tag("c40").writeln("\tgit branch:\t"+git_str).end_tag();}
 		doc.begin_tag("c40").writeln("\tmodified:\t"+time_stamp).end_tag();
         doc.end_tag_check(t1);
         doc.end_tag_check(t0);
@@ -215,6 +218,26 @@ fn write_head(doc:&mut HtmlWriter, out_file: &Path, options: &RF_Options) {
     write_css_link(doc, css_rel_path, "css/sourcestyle.css");
     doc.end_tag();
 }
+
+fn get_git_branch_info()->~str {
+	use std::io;
+	use std::io::process;
+	use std::os;
+	use std::str;
+	use std::io::pipe;
+
+	match process::Process::output("git",&[~"branch",~"-v"]) {
+		Err(_)=>{},
+		Ok(out)=> {
+			let mut curr_branch=~"";
+			for line in str::from_utf8(out.output.as_slice()).unwrap_or("").lines() {
+				if line.chars().nth(0).unwrap_or('\0')=='*' { return line.to_owned();}
+			}
+		},
+	}
+	return ~"";
+}
+
 
 fn get_str_hash(s:&str)->uint{
     let mut acc=0;
