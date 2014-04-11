@@ -35,10 +35,7 @@ pub fn write_index_html(source_dir: &Path,extentions:&[~str], options:&RF_Option
 						let ext=path.extension_str().unwrap_or(&"");;	
 						let filename=path.filename_str().unwrap_or(&"");
 						let dirname=path.dirname_str().unwrap_or(&"");
-						if (ext=="rs" ||
-							ext=="cpp"||
-							ext=="c"||
-							ext=="h") {
+						if (ext=="rs") { 
 							source_dirs.insert((path.clone(), dirname.to_owned()));
 							source_files.insert((path.clone(), filename.to_owned()));
 						}
@@ -73,10 +70,19 @@ pub fn write_index_html(source_dir: &Path,extentions:&[~str], options:&RF_Option
 	let desired_width=100;
 	let num_cols = desired_width / max_line_len;
 
+	let mut column=0;
 	for &(ref sp,ref sf) in source_files.iter() {
 		doc.begin_tag_link( sp.as_str().unwrap_or("") + ".html");
-		doc.writeln(*sf);
+		let sp_str=sp.as_str().unwrap_or("");
+		doc.write(sp_str);
 		doc.end_tag();
+		let mut i=sp_str.len();
+		while i<max_line_len { doc.write(" "); i+=1;}
+		column+=1;
+		if column>=num_cols {
+			doc.write_tag("br");
+			column=0;
+		}
 	}
 
     doc.end_tag();
