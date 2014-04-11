@@ -134,5 +134,11 @@ impl<'a> HtmlWriter {
 	    	fail!(format!("check_depth should be {} it is {}", depth, self.depth()))
 	    }
 	}
+	pub fn as_str<'s>(&'s self)->&'s ~str {
+		return &self.doc;
+	}
+	pub fn as_bytes<'s>(&'s self)->&'s[u8]{
+		return self.doc.as_bytes();
+	}
 }
 

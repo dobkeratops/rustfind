@@ -15,6 +15,7 @@ use crosscratemap::{CrossCrateMap};
 use jumptodefmap::{JumpToDefMap};
 use rsfind::MyOption;
 use timer::Profiler;
+use indexpage;
 //use rust2html::HtmlWriter; TODO- why can't we just do this the recomended way?
 use rust2html::htmlwriter::HtmlWriter;
 
@@ -149,7 +150,10 @@ pub fn make_html_from_source(dc: &RustFindCtx, fm: &codemap::FileMap, nmaps: &No
     doc.doc
 }
 
-pub fn write_source_as_html_sub(dc:&RustFindCtx, nim:&FNodeInfoMap, jdm:&JumpToDefMap,xcm:&CrossCrateMap,lib_path:&str, options: &RF_Options) {
+pub fn write_crate_as_html_sub(dc:&RustFindCtx, nim:&FNodeInfoMap, jdm:&JumpToDefMap,xcm:&CrossCrateMap,lib_path:&str, options: &RF_Options) {
+
+	//println!("output dir={}",options.output_dir.as_str().unwrap_or(""));
+	indexpage::write_index_html(&Path::new("."), &[~"rs",~"cpp",~"h",~"c"],options);
 
     let npl=NodesPerLinePerFile::new(dc,nim);
 
@@ -180,7 +184,7 @@ pub fn write_source_as_html_sub(dc:&RustFindCtx, nim:&FNodeInfoMap, jdm:&JumpToD
 	file_write_bytes_as(&Path::new("css/sourcestyle.css"), g_default_css);
 }
 
-fn file_write_bytes_as(file_path:&Path, data:&[u8]) {
+pub fn file_write_bytes_as(file_path:&Path, data:&[u8]) {
 	// todo - file_write_as<T>(,&[T]);
 	match fs::File::create(file_path) {
 		Err(_)		=> println!("cant write {}",file_path.as_str().unwrap()),
@@ -200,7 +204,7 @@ fn is_valid_filename(f:&str) ->bool{
     }
 }
 
-fn write_head(doc:&mut HtmlWriter, out_file: &Path, options: &RF_Options) {
+pub fn write_head(doc:&mut HtmlWriter, out_file: &Path, options: &RF_Options) {
     let css_rel_path = &options.output_dir
                         .path_relative_from(&out_file.dir_path())
                         .unwrap_or(Path::new(""));
@@ -219,7 +223,7 @@ fn write_head(doc:&mut HtmlWriter, out_file: &Path, options: &RF_Options) {
     doc.end_tag();
 }
 
-fn get_git_branch_info()->~str {
+pub fn get_git_branch_info()->~str {
 	use std::io;
 	use std::io::process;
 	use std::os;

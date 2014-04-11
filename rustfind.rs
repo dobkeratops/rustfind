@@ -51,6 +51,7 @@ pub mod util;
 pub mod rf_ast_ut;
 pub mod jumptodefmap;
 pub mod timer;
+pub mod indexpage;
 
 pub macro_rules! tlogi{
     ($($a:expr),*)=>(println!((file!()+":"+line!().to_str()+": " $(+$a.to_str())*) ))
@@ -194,7 +195,7 @@ fn main() {
         }
         if matches.opt_present("r") {
             println!("Writing .rfx ast nodes/cross-crate-map:-");
-            write_source_as_html_and_rfx(dc,lib_html_path, &html_options, false);
+            write_crate_as_html_and_rfx(dc,lib_html_path, &html_options, false);
             println!("Writing .rfx .. done");
             done=true;
         }
@@ -202,7 +203,7 @@ fn main() {
         // Dump as html..
         if matches.opt_present("w") || !(done) {
             println!("Creating HTML pages from source & .rfx:-");
-            write_source_as_html_and_rfx(dc,lib_html_path, &html_options, true);
+            write_crate_as_html_and_rfx(dc,lib_html_path, &html_options, true);
             println!("Creating HTML pages from source.. done");
         }
 	} else {
@@ -339,9 +340,9 @@ fn debug_test(dc:&RustFindCtx) {
 }
 
 
-pub fn write_source_as_html_and_rfx(dc:&RustFindCtx,lib_html_path:&str,opts: &RF_Options, write_html:bool) {
+pub fn write_crate_as_html_and_rfx(dc:&RustFindCtx,lib_html_path:&str,opts: &RF_Options, write_html:bool) {
     let mut xcm:~CrossCrateMap=~HashMap::new();
-	let tm=Profiler::new("write_source_as_html_and_rfx");
+	let tm=Profiler::new("write_crate_as_html_and_rfx");
 
     dc.cstore().iter_crate_data(|i,md| {
 //      dump!(i, md.name,md.data.len(),md.cnum);
@@ -353,8 +354,8 @@ pub fn write_source_as_html_and_rfx(dc:&RustFindCtx,lib_html_path:&str,opts: &RF
     let (info_map,def_map,jump_map) = make_jump_to_def_map(dc);
     crosscratemap::write_cross_crate_map(dc,lib_html_path, &info_map,def_map,jump_map);
     if write_html {
-		let mut tm=::timer::Profiler::new("write_source_as_html_and_rfx");
-        rust2html::write_source_as_html_sub(dc,&info_map,jump_map,xcm,lib_html_path,opts);
+		let mut tm=::timer::Profiler::new("write_crate_as_html_and_rfx");
+        rust2html::write_crate_as_html_sub(dc,&info_map,jump_map,xcm,lib_html_path,opts);
 
     }
 }
