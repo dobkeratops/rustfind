@@ -8,6 +8,7 @@ extern crate rustc;
 extern crate getopts;
 extern crate serialize;
 extern crate collections;
+extern crate time;
 extern crate libc;
 
 use std::io::println;

@@ -15,6 +15,7 @@ pub type Size_t=u64;    // todo - we're not sure this should be u64
                         // as the libc stuff seems to want.
                         // should it be uint?
 
+// TODO cleanup, we can just use the mature rust fileio now.
 
 macro_rules! logi{
     ($($a:expr),*)=>(println!("{}", file!()+":"+line!().to_str()+": " $(+$a.to_str())* ))

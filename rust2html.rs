@@ -2,11 +2,12 @@ use syntax::codemap;
 use syntax::ast;
 use syntax::codemap::Pos;
 use rustc::middle::ty;
-use iou=ioutil;
 use std::hash::Hash;
 use collections::HashMap;
 use std::slice;
 use std::cmp;
+use std::io;
+use std::io::fs;
 use codemaput::{ZIndexFilePos,ToZIndexFilePos};
 use find_ast_node::{FNodeInfoMap,FNodeInfo};
 use rfindctx::{RustFindCtx};
@@ -54,15 +55,27 @@ impl RF_Options {
     }
 }
 
+fn file_get_time_stamp_str(fpath:&Path)->~str {
+	let file_time=match fs::stat(fpath) {
+		Ok(stat)=>stat.modified as i64, Err(_)=>0_i64
+	};
+	let ts=::time::at_utc(::time::Timespec::new(file_time/1000,0));
+	ts.ctime()
+}
+
 //nim:&FNodeInfoMap,jdm:&JumpToDefMap, jrm:&JumpToRefMap
-pub fn make_html(dc: &RustFindCtx, fm: &codemap::FileMap, nmaps: &NodeMaps,
+pub fn make_html_from_source(dc: &RustFindCtx, fm: &codemap::FileMap, nmaps: &NodeMaps,
                  xcm: &CrossCrateMap, fln: &FileLineNodes, lib_path: &str, 
                  out_file: &Path, options: &RF_Options) -> ~str {
     // todo - Rust2HtmlCtx { fm,nim,jdm,jrm } .. cleanup common intermediates
 	let mut p=Profiler::new("make_html");
 
     let mut doc= HtmlWriter::new();
+
+	let time_stamp=file_get_time_stamp_str(&Path::new(fm.name.clone()));	
+
     write_head(&mut doc, out_file, options);
+
 
     let hash=get_str_hash(fm.name);
 //  let bg=(~[~"383838",~"34383c",~"3c3834",~"383c34",~"343c38",~"38343c",~"3a343a",
@@ -79,6 +92,7 @@ pub fn make_html(dc: &RustFindCtx, fm: &codemap::FileMap, nmaps: &NodeMaps,
         let t0=doc.begin_tag_check("div");//,&[(~"style",~"background-color:#"+bg+";")]);
         let t1=doc.begin_tag_check("fileblock");
         doc.write_path_links(fm.name);
+		doc.begin_tag("c40").writeln("\tmodified:\t"+time_stamp).end_tag();
         doc.end_tag_check(t1);
         doc.end_tag_check(t0);
     }
@@ -145,40 +159,29 @@ pub fn write_source_as_html_sub(dc:&RustFindCtx, nim:&FNodeInfoMap, jdm:&JumpToD
     };
 
     let nmaps=NodeMaps { node_info_map:nim, jump_def_map:jdm, jump_ref_map:def2refs};
-    let files=&dc.codemap().files;
-    let files = files.borrow();
-    for (fi,fm) in files.iter().enumerate() {
-        if is_valid_filename(fm.name) {
-            let html_name = options.output_dir.join(Path::new(make_html_name(fm.name)));
-            println!("generating {}: {}..", fi.to_str(), html_name.display());
-            let doc_str=make_html(dc, &**fm, &nmaps,xcm, &npl.file[fi] , lib_path,
+    let files=&dc.codemap().files.borrow();
+    for (i,cm_file) in files.iter().enumerate() {
+        if is_valid_filename(cm_file.name) {
+            let html_name = options.output_dir.join(Path::new(make_html_name(cm_file.name)));
+            println!("generating {}: {}.. ", i.to_str(), html_name.display());
+            let doc_str=make_html_from_source(dc, &**cm_file, &nmaps,xcm, &npl.file[i] , lib_path,
                                   &html_name, options);
-            iou::fileSaveStr(doc_str, &html_name);
+
+			file_write_bytes_as(&html_name, doc_str.as_bytes() );
         }
     }
 
-    // copy all resources to the output folder
+    // TODO -copy all resources to the output folder
+	// for the minute we're just copying the compiled-in default.
+	fs::mkdir(&Path::new("css"),io::UserDir);
+	file_write_bytes_as(&Path::new("css/sourcestyle.css"), g_default_css);
+}
 
-// can't be bothered with making this data driven now.
-// just have some styles compiled in, and maybe have a switch light/dark theme to begin with.
-// its more important that it actually works without faffing around with paths. Its just some colored text
-//
-//	match iou::copy_folder(&Path::new("resources/"), &options.output_dir) {
-//		Ok(_)	=>{},
-//		Err(_)	=>{
-//			println!("Could not copy resources, so copying default CSS\n");
-
-	{
-		use std::io;
-		use std::io::fs;
-		fs::mkdir(&Path::new("css"),io::UserDir);
-		match io::fs::File::create(&Path::new("css/sourcestyle.css")) {
-			Err(_) => println!("can't write css/sourcestyle.css"),
-			Ok(mut file)=>{
-				println!("Writing default CSS");
-				file.write(g_default_css);
-			}
-		}
+fn file_write_bytes_as(file_path:&Path, data:&[u8]) {
+	// todo - file_write_as<T>(,&[T]);
+	match fs::File::create(file_path) {
+		Err(_)		=> println!("cant write {}",file_path.as_str().unwrap()),
+		Ok(mut f)	=> {f.write(data);},
 	}
 }
 
@@ -886,7 +889,6 @@ impl<T:Ord+Clone> Extents<T> {
         Extents { lo: min!(self.lo, *value), hi: max!(self.hi, *value) }
     }
 }
-
 
 /// Write a block of links to symbol references.
 /// Workaround for not having popup menus when you click on a symbol.
