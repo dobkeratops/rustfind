@@ -47,9 +47,16 @@ pub fn get_source_loc(dc:&RustFindCtx, pos:codemap::BytePos)->codemap::Loc {
 }
 
 
-pub fn str_of_opt_ident(ident:Option<ast::Ident>)->~str{
-    match ident {
+pub fn str_of_opt_ident(id:Option<ast::Ident>)->~str{
+    match id {
         Some(i)=>token::get_ident(i).get().to_owned(), None=>~""
     }
 }
+
+pub fn str_of_ident(id:ast::Ident)->~str{
+	token::get_ident(id).get().to_owned()
+}
+
+
+
 

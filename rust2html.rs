@@ -12,10 +12,12 @@ use codemaput::{ZIndexFilePos,ToZIndexFilePos};
 use find_ast_node::{FNodeInfoMap,FNodeInfo};
 use rfindctx::{RustFindCtx};
 use crosscratemap::{CrossCrateMap};
-use jumptodefmap::{JumpToDefMap};
+use jumptodefmap::{JumpToDefMap,JumpToRefMap,NodeMaps,MultiMap};
 use rsfind::MyOption;
 use timer::Profiler;
 use indexpage;
+
+//
 //use rust2html::HtmlWriter; TODO- why can't we just do this the recomended way?
 use rust2html::htmlwriter::HtmlWriter;
 
@@ -46,7 +48,7 @@ pub struct RF_Options {
 }
 
 impl RF_Options {
-    pub fn default() -> RF_Options {
+    pub fn new() -> RF_Options {
         RF_Options {
             write_file_path: true,
             write_references: true,
@@ -70,6 +72,7 @@ pub fn make_html_from_source(dc: &RustFindCtx, fm: &codemap::FileMap, nmaps: &No
                  out_file: &Path, options: &RF_Options) -> ~str {
     // todo - Rust2HtmlCtx { fm,nim,jdm,jrm } .. cleanup common intermediates
 	let mut p=Profiler::new("make_html");
+//	::callgraph::dump_callgraph(xcm, nmaps);
 
     let mut doc= HtmlWriter::new();
 
@@ -446,11 +449,6 @@ fn sub_match(line:&str,x:uint,opts:&[&str])->Option<(uint,uint)>{
     return None;
 }
 
-pub struct NodeMaps<'a>  {
-    node_info_map:&'a FNodeInfoMap,
-    jump_def_map:&'a JumpToDefMap,
-    jump_ref_map:&'a JumpToRefMap
-}
 
 /// interface for emitting source code serially
 /// carries state between emitting lines
@@ -721,7 +719,7 @@ fn resolve_link(link:i64, dc:&RustFindCtx,fm:&codemap::FileMap,lib_path:&str, nm
 				// Write a CROSS CRATE link, to a different crate. We know the Node Index.
                 Some(a)=>{
     //                          "../gplsrc/rust/src/"+a.fname+".html"+
-                    make_html_name_reloc(a.fname,fm.name,lib_path)+
+                    make_html_name_reloc(a.file_name,fm.name,lib_path)+
                         "#n"+def_node.to_str()
                 }
             }
@@ -776,34 +774,7 @@ fn find_defs_in_file(fm:&codemap::FileMap, nim:&FNodeInfoMap)->~[ast::NodeId] {
     acc
 }
 
-/// K:[V]  insert(K, V) for many V;  find(K)->[V]
-pub struct MultiMap<K,V> {
-    next_index:uint,
-    indices:HashMap<K,uint>,
-    items:~[~[V]],
-    empty:~[V]
-}
-impl<'a,K:Hash+TotalEq,V> MultiMap<K,V> {
-    pub fn new()->MultiMap<K,V> {
-        MultiMap{ next_index:0, indices:HashMap::new(), items:~[], empty:~[] }
-    }
-    pub fn find(&'a self, k:K)->&'a~[V] {
-        // TODO - return iterator, not collection
-        match self.indices.find(&k) {
-            None=>&self.empty,
-            Some(&ix)=>&self.items[ix]
-        }
-    }
-    pub fn insert(&'a mut self, k:K,v:V) {
-        let ix=match self.indices.find(&k) {
-            None=>{ self.indices.insert(k,self.next_index); self.next_index+=1; self.items.push(~[]); self.next_index-1},
-            Some(&ix)=> ix
-        };
-        self.items[ix].push(v);
-    }
-}
 
-pub type JumpToRefMap = MultiMap<ast::NodeId, ast::NodeId>;
 
 // TODO: find nodes of enclosing context.
 // 'this function, called from these locations'

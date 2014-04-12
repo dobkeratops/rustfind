@@ -4,11 +4,12 @@ use syntax::ast;
 use rustc::middle::{ty,typeck};
 use syntax::codemap::{BytePos, Pos};
 use rsfind::ShowDefMode;
+use std::hash::Hash;
 
 
 //use rustc::middle::typeck::*;-
 
-use find_ast_node::{FNodeInfoMap, FNodeInfo, AstNode, NodeTreeLoc, find_node_tree_loc_at_byte_pos,
+use find_ast_node::{FNodeInfoMap, FNodeInfo, AstNode_, NodeTreeLoc, find_node_tree_loc_at_byte_pos,
     build_node_def_node_table, build_node_info_map, get_node_source, astnode_expr,
     get_def_id, byte_pos_from_text_file_pos_str, ToJsonStr, ToJsonStrFc, AstNodeAccessors};
 use rfindctx::{RustFindCtx,get_source_loc};
@@ -32,10 +33,18 @@ pub macro_rules! if_some {
     );
 }
 
+pub type JumpToRefMap = MultiMap<ast::NodeId, ast::NodeId>;
 pub type JumpToDefMap = HashMap<ast::NodeId,ast::DefId> ;
 
+// TODO Move to jumptodefmap. Its not part of HTML generation.
+pub struct NodeMaps<'a>  {
+    pub node_info_map:&'a FNodeInfoMap,
+    pub jump_def_map:&'a JumpToDefMap,
+    pub jump_ref_map:&'a JumpToRefMap
+}
 
-pub fn lookup_def_node_of_node(dc:&RustFindCtx,node:&AstNode, nodeinfomap:&FNodeInfoMap, _: &HashMap<ast::NodeId,ast::DefId>)->Option<ast::DefId> {
+
+pub fn lookup_def_node_of_node(dc:&RustFindCtx,node:&AstNode_, nodeinfomap:&FNodeInfoMap, _: &HashMap<ast::NodeId,ast::DefId>)->Option<ast::DefId> {
 
     match *node {
         astnode_expr(e)=>match e.node {
@@ -198,7 +207,7 @@ pub fn node_id_from_text_file_pos_str(dc:&RustFindCtx, file_pos_str:&str)->Optio
         Some(an)=>an.get_id()
     }
 }
-pub fn node_from_text_file_pos_str(dc:&RustFindCtx, file_pos_str:&str)->Option<AstNode> {
+pub fn node_from_text_file_pos_str(dc:&RustFindCtx, file_pos_str:&str)->Option<AstNode_> {
     match byte_pos_from_text_file_pos_str(dc,file_pos_str) {
         Some(bp)=>{let ndt=find_node_tree_loc_at_byte_pos(dc.crate_,bp); Some(*ndt.last().get_ref().clone())},
         None=>None
@@ -217,7 +226,7 @@ pub fn lookup_def_of_node_tree_loc(dc:&RustFindCtx,node_tree_loc:&NodeTreeLoc,m:
     lookup_def_of_node(dc,*node_tree_loc.last().get_ref(),m)
 }
 
-pub fn lookup_def_of_node(dc: &RustFindCtx, node: &AstNode, m: ShowDefMode)->Option<~str> {
+pub fn lookup_def_of_node(dc: &RustFindCtx, node: &AstNode_, m: ShowDefMode)->Option<~str> {
     io::println("def of node:"+node.get_id().unwrap_or(0).to_str());
     let node_spans=build_node_info_map(dc.crate_);
     let node_def_node = build_node_def_node_table(dc);
@@ -225,7 +234,7 @@ pub fn lookup_def_of_node(dc: &RustFindCtx, node: &AstNode, m: ShowDefMode)->Opt
 }
 
 
-pub fn lookup_def_of_node_sub(dc:&RustFindCtx,node:&AstNode,m:ShowDefMode,nim:&FNodeInfoMap, node_def_node:&HashMap<ast::NodeId,ast::DefId>)->Option<~str> {
+pub fn lookup_def_of_node_sub(dc:&RustFindCtx,node:&AstNode_,m:ShowDefMode,nim:&FNodeInfoMap, node_def_node:&HashMap<ast::NodeId,ast::DefId>)->Option<~str> {
     // TODO - cache outside?
 
 
@@ -264,4 +273,32 @@ pub fn make_jump_to_def_map(dc:&RustFindCtx)->( FNodeInfoMap, ~HashMap<ast::Node
     let ndm=build_node_def_node_table(dc);
     let jdm=build_jump_to_def_map(dc, &nim,ndm);
     (nim,ndm,jdm)
+}
+
+
+/// K:[V]  insert(K, V) for many V;  find(K)->[V]
+pub struct MultiMap<K,V> {
+    next_index:uint,
+    indices:HashMap<K,uint>,
+    items:~[~[V]],
+    empty:~[V]
+}
+impl<'a,K:Hash+TotalEq,V> MultiMap<K,V> {
+    pub fn new()->MultiMap<K,V> {
+        MultiMap{ next_index:0, indices:HashMap::new(), items:~[], empty:~[] }
+    }
+    pub fn find(&'a self, k:K)->&'a~[V] {
+        // TODO - return iterator, not collection
+        match self.indices.find(&k) {
+            None=>&self.empty,
+            Some(&ix)=>&self.items[ix]
+        }
+    }
+    pub fn insert(&'a mut self, k:K,v:V) {
+        let ix=match self.indices.find(&k) {
+            None=>{ self.indices.insert(k,self.next_index); self.next_index+=1; self.items.push(~[]); self.next_index-1},
+            Some(&ix)=> ix
+        };
+        self.items[ix].push(v);
+    }
 }

@@ -52,6 +52,7 @@ pub mod rf_ast_ut;
 pub mod jumptodefmap;
 pub mod timer;
 pub mod indexpage;
+pub mod callgraph;
 
 pub macro_rules! tlogi{
     ($($a:expr),*)=>(println!((file!()+":"+line!().to_str()+": " $(+$a.to_str())*) ))
@@ -144,7 +145,7 @@ fn main() {
         let dc = @get_ast_and_resolve(&Path::new(filename), libs.move_iter().collect());
         local_data::set(ctxtkey, dc);
 
-        let mut html_options = rust2html::RF_Options::default();
+        let mut html_options = rust2html::RF_Options::new();
         if matches.opt_present("D") {
             debug_test(dc);
             done=true;
@@ -336,23 +337,23 @@ fn debug_test(dc:&RustFindCtx) {
     dump!(lookup_def_at_text_file_pos(dc, &ZTextFilePos::new("test_input.rs",10-1,8),SDM_Source));println!("");
     dump!(lookup_def_at_text_file_pos(dc, &ZTextFilePos::new("test_input.rs",13-1,16),SDM_Source));println!("");
     dump!(lookup_def_at_text_file_pos(dc, &ZTextFilePos::new("test_input.rs",11-1,10),SDM_Source));println!("");
-
 }
-
 
 pub fn write_crate_as_html_and_rfx(dc:&RustFindCtx,lib_html_path:&str,opts: &RF_Options, write_html:bool) {
     let mut xcm:~CrossCrateMap=~HashMap::new();
 	let tm=Profiler::new("write_crate_as_html_and_rfx");
 
     dc.cstore().iter_crate_data(|i,md| {
-//      dump!(i, md.name,md.data.len(),md.cnum);
         println!("loading cross crate data {} {}", i, md.name);
-        let xcm_sub=crosscratemap::read_cross_crate_map(dc, i as int, lib_html_path + "lib"+md.name+&"/lib.rfx",lib_html_path);
-        for (k,v) in xcm_sub.iter() {xcm.insert(*k,(*v).clone());}
+        let xcm_sub=crosscratemap::cross_crate_map_read_into(xcm, i as int, lib_html_path + "lib"+md.name+&"/lib.rfx",lib_html_path);
     });
 
     let (info_map,def_map,jump_map) = make_jump_to_def_map(dc);
-    crosscratemap::write_cross_crate_map(dc,lib_html_path, &info_map,def_map,jump_map);
+	// combine_current_create: Allows us to use 'xcm' alone to resolve DefIds elsewhere.
+	// existing codepath also uses local info in 'jump_maps' to do the same job, we can simplify that out.
+	crosscratemap::cross_crate_map_combine_current_crate(xcm, dc,&info_map,def_map,jump_map); 
+	
+    crosscratemap::cross_crate_map_write(dc,lib_html_path, &info_map,def_map,jump_map);
     if write_html {
 		let mut tm=::timer::Profiler::new("write_crate_as_html_and_rfx");
         rust2html::write_crate_as_html_sub(dc,&info_map,jump_map,xcm,lib_html_path,opts);
