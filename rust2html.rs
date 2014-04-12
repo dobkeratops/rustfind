@@ -703,7 +703,17 @@ fn resolve_link(link:i64, dc:&RustFindCtx,fm:&codemap::FileMap,lib_path:&str, nm
             let def_node=(link&((1<<48)-1)) as u32;
             match xcm.find(&ast::DefId{krate:def_crate,node:def_node}) {
 				// Write a LOCAL link in the same crate, but not necaserily the same page. we know line filename, index
-                None=>//"#n"+def_node.to_str(), by node linnk
+				// Write a CROSS CRATE link, to a different crate. use the Node Index.
+                Some(a) if def_crate>0 =>{
+    //                          "../gplsrc/rust/src/"+a.fname+".html"+
+                    make_html_name_reloc(a.file_name,fm.name,lib_path)+
+                        "#n"+def_node.to_str()
+                },
+				// Write a LOCAL CRATE link, use 'file#line
+				//"#n"+def_node.to_str(), by node link
+				// TODO - we could do everything with nodes
+				// it might be possible to do way better with json/javascript..
+                None|_=>
                 {
                     match (nmaps.node_info_map,def_node).to_index_file_pos(dc.tycx_ref()) {
                         Some(node_file_pos)=>{
@@ -715,12 +725,6 @@ fn resolve_link(link:i64, dc:&RustFindCtx,fm:&codemap::FileMap,lib_path:&str, nm
                         None=>~"crate_id="+def_crate.to_str()+" node_id="+def_node.to_str()
                     }
 
-                },
-				// Write a CROSS CRATE link, to a different crate. We know the Node Index.
-                Some(a)=>{
-    //                          "../gplsrc/rust/src/"+a.fname+".html"+
-                    make_html_name_reloc(a.file_name,fm.name,lib_path)+
-                        "#n"+def_node.to_str()
                 }
             }
         }

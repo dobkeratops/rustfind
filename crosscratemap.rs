@@ -107,29 +107,24 @@ pub fn cross_crate_map_read_into(dst:&mut CrossCrateMap,crate_num:int, crate_nam
 	cross_crate_map_combine(dst, xcm_sub);
 }
 
-pub fn cross_crate_map_combine_current_crate(dst:&mut CrossCrateMap,dc:&RustFindCtx, nim:&FNodeInfoMap, def_map:&HashMap<ast::NodeId, ast::DefId>, jdm:&JumpToDefMap) {
-/*
-	for (k,ni) in nim.iter() {
-		match ni.span.lo.to_text_file_pos(dc.tycx_ref()) {
-			Some(tfp)=>{
-			// new format, a little more verbose,
-			// and includes parent id for easier reconstruction of full AST
-			// "node" cratename id parent_id filename line col len type [ident]
-			if new_format {
-//				try!(writeln!(&mut out_file, "node\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
-					curr_crate_name_only, 
-					k, 
-					ni.parent_id, 
-					tfp.name, 
-					(tfp.line + 1), 
-					tfp.col,
-		            (ni.span.hi - ni.span.lo).to_uint(),
-					ni.kind,
-					str_of_opt_ident(ni.ident)));
+pub fn cross_crate_map_combine_current_crate(xcm:&mut CrossCrateMap,dc:&RustFindCtx, nim:&FNodeInfoMap, def_map:&HashMap<ast::NodeId, ast::DefId>, jdm:&JumpToDefMap) {
+	let (_,crate_name)=get_crate_name(dc);
+	for (node_id,node_info) in nim.iter() {
+		match node_info.span.lo.to_text_file_pos(dc.tycx_ref()) { // f this node has a place in the codemap..
+			Some(ref tfp)=>{
+			   xcm.insert(ast::DefId{krate:0, node:*node_id as u32,},
+					CrossCrateMapItem{
+						item_name:	Some(str_of_opt_ident(node_info.ident)),
+						file_name:	tfp.name.clone(),
+						line:	tfp.line as uint,
+						col:	tfp.col as uint,
+						len:	(node_info.span.hi - node_info.span.lo).to_uint()
+					}
+				);
 			}
+			_=>{}
 		}
 	}
-*/
 }
 
 fn get_crate_name(dc:&RustFindCtx)->(posix::Path,~str) {
