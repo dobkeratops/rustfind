@@ -26,28 +26,46 @@ pub macro_rules! logi{
     ($($a:expr),*)=>(println!("{}", $($a.to_str())*) )
 }
 
+type AstSPtr<T> =ast::P<T>;
+
+// Wrappers to prepare for de-@
+#[inline]
+fn 	mkAstSPtr<T>(a:@T)->AstSPtr<T> {
+	a
+}
+// Wrappers to prepare for de-@
+#[inline]
+fn 	mkAstSPtrClone<T: 'static + Clone>(a:&T)->AstSPtr<T> {
+	ast::P((*a).clone())
+}
+fn 	mkAstSPtr2<T: 'static>(a:T)->AstSPtr<T> {
+	ast::P(a)
+}
+
+
+
 /// wrapper enum for the varios ast:: node types.
 #[deriving(Clone)]
 pub enum AstNode_ { 
 	// todo: CamelCase
-    astnode_mod(@ast::Mod),
-    astnode_view_item(@ast::ViewItem),
-    astnode_item(@ast::Item),
-    astnode_local(@ast::Local),
-    astnode_block(@ast::Block),
-    astnode_stmt(@ast::Stmt),
-    astnode_arm(@ast::Arm),
-    astnode_pat(@ast::Pat),
-    astnode_decl(@ast::Decl),
-    astnode_expr(@ast::Expr),
-    astnode_ty(@ast::Ty),
-    astnode_ty_method(@ast::TypeMethod),
-    astnode_trait_method(@ast::TraitMethod),
-    astnode_method(@ast::Method),
-    astnode_struct_def(@ast::StructDef),
-    astnode_struct_field(@ast::StructField),
-    astnode_trait_ref(@ast::TraitRef),
-    astnode_variant(@ast::Variant_),
+    astnode_mod(AstSPtr<ast::Mod>),
+    astnode_view_item(AstSPtr<ast::ViewItem>),
+    astnode_item(AstSPtr<ast::Item>),
+    astnode_local(AstSPtr<ast::Local>),
+    astnode_block(AstSPtr<ast::Block>),
+    astnode_stmt(AstSPtr<ast::Stmt>),
+    astnode_arm(AstSPtr<ast::Arm>),
+    astnode_pat(AstSPtr<ast::Pat>),
+    astnode_decl(AstSPtr<ast::Decl>),
+    astnode_expr(AstSPtr<ast::Expr>),
+    astnode_ty(AstSPtr<ast::Ty>),
+    astnode_ty_method(AstSPtr<ast::TypeMethod>),
+    astnode_trait_method(AstSPtr<ast::TraitMethod>),
+    astnode_method(AstSPtr<ast::Method>),
+    astnode_struct_def(AstSPtr<ast::StructDef>),
+    astnode_struct_field(AstSPtr<ast::StructField>),
+    astnode_trait_ref(AstSPtr<ast::TraitRef>),
+    astnode_variant(AstSPtr<ast::Variant_>),
     astnode_root,
     astnode_none
 }
@@ -87,7 +105,7 @@ impl FNodeInfo {
 	// suggestion for rustc.. macros to switch idents from CamelCase to snake_case and back..
 
 	/// Check if the contained node is a function declaretion, return it or not.
-	pub fn as_item<'a>(&'a self)->Option<@ast::Item> {
+	pub fn as_item<'a>(&'a self)->Option<AstSPtr<ast::Item>> {
 		match self.node
 		{
 			astnode_item(item)=>Some(item),
@@ -100,7 +118,7 @@ impl FNodeInfo {
 	/// but seems to make some tasks easier elsewhere.
 
 	pub fn as_fn_decl<'a>(&'a self)->
-			Option<(@ast::Item,
+			Option<(AstSPtr<ast::Item>,
 				(ast::P<ast::FnDecl>, ast::Purity, abi::Abi, ast::Generics, ast::P<ast::Block>)
 				)>
 	{
@@ -124,7 +142,7 @@ impl FNodeInfo {
 		
 	}
 	pub fn is_fn_decl(&self)->bool { self.as_fn_decl().is_some()}
-	pub fn as_expr<'a>(&'a self)->Option<(@ast::Expr)> {
+	pub fn as_expr<'a>(&'a self)->Option<(AstSPtr<ast::Expr>)> {
 		match self.node {
 			astnode_expr(expr)=>Some(expr),
 			_=>None
@@ -188,14 +206,14 @@ macro_rules! dump{ ($($a:expr),*)=>
 }
 
 /// main
-pub fn find_node_at_byte_pos(c:@ast::Crate,_location:codemap::BytePos)->AstNode_ {
+pub fn find_node_at_byte_pos(c:AstSPtr<ast::Crate>,_location:codemap::BytePos)->AstNode_ {
 	fail!();
     let tree_loc=find_node_tree_loc_at_byte_pos(c,_location);
     return tree_loc.last().expect("Unable to find node").clone();
 }
 
 
-pub fn find_node_tree_loc_at_byte_pos(c:@ast::Crate,_location:codemap::BytePos)->NodeTreeLoc {
+pub fn find_node_tree_loc_at_byte_pos(c:AstSPtr<ast::Crate>,_location:codemap::BytePos)->NodeTreeLoc {
     // TODO: Now that we have a sepereate 'node-spans table'
     // would it be more efficient to use that?
     // if we encoded hrc information in the node-spans-table,
@@ -209,7 +227,7 @@ pub fn find_node_tree_loc_at_byte_pos(c:@ast::Crate,_location:codemap::BytePos)-
     vt.env.result
 }
 
-pub fn build_node_info_map(c:@ast::Crate)-> FNodeInfoMap {
+pub fn build_node_info_map(c:AstSPtr<ast::Crate>)-> FNodeInfoMap {
     // todo-lambdas, big fcuntion but remove the extraneous symbols
 	let prof=::timer::Profiler::new("build_node_info_map");
 
@@ -752,11 +770,11 @@ impl FNodeInfoMapBuilder {
     }
 
     pub fn trait_ref(&mut self, tr:&ast::TraitRef, p: ast::NodeId) {
-        push_span(&mut self.all_nodes, tr.ref_id, p,None, "trait_ref", tr.path.span, astnode_trait_ref(@tr.clone()));
+        push_span(&mut self.all_nodes, tr.ref_id, p,None, "trait_ref", tr.path.span, astnode_trait_ref(mkAstSPtrClone(tr)) );
     }
 
     pub fn variant(&mut self, va:&ast::Variant, p: ast::NodeId) {
-        push_span(&mut self.all_nodes, va.node.id,p, Some(va.node.name),"variant", va.span, astnode_variant(@va.node.clone()))
+        push_span(&mut self.all_nodes, va.node.id,p, Some(va.node.name),"variant", va.span, astnode_variant(mkAstSPtrClone(&va.node)))
 //       visit_item(va,(s,va.node.id,v)) - TODO , are we actually suppoed to iterate here? why was't it done
     }
 }
@@ -785,7 +803,7 @@ impl Visitor<ast::NodeId> for FNodeInfoMapBuilder {
     }
 
     fn visit_item(&mut self, a:&ast::Item, p: ast::NodeId) {
-        push_span(&mut self.all_nodes,a.id,p,item_get_ident(a),a.kind_to_str(),a.span,astnode_item(@a.clone()));
+        push_span(&mut self.all_nodes,a.id,p,item_get_ident(a),a.kind_to_str(),a.span,astnode_item(mkAstSPtrClone(a)));
 
         // TODO: Push nodes for type-params... since we want to click on their defs...
         match a.node {
@@ -817,7 +835,7 @@ impl Visitor<ast::NodeId> for FNodeInfoMapBuilder {
     }
 
     fn visit_local(&mut self, a:&ast::Local, p: ast::NodeId) {
-        push_span(&mut self.all_nodes, a.id, p, None, "local", a.span, astnode_local(@*a.clone()));
+        push_span(&mut self.all_nodes, a.id, p, None, "local", a.span, astnode_local(@*a.clone())); // How to remove this?!
 
         visit::walk_local(self, a, a.id);
     }
@@ -829,7 +847,7 @@ impl Visitor<ast::NodeId> for FNodeInfoMapBuilder {
     }
 
     fn visit_stmt(&mut self, a:&ast::Stmt, p: ast::NodeId) {
-        push_spanned(&mut self.all_nodes, "stmt", a, astnode_stmt(@a.clone()), p);
+        push_spanned(&mut self.all_nodes, "stmt", a, astnode_stmt(mkAstSPtrClone(a)), p);
 
         visit::walk_stmt(self, a, p);
     }
@@ -838,7 +856,7 @@ impl Visitor<ast::NodeId> for FNodeInfoMapBuilder {
 //   fn visit_arm(&mut self, a:&ast::Arm, p: ast::NodeId) {}
 
     fn visit_pat(&mut self, a: &ast::Pat, p: ast::NodeId) {
-        push_span(&mut self.all_nodes, a.id, p, None, "pat", a.span, astnode_pat(@a.clone()));
+        push_span(&mut self.all_nodes, a.id, p, None, "pat", a.span, astnode_pat(mkAstSPtrClone(a)));
 
         visit::walk_pat(self, a, a.id);
     }
@@ -852,7 +870,7 @@ impl Visitor<ast::NodeId> for FNodeInfoMapBuilder {
 //   fn visit_struct_def(&mut self, s)
 
     fn visit_expr(&mut self, a:&ast::Expr, p: ast::NodeId) {
-        push_span(&mut self.all_nodes, a.id, p, expr_get_ident(a), a.kind_to_str(), a.span, astnode_expr(@a.clone()));
+        push_span(&mut self.all_nodes, a.id, p, expr_get_ident(a), a.kind_to_str(), a.span, astnode_expr(mkAstSPtrClone(a)));
 
         visit::walk_expr(self, a, a.id);
     }
@@ -861,7 +879,7 @@ impl Visitor<ast::NodeId> for FNodeInfoMapBuilder {
 //   fn visit_expr_post()
 
     fn visit_ty(&mut self, a:&ast::Ty, p: ast::NodeId) {
-        push_span(&mut self.all_nodes, a.id, p, None, "ty", a.span, astnode_ty(@a.clone()));
+        push_span(&mut self.all_nodes, a.id, p, None, "ty", a.span, astnode_ty(mkAstSPtrClone(a)));
 
         visit::walk_ty(self, a, a.id);
     }
@@ -870,13 +888,13 @@ impl Visitor<ast::NodeId> for FNodeInfoMapBuilder {
 //   fn visit_fn()
 
     fn visit_struct_field(&mut self, a: &ast::StructField, p: ast::NodeId) {
-        push_spanned(&mut self.all_nodes, "struct_field", a, astnode_struct_field(@a.clone()), p);
+        push_spanned(&mut self.all_nodes, "struct_field", a, astnode_struct_field(mkAstSPtrClone(a)), p);
 
         visit::walk_struct_field(self, a, p);
     }
 
     fn visit_ty_method(&mut self, a:&ast::TypeMethod, p: ast::NodeId) {
-        push_span(&mut self.all_nodes, a.id, p, Some(a.ident), "type_method", a.span, astnode_ty_method(@a.clone()));
+        push_span(&mut self.all_nodes, a.id, p, Some(a.ident), "type_method", a.span, astnode_ty_method(mkAstSPtrClone(a)));
 
         visit::walk_ty_method(self, a, a.id);
     }
@@ -903,14 +921,14 @@ impl Finder {
 impl Visitor<()> for Finder {
     fn visit_view_item(&mut self, a:&ast::ViewItem, _: ()) {
         if span_contains(self.env.location, a.span) {
-            self.env.result.push(astnode_view_item(@a.clone()));;
+            self.env.result.push(astnode_view_item(mkAstSPtrClone(a)));;
         }
         visit::walk_view_item(self, a, ());
     }
 
     fn visit_item(&mut self, a:&ast::Item, _: ()) {
         if span_contains(self.env.location, a.span) {
-            self.env.result.push(astnode_item(@a.clone()));
+            self.env.result.push(astnode_item(mkAstSPtrClone(a)));
         }
         visit::walk_item(self, a, ());
     }
@@ -925,7 +943,7 @@ impl Visitor<()> for Finder {
 
     fn visit_block(&mut self, a:&ast::Block, _: ()) {
         if span_contains(self.env.location, a.span) {
-            self.env.result.push(astnode_block(@a.clone()));
+            self.env.result.push(astnode_block(mkAstSPtrClone(a)));
         }
 
         visit::walk_block(self, a, ());
@@ -933,7 +951,7 @@ impl Visitor<()> for Finder {
 
     fn visit_stmt(&mut self, a:&ast::Stmt, _: ()) {
         if span_contains(self.env.location, a.span) {
-            self.env.result.push(astnode_stmt(@a.clone()));
+            self.env.result.push(astnode_stmt(mkAstSPtrClone(a)));
         }
 
         visit::walk_stmt(self, a, ());
@@ -949,7 +967,7 @@ impl Visitor<()> for Finder {
 
     fn visit_pat(&mut self, a: &ast::Pat, _: ()) {
         if span_contains(self.env.location, a.span) {
-            self.env.result.push(astnode_pat(@a.clone()));
+            self.env.result.push(astnode_pat(mkAstSPtrClone(a)));
         }
 
         visit::walk_pat(self, a, ());
@@ -965,7 +983,7 @@ impl Visitor<()> for Finder {
 
     fn visit_expr(&mut self, a:&ast::Expr, _: ()) {
         if span_contains(self.env.location, a.span) {
-            self.env.result.push(astnode_expr(@a.clone()));
+            self.env.result.push(astnode_expr(mkAstSPtrClone(a)));
         }
 
         visit::walk_expr(self, a, ());
@@ -973,7 +991,7 @@ impl Visitor<()> for Finder {
 
     fn visit_ty(&mut self, a:&ast::Ty, _: ()) {
         if span_contains(self.env.location, a.span) {
-            self.env.result.push(astnode_ty(@a.clone()));
+            self.env.result.push(astnode_ty(mkAstSPtrClone(a)));
         }
 
         visit::walk_ty(self, a, ());
@@ -985,7 +1003,7 @@ impl Visitor<()> for Finder {
 
     fn visit_struct_field(&mut self, a: &ast::StructField, _: ()) {
         if span_contains(self.env.location, a.span) {
-            self.env.result.push(astnode_struct_field(@a.clone()));
+            self.env.result.push(astnode_struct_field(mkAstSPtrClone(a)));
         }
 
         visit::walk_struct_field(self, a, ());
