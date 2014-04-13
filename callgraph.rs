@@ -26,7 +26,7 @@ use rfindctx::*;
 
 pub fn dump_functions(nmaps:&NodeMaps) {
 	for (node_id, info) in nmaps.node_info_map.iter() {
-		info.as_fn_decl().map(|(ref item, fn_decl)|{
+		info.rf_as_fn_decl().map(|(ref item, fn_decl)|{
 			println!("fn {}()", str_of_ident(item.ident));
 		});
 	}
@@ -47,8 +47,13 @@ impl CG_Options {
 /// Todo - seperate into callgraph iterator and file writer passing a closure..
 type RefCCMItem<'a> =(DefId,&'a CrossCrateMapItem);
 type SetOfItems<'a> =HashSet<RefCCMItem<'a>>;
+type TraitMap<'a> =HashMap<DefId,TraitInfo<'a>>;
 
 pub fn write_call_graph(xcm:&CrossCrateMap, nmaps:&NodeMaps, outdirname:&str, filename:&str,opts:&CG_Options) {
+
+	let mut tg:TraitMap =HashMap::new();
+//	gather_trait_graph(&tg, (xcm,nmaps), rf_get_root_node(nmaps.node_info_map));
+
 	println!("Writing callgraph {} {}..",outdirname, filename);
 	match (	fs::File::create(&posix::Path::new(outdirname+filename.to_owned()+~".txt")),
 			fs::File::create(&posix::Path::new(outdirname+filename.to_owned()+~".dot")),
@@ -66,7 +71,7 @@ pub fn write_call_graph(xcm:&CrossCrateMap, nmaps:&NodeMaps, outdirname:&str, fi
 			// Traverse and collect.. 
 			for (node_id, info) in nmaps.node_info_map.iter() {
 				let mut calls:SetOfItems =HashSet::new();
-				info.as_fn_decl().map(
+				info.rf_as_fn_decl().map(
 					|(ref item, fn_decl)|{
 						let fn_defid=DefId{krate:0,node:*node_id};
 						let xcmi=xcm.find(&fn_defid).unwrap();
@@ -134,9 +139,8 @@ pub fn write_call_graph(xcm:&CrossCrateMap, nmaps:&NodeMaps, outdirname:&str, fi
 /// requires populated CrossCrateMap and NodeMaps
 pub fn visit_call_graph<'a>(xcm:&'a CrossCrateMap, nmaps:&NodeMaps, f:|caller:(DefId, &'a CrossCrateMapItem), callee:(DefId,&'a CrossCrateMapItem)|)
 {
-
 	for (node_id, info) in nmaps.node_info_map.iter() {
-		info.as_fn_decl().map(
+		info.rf_as_fn_decl().map(
 			|(ref fn_item, fn_decl)|{
 				let caller_defid=ast::DefId{krate:0,node:*node_id};
 				let caller_ccmitem=xcm.find(&caller_defid).unwrap();
@@ -154,11 +158,12 @@ pub fn visit_call_graph<'a>(xcm:&'a CrossCrateMap, nmaps:&NodeMaps, f:|caller:(D
 	}
 }
 
-
 // todo - build Vec<(DefId/*caller*/,DefId/*callee*/)> 
 fn gather_call_graph_rec<'s>(calls:&mut SetOfItems<'s>,xcm:&'s CrossCrateMap, nmaps:&NodeMaps, node:ast::NodeId) 
 {
 	let node=nmaps.node_info_map.find(&node).unwrap();
+
+	// todo 'for child in iter_children(nmaps,node)' {
 	for &child_id in node.children.iter() {
 		let child_node = nmaps.node_info_map.find(&child_id).unwrap();
 		gather_call_graph_rec(calls, xcm,nmaps, child_id);
@@ -186,6 +191,51 @@ fn gather_call_graph_rec<'s>(calls:&mut SetOfItems<'s>,xcm:&'s CrossCrateMap, nm
 			}
 		}
 	}
+}
+
+struct TraitInfo<'a> {
+	pub ti_defid: RefCCMItem<'a>,
+	pub ti_name:~str,
+	pub ti_module:DefId,
+	pub ti_inherits:HashSet<DefId>,
+	pub ti_functions:HashSet<DefId>,
+}
+
+fn gather_trait_graph_rec<'a>(tg:&mut HashMap<DefId,TraitInfo<'a>>, (xcm,nmaps):(&'a CrossCrateMap,&NodeMaps), node:ast::NodeId) 
+{
+	// todo 'for child in iter_children(nmaps,node)' {
+	let node=nmaps.node_info_map.find(&node).unwrap();
+	for &child_id in node.children.iter() {
+		let child_node = nmaps.node_info_map.find(&child_id).unwrap();
+
+		match child_node.node {
+			// is it in decl, or item?!
+			astnode_item(item)=> {
+				match item.node {
+					// to escape the pyramid of doom, we want to pass ::ItemTrait, but its not a type itself :( we hope rust gets this addition
+					ast::ItemTrait(ref g,ref tr, ref tm)=>{
+						gather_trait_graph_sub((g,tr,tm),tg,(xcm,nmaps),child_node);
+					},
+					_=>{}
+				}
+			}
+			_=>{
+			}
+		}
+		gather_trait_graph_rec(tg, (xcm,nmaps), child_id);
+	}
+}
+
+// we hope they will in future allow inference between functions in the same module-
+// easier to break up and refactor.
+// the only reason we're writing this function is to reduce indentation above.
+fn gather_trait_graph_sub<'a>(
+		(g,tr,rm):(&ast::Generics,&Vec<ast::TraitRef>,&Vec<ast::TraitMethod>),
+		tg:&mut HashMap<DefId, TraitInfo<'a>>,
+		(xcm,nmaps):(&'a CrossCrateMap,&NodeMaps),
+		node:&FNodeInfo)
+{
+	println!("trait {}\n", str_of_opt_ident(node.ident));
 }
 
 // TODO: populate this 

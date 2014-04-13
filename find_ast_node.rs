@@ -44,6 +44,8 @@ fn 	mkAstSPtr2<T: 'static>(a:T)->AstSPtr<T> {
 
 
 
+// todo: looks like RustC does have this, "syntax::ast_map::Node" ?
+// refactor ou code to use that.
 /// wrapper enum for the varios ast:: node types.
 #[deriving(Clone)]
 pub enum AstNode_ { 
@@ -76,6 +78,7 @@ pub enum AstNode_ {
 /// Allows unified access to various properties that many nodes share, 
 /// through acessor functions returning options, eg. ident ..
 
+/// This will be refactored into something like clang 'Cursor', more like an iterator.
 #[deriving(Clone)]
 pub struct FNodeInfo {
 	pub id:	ast::NodeId,					// id of this node.
@@ -86,11 +89,17 @@ pub struct FNodeInfo {
     pub parent_id:ast::NodeId,	// todo: vector of child nodes aswell?
 	pub children:Vec<ast::NodeId>,
 }
+
+
 //.. TODO - does it make sense to cache an ident here? not all nodes have one
 
 type SPtr<T> =@T;	// temporary to be replaced later.
 
 /// implementations for FNodeInfo, convinience accessors.
+/// refactor rustfinds' accessors to our AST wrappers
+/// we suspect either these are already available, or they will be added in time.
+/// use rf_ prefix for methods for ease of search replace when we know what the
+/// best way is !
 impl FNodeInfo {
 /*
 	pub fn visit_children(&self, all_nodes:&FNodeInfoMap, f:|all_nodes:&FNodeInfoMap,node:&FNodeInfo|) {
@@ -99,13 +108,29 @@ impl FNodeInfo {
 		}
 	}
 */
-	pub fn get_ident(&self)->Option<ast::Ident> { self.ident}
+
+	pub fn rf_get_id(&self)->ast::NodeId { self.id}
+	pub fn rf_get_span(&self)->codemap::Span { self.span }
+	pub fn rf_get_node(&self)->AstNode_ { self.node }
+	pub fn rf_get_parent_id(&self)->Option<ast::NodeId> { Some(self.parent_id) } // surely the root node doesn't have a parent. Is the root node in the same system ?
+	pub fn rf_visit_children(&self, nim:&FNodeInfoMap,  f:|ni:&FNodeInfo|) {
+		for nid in self.children.iter() {
+			match nim.find(nid) {
+				Some(node)=> f(node),
+				_=>{},
+			}
+			
+		}
+	}
+
+
+	pub fn rf_get_ident(&self)->Option<ast::Ident> { self.ident}
 
 	// TODO: Macro to write these acessors, its just a simple pattern.
 	// suggestion for rustc.. macros to switch idents from CamelCase to snake_case and back..
 
 	/// Check if the contained node is a function declaretion, return it or not.
-	pub fn as_item<'a>(&'a self)->Option<AstSPtr<ast::Item>> {
+	pub fn rf_as_item<'a>(&'a self)->Option<AstSPtr<ast::Item>> {
 		match self.node
 		{
 			astnode_item(item)=>Some(item),
@@ -117,12 +142,12 @@ impl FNodeInfo {
 	/// this is a lot of boilerplate, probably more code overall,
 	/// but seems to make some tasks easier elsewhere.
 
-	pub fn as_fn_decl<'a>(&'a self)->
+	pub fn rf_as_fn_decl<'a>(&'a self)->
 			Option<(AstSPtr<ast::Item>,
 				(ast::P<ast::FnDecl>, ast::Purity, abi::Abi, ast::Generics, ast::P<ast::Block>)
 				)>
 	{
-		let x=self.as_item().map(
+		let x=self.rf_as_item().map(
 			|item|{
 				match item.node{
 					ast::ItemFn(ref decl,ref purity,ref abi,ref generics,ref block)
@@ -141,14 +166,14 @@ impl FNodeInfo {
 		}
 		
 	}
-	pub fn is_fn_decl(&self)->bool { self.as_fn_decl().is_some()}
-	pub fn as_expr<'a>(&'a self)->Option<(AstSPtr<ast::Expr>)> {
+	pub fn rf_is_fn_decl(&self)->bool { self.rf_as_fn_decl().is_some()}
+	pub fn rf_as_expr<'a>(&'a self)->Option<(AstSPtr<ast::Expr>)> {
 		match self.node {
 			astnode_expr(expr)=>Some(expr),
 			_=>None
 		}
 	}
-	pub fn is_expr(&self)->bool { self.as_expr().is_some() }
+	pub fn rf_is_expr(&self)->bool { self.rf_as_expr().is_some() }
 /*
 	pub fn as_fn_call<'a>(&'a self)->Option<_> {
 		match self.as_expr() {
@@ -162,6 +187,49 @@ impl FNodeInfo {
 }
 
 pub type FNodeInfoMap= HashMap<ast::NodeId,FNodeInfo>;
+
+static mut g_root_node:Option<ast::NodeId> =None;
+pub fn rf_set_root_node<'a> (nim:&'a FNodeInfoMap, root_node: ast::NodeId) {
+	unsafe {
+		// todo -lock!
+		match g_root_node {
+			Some(node)=> {
+				fail!("only one root node, its a global hack till we refactor out");
+				 
+			}
+			None=> { g_root_node = Some(root_node);
+			}
+		}
+	}
+}
+pub fn rf_clear_root_node<'a> (nim:&'a FNodeInfoMap) {
+	unsafe { g_root_node=None }
+}
+
+pub fn rf_get_root_node<'a> (nim:&'a FNodeInfoMap)->Option<(ast::NodeId,&'a FNodeInfo)> {
+	unsafe {
+		match g_root_node {
+			None=>{ fail!("must have a root node set")},
+			Some(nid)=>Some( (nid, nim.find(&nid).unwrap()) )
+		}		
+	}
+}
+/*
+	match nim.iter().nth(0) {
+		None=> None,
+		Some(( ref mut id, ref mut v))=>{
+			while true {
+				match nim.find(v.parent_id) {
+					None=> return Some((id,v)),
+					Some(ref node) =>{
+						id=v.parent_id; v=node;
+					}
+				}
+			}
+		}
+	}
+*/
+
 
 pub type NodeTreeLoc = ~[AstNode_];
 pub fn dump_node_tree_loc(ndt:&NodeTreeLoc) {
