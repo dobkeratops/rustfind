@@ -43,6 +43,8 @@ pub mod htmlwriter;	// TODO - this is wrong, will cause confusion!
 pub struct RF_Options {
     pub write_file_path: bool,
     pub write_references: bool,
+	pub write_callgraph: bool,
+	pub write_html:bool,
     pub output_dir: Path,
 	pub rustdoc_url: Option<Path>,		// optional where to place links back to rustdoc pages
 }
@@ -52,6 +54,8 @@ impl RF_Options {
         RF_Options {
             write_file_path: true,
             write_references: true,
+			write_callgraph: true,
+			write_html:true,
             output_dir: Path::new(""),
             rustdoc_url: None
         }
@@ -153,28 +157,22 @@ pub fn make_html_from_source(dc: &RustFindCtx, fm: &codemap::FileMap, nmaps: &No
     doc.doc
 }
 
-pub fn write_crate_as_html_sub(dc:&RustFindCtx, nim:&FNodeInfoMap, jdm:&JumpToDefMap,xcm:&CrossCrateMap,lib_path:&str, options: &RF_Options) {
+pub fn write_crate_as_html_sub(dc:&RustFindCtx, nmaps:&NodeMaps,
+	xcm:&CrossCrateMap,lib_path:&str, options: &RF_Options) {
 
 	//println!("output dir={}",options.output_dir.as_str().unwrap_or(""));
 	indexpage::write_index_html(&Path::new("."), &[~"rs",~"cpp",~"h",~"c"],options);
 
-    let npl=NodesPerLinePerFile::new(dc,nim);
+    let npl=NodesPerLinePerFile::new(dc,nmaps.node_info_map);
 
 //  let nspl=~[~[]];
-    let mut def2refs = ~MultiMap::new();
-    for (&nref,&ndef) in jdm.iter() {
-        if ndef.krate==0 {
-            def2refs.insert(ndef.node,nref);
-        }
-    };
 
-    let nmaps=NodeMaps { node_info_map:nim, jump_def_map:jdm, jump_ref_map:def2refs};
     let files=&dc.codemap().files.borrow();
     for (i,cm_file) in files.iter().enumerate() {
         if is_valid_filename(cm_file.name) {
             let html_name = options.output_dir.join(Path::new(make_html_name(cm_file.name)));
             println!("generating {}: {}.. ", i.to_str(), html_name.display());
-            let doc_str=make_html_from_source(dc, &**cm_file, &nmaps,xcm, &npl.file[i] , lib_path,
+            let doc_str=make_html_from_source(dc, &**cm_file, nmaps,xcm, &npl.file[i] , lib_path,
                                   &html_name, options);
 
 			file_write_bytes_as(&html_name, doc_str.as_bytes() );

@@ -17,14 +17,20 @@ pub type ZeroBasedIndex=uint;
 /// allows sunsequent crates to jump to definitions in that crate
 /// TODO - check if this already exists in the 'cstore/create metadata'
 /// specificially we need node->span info
-#[deriving(Clone)]
+#[deriving(Clone,Hash,TotalEq,Eq)]
 pub struct CrossCrateMapItem {
-	pub item_name:Option<~str>,
+	pub item_name:~str,
     pub file_name:~str,
     pub line:ZeroBasedIndex,
     pub col:uint,
     pub len:uint
 }
+/*
+impl<S> std::hash::Hash<S> for CrossCrateMapItem {
+	fn hash(&self, state:&mut S) {
+	}
+}
+*/
 
 /// Cross Crate Map - resolves file locations from DefIds, across crates
 /// also caches item paths
@@ -32,7 +38,7 @@ pub type CrossCrateMap = HashMap<ast::DefId,CrossCrateMapItem>;
 
 
 fn get_def_id_name(xcm:&CrossCrateMap, def_id:&ast::DefId)->~str {
-	xcm.find(def_id).map(|x|x.item_name.clone().unwrap_or(~"")).unwrap_or(~"")
+	xcm.find(def_id).map(|x|x.item_name.clone()).unwrap_or(~"")
 }
 
 
@@ -68,7 +74,7 @@ pub fn read_cross_crate_map(crate_num:int, crate_name:&str,lib_path:&str)->~Cros
                     let node_id: int= from_str::<int>(toks[2]).unwrap_or(0);
                     xcm.insert(ast::DefId{krate:crate_num as u32, node:node_id as u32,},
                         CrossCrateMapItem{
-							item_name:	toks.iter().nth(9).map(|x|x.to_owned()),
+							item_name:	toks.iter().nth(9).map_or(~"",|x|x.to_owned()),
                             file_name:  toks[4].to_owned(),
                             line:   from_str(toks[5]).unwrap_or(0)-1,
                             col:    from_str(toks[6]).unwrap_or(0),
@@ -82,7 +88,7 @@ pub fn read_cross_crate_map(crate_num:int, crate_name:&str,lib_path:&str)->~Cros
                     let node_id:int=from_str(toks[1]).unwrap_or(0);
                     xcm.insert(ast::DefId{krate:crate_num as u32, node:node_id as u32,},
                         CrossCrateMapItem{
-							item_name:	toks.iter().nth(9).map(|x|x.to_owned()),
+							item_name:	toks.iter().nth(9).map_or(~"",|x|x.to_owned()),
                             file_name:  toks[2].to_owned(),
                             line:   from_str(toks[3]).unwrap_or(0)-1,
                             col:    from_str(toks[4]).unwrap_or(0),
@@ -114,7 +120,7 @@ pub fn cross_crate_map_combine_current_crate(xcm:&mut CrossCrateMap,dc:&RustFind
 			Some(ref tfp)=>{
 			   xcm.insert(ast::DefId{krate:0, node:*node_id as u32,},
 					CrossCrateMapItem{
-						item_name:	Some(str_of_opt_ident(node_info.ident)),
+						item_name:	str_of_opt_ident(node_info.ident),
 						file_name:	tfp.name.clone(),
 						line:	tfp.line as uint,
 						col:	tfp.col as uint,

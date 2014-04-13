@@ -21,6 +21,7 @@ use std::cell::RefCell;
 use collections::{HashMap,HashSet};
 use std::path::Path;
 use rust2html::RF_Options;
+use jumptodefmap::{MultiMap,NodeMaps};
 
 use getopts::{optmulti, optopt, optflag, getopts};
 
@@ -196,7 +197,8 @@ fn main() {
         }
         if matches.opt_present("r") {
             println!("Writing .rfx ast nodes/cross-crate-map:-");
-            write_crate_as_html_and_rfx(dc,lib_html_path, &html_options, false);
+			html_options.write_html=false;
+            write_crate_as_html_and_rfx(dc,lib_html_path, &html_options);
             println!("Writing .rfx .. done");
             done=true;
         }
@@ -204,7 +206,8 @@ fn main() {
         // Dump as html..
         if matches.opt_present("w") || !(done) {
             println!("Creating HTML pages from source & .rfx:-");
-            write_crate_as_html_and_rfx(dc,lib_html_path, &html_options, true);
+			html_options.write_html=true;
+            write_crate_as_html_and_rfx(dc,lib_html_path, &html_options);
             println!("Creating HTML pages from source.. done");
         }
 	} else {
@@ -339,25 +342,39 @@ fn debug_test(dc:&RustFindCtx) {
     dump!(lookup_def_at_text_file_pos(dc, &ZTextFilePos::new("test_input.rs",11-1,10),SDM_Source));println!("");
 }
 
-pub fn write_crate_as_html_and_rfx(dc:&RustFindCtx,lib_html_path:&str,opts: &RF_Options, write_html:bool) {
-    let mut xcm:~CrossCrateMap=~HashMap::new();
+pub fn write_crate_as_html_and_rfx(dc:&RustFindCtx,lib_html_path:&str,opts: &RF_Options) {
+    let mut xcm:CrossCrateMap=HashMap::new();
 	let tm=Profiler::new("write_crate_as_html_and_rfx");
 
     dc.cstore().iter_crate_data(|i,md| {
         println!("loading cross crate data {} {}", i, md.name);
-        let xcm_sub=crosscratemap::cross_crate_map_read_into(xcm, i as int, lib_html_path + "lib"+md.name+&"/lib.rfx",lib_html_path);
+        let xcm_sub=crosscratemap::cross_crate_map_read_into(&mut xcm, i as int, lib_html_path + "lib"+md.name+&"/lib.rfx",lib_html_path);
     });
 
-    let (info_map,def_map,jump_map) = make_jump_to_def_map(dc);
+	// Pull togetherr the node info maps/def maps /jump maps..
+    let (info_map,def_map,jump_def_map) = make_jump_to_def_map(dc);
+//	nim:&FNodeInfoMap, jdm:&JumpToDefMap,
+    let mut def2refs = ~MultiMap::new();
+    for (&nref,&ndef) in jump_def_map.iter() {
+        if ndef.krate==0 {
+            def2refs.insert(ndef.node,nref);
+        }
+    };
+    let nmaps=NodeMaps { node_info_map:&info_map, jump_def_map:jump_def_map, jump_ref_map:def2refs};
+
+
+
 	// combine_current_create: Allows us to use 'xcm' alone to resolve DefIds elsewhere.
 	// existing codepath also uses local info in 'jump_maps' to do the same job, we can simplify that out.
-	crosscratemap::cross_crate_map_combine_current_crate(xcm, dc,&info_map,def_map,jump_map); 
+	crosscratemap::cross_crate_map_combine_current_crate(&mut xcm, dc,&info_map,def_map,jump_def_map); 
 	
-    crosscratemap::cross_crate_map_write(dc,lib_html_path, &info_map,def_map,jump_map);
-    if write_html {
+    crosscratemap::cross_crate_map_write(dc,lib_html_path, &info_map,def_map,jump_def_map);
+    if opts.write_html {
 		let mut tm=::timer::Profiler::new("write_crate_as_html_and_rfx");
-        rust2html::write_crate_as_html_sub(dc,&info_map,jump_map,xcm,lib_html_path,opts);
-
+        rust2html::write_crate_as_html_sub(dc,&nmaps,&xcm,lib_html_path,opts);
     }
+	if opts.write_callgraph {
+		callgraph::write_call_graph(&xcm,&nmaps, opts.output_dir.as_str().unwrap_or(".")+"/callgraph.txt");
+	}
 }
 
