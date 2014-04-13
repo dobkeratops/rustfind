@@ -20,8 +20,8 @@ use std::{os,local_data};
 use std::cell::RefCell;
 use collections::{HashMap,HashSet};
 use std::path::Path;
-use rust2html::RF_Options;
 use jumptodefmap::{MultiMap,NodeMaps};
+use std::path::posix;
 
 use getopts::{optmulti, optopt, optflag, getopts};
 
@@ -54,6 +54,29 @@ pub mod jumptodefmap;
 pub mod timer;
 pub mod indexpage;
 pub mod callgraph;
+pub struct RF_Options {
+	pub write_file_path:bool,
+	pub write_references:bool,
+	pub write_callgraph:bool,
+	pub write_html:bool,
+	pub output_dir:posix::Path,
+	pub rustdoc_url:Option<posix::Path>,
+	pub callgraph_opt:callgraph::CG_Options,
+}
+impl RF_Options {
+    pub fn new() -> RF_Options {
+        RF_Options {
+            write_file_path: true,
+            write_references: true,
+			write_callgraph: true,
+			write_html:true,
+            output_dir: Path::new(""),
+            rustdoc_url: None,
+			callgraph_opt:callgraph::CG_Options::new(),
+        }
+    }
+}
+
 
 pub macro_rules! tlogi{
     ($($a:expr),*)=>(println!((file!()+":"+line!().to_str()+": " $(+$a.to_str())*) ))
@@ -146,7 +169,7 @@ fn main() {
         let dc = @get_ast_and_resolve(&Path::new(filename), libs.move_iter().collect());
         local_data::set(ctxtkey, dc);
 
-        let mut html_options = rust2html::RF_Options::new();
+        let mut html_options = RF_Options::new();
         if matches.opt_present("D") {
             debug_test(dc);
             done=true;
@@ -373,8 +396,9 @@ pub fn write_crate_as_html_and_rfx(dc:&RustFindCtx,lib_html_path:&str,opts: &RF_
 		let mut tm=::timer::Profiler::new("write_crate_as_html_and_rfx");
         rust2html::write_crate_as_html_sub(dc,&nmaps,&xcm,lib_html_path,opts);
     }
-	if opts.write_callgraph {
-		callgraph::write_call_graph(&xcm,&nmaps, opts.output_dir.as_str().unwrap_or(".")+"/callgraph");
+	if !opts.write_callgraph {
+		return;
 	}
+	callgraph::write_call_graph(&xcm,&nmaps, opts.output_dir.as_str().unwrap_or(".")+"/callgraph", &opts.callgraph_opt);
 }
 

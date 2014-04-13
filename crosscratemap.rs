@@ -1,7 +1,10 @@
 use std::io::println;
+use std::path::posix::Path;
 use std::path::posix;
+use std::io::fs;
 use rf_common::*;
 use syntax::ast;
+use syntax::ast::NodeId;
 use syntax::codemap::Pos;
 use find_ast_node::FNodeInfoMap;
 use jumptodefmap::{JumpToDefMap};
@@ -23,7 +26,7 @@ pub struct CrossCrateMapItem {
     pub file_name:~str,
     pub line:ZeroBasedIndex,
     pub col:uint,
-    pub len:uint
+    pub len:uint,
 }
 /*
 impl<S> std::hash::Hash<S> for CrossCrateMapItem {
@@ -41,6 +44,16 @@ fn get_def_id_name(xcm:&CrossCrateMap, def_id:&ast::DefId)->~str {
 	xcm.find(def_id).map(|x|x.item_name.clone()).unwrap_or(~"")
 }
 
+pub trait FindNode {
+	fn find_node<'a>(&'a self,id:NodeId)->&'a CrossCrateMapItem;
+}
+impl FindNode for CrossCrateMap {
+	fn find_node<'a>(&'a self, id:NodeId)->&'a CrossCrateMapItem {
+		let item_defid = ast::DefId{krate:0, node:id};
+		let xcmi=self.find(&item_defid).unwrap();
+		xcmi
+	}
+}
 
 
 pub fn read_cross_crate_map(crate_num:int, crate_name:&str,lib_path:&str)->~CrossCrateMap {

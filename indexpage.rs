@@ -2,7 +2,6 @@ use rust2html::htmlwriter::HtmlWriter;
 use std::str;
 use std::io::{File, UserDir};
 use std::io::fs::{mkdir_recursive,copy,walk_dir};
-use rust2html::RF_Options;
 use collections::hashmap::HashMap;
 use collections::hashmap::HashSet;
 use rust2html;
@@ -15,7 +14,7 @@ use std::vec::Vec;
 // each listed file links to its 'file.html'.
 
 
-pub fn write_index_html(source_dir: &Path,extentions:&[~str], options:&RF_Options) {
+pub fn write_index_html(source_dir: &Path,extentions:&[~str], options:&::RF_Options) {
 
 	//println!("output dir={}",options.output_dir.as_str().unwrap_or(""));
 	println!("Generating index page:-");

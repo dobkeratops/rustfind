@@ -6,12 +6,14 @@ use syntax::parse::token;
 use rustc::{driver, middle};
 use rustc::metadata::cstore;
 
+/// context object for the application; holds structs populated by rustc
 pub struct RustFindCtx {
      pub crate_: @ast::Crate,
 //     tycx: middle::ty::ctxt, // todo: lazy and make an Rc<T>, or propogate the lifetimes needed for &..
 //     sess: driver::session::Session,
      pub ca: driver::driver::CrateAnalysis	//todo: tycx is in here!
 }
+/// accessors for RustFindCtx
 impl RustFindCtx {
 	pub fn codemap<'a>(&'a self)->&'a codemap::CodeMap { self.ca.ty_cx.sess.codemap() }
 	pub fn session<'a>(&'a self)->&'a driver::session::Session { &self.ca.ty_cx.sess }

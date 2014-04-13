@@ -39,28 +39,6 @@ pub mod htmlwriter;	// TODO - this is wrong, will cause confusion!
 // and link to their *nodes* instead of source-lines? or would the spans still work?
 // we could give the whole generator a root dir to look for crates? ... and assume html is generated in there..
 
-// todo: options struct.
-pub struct RF_Options {
-    pub write_file_path: bool,
-    pub write_references: bool,
-	pub write_callgraph: bool,
-	pub write_html:bool,
-    pub output_dir: Path,
-	pub rustdoc_url: Option<Path>,		// optional where to place links back to rustdoc pages
-}
-
-impl RF_Options {
-    pub fn new() -> RF_Options {
-        RF_Options {
-            write_file_path: true,
-            write_references: true,
-			write_callgraph: true,
-			write_html:true,
-            output_dir: Path::new(""),
-            rustdoc_url: None
-        }
-    }
-}
 
 fn file_get_time_stamp_str(fpath:&Path)->~str {
 	let file_time=match fs::stat(fpath) {
@@ -70,10 +48,10 @@ fn file_get_time_stamp_str(fpath:&Path)->~str {
 	ts.ctime()
 }
 
-//nim:&FNodeInfoMap,jdm:&JumpToDefMap, jrm:&JumpToRefMap
+/// Takes populated node maps (NodeMaps)&'CrossCrateMap, plus a 'filemap' from crate-analysis, and generates an HTML view of the source with links.
 pub fn make_html_from_source(dc: &RustFindCtx, fm: &codemap::FileMap, nmaps: &NodeMaps,
                  xcm: &CrossCrateMap, fln: &FileLineNodes, lib_path: &str, 
-                 out_file: &Path, options: &RF_Options) -> ~str {
+                 out_file: &Path, options: &::RF_Options) -> ~str {
     // todo - Rust2HtmlCtx { fm,nim,jdm,jrm } .. cleanup common intermediates
 	let mut p=Profiler::new("make_html");
 //	::callgraph::dump_callgraph(xcm, nmaps);
@@ -128,8 +106,8 @@ pub fn make_html_from_source(dc: &RustFindCtx, fm: &codemap::FileMap, nmaps: &No
             // this block appears to be what corrupted it - is it anything to do with the iteration?
             
             let depth=scw.doc.depth();
-            let null_line=~[];
-            let def_nodes_on_line=fln.def_nodes_per_line.get(line).unwrap_or(&null_line); // caution, because what it returned was Option, it seems.
+//            let null_line=Vec::new();
+            let def_nodes_on_line=fln.def_nodes_per_line.get(line)/*.unwrap_or(&null_line)*/; // caution, because what it returned was Option, it seems.
             for nl in def_nodes_on_line.iter() {
                 scw.doc.begin_tag_anchor("n"+nl.to_str());
             }
@@ -140,13 +118,13 @@ pub fn make_html_from_source(dc: &RustFindCtx, fm: &codemap::FileMap, nmaps: &No
             scw.doc.check_depth(depth);
             
             
-            write_line_with_links(&mut scw,dc,fm,lib_path, nmaps,xcm, line_str, fln.nodes_per_line[line]);
+            write_line_with_links(&mut scw,dc,fm,lib_path, nmaps,xcm, line_str, fln.nodes_per_line.get(line));
             scw.doc.writeln("");
     //      doc.writeln(markup_line);
         }
     }
     if options.write_references {
-        write_symbol_references(&mut doc,dc,fm,lib_path,nmaps, fln.nodes_per_line);
+        write_symbol_references(&mut doc,dc,fm,lib_path,nmaps, &fln.nodes_per_line);
     }
 
     doc.end_tag_check(maintext);
@@ -158,7 +136,7 @@ pub fn make_html_from_source(dc: &RustFindCtx, fm: &codemap::FileMap, nmaps: &No
 }
 
 pub fn write_crate_as_html_sub(dc:&RustFindCtx, nmaps:&NodeMaps,
-	xcm:&CrossCrateMap,lib_path:&str, options: &RF_Options) {
+	xcm:&CrossCrateMap,lib_path:&str, options: &::RF_Options) {
 
 	//println!("output dir={}",options.output_dir.as_str().unwrap_or(""));
 	indexpage::write_index_html(&Path::new("."), &[~"rs",~"cpp",~"h",~"c"],options);
@@ -172,7 +150,7 @@ pub fn write_crate_as_html_sub(dc:&RustFindCtx, nmaps:&NodeMaps,
         if is_valid_filename(cm_file.name) {
             let html_name = options.output_dir.join(Path::new(make_html_name(cm_file.name)));
             println!("generating {}: {}.. ", i.to_str(), html_name.display());
-            let doc_str=make_html_from_source(dc, &**cm_file, nmaps,xcm, &npl.file[i] , lib_path,
+            let doc_str=make_html_from_source(dc, &**cm_file, nmaps,xcm, npl.file.get(i) , lib_path,
                                   &html_name, options);
 
 			file_write_bytes_as(&html_name, doc_str.as_bytes() );
@@ -205,7 +183,7 @@ fn is_valid_filename(f:&str) ->bool{
     }
 }
 
-pub fn write_head(doc:&mut HtmlWriter, out_file: &Path, options: &RF_Options) {
+pub fn write_head(doc:&mut HtmlWriter, out_file: &Path, options: &::RF_Options) {
     let css_rel_path = &options.output_dir
                         .path_relative_from(&out_file.dir_path())
                         .unwrap_or(Path::new(""));
@@ -224,6 +202,7 @@ pub fn write_head(doc:&mut HtmlWriter, out_file: &Path, options: &RF_Options) {
     doc.end_tag();
 }
 
+/// spawns git to find version info for the source tree here.
 pub fn get_git_branch_info()->~str {
 	use std::io;
 	use std::io::process;
@@ -269,12 +248,14 @@ fn pad_to_length(a:&str,l:uint,pad:&str)->~str {
     acc
 }
 
+/// Struct to accumulate nodes sorted for each line of the file.
 pub struct FileLineNodes {
-    nodes_per_line:~[~[ast::NodeId]],
-    def_nodes_per_line:~[~[ast::NodeId]]
+    nodes_per_line:Vec<Vec<ast::NodeId>>,
+    def_nodes_per_line:Vec<Vec<ast::NodeId>>
 }
+/// Struct to accumulate nodes sorted for each line of the file.
 struct NodesPerLinePerFile {
-    file :~[FileLineNodes]
+    file :Vec<FileLineNodes>
 }
 //type NodesPerLine=&[~[ast::NodeId]];
 
@@ -302,7 +283,7 @@ impl NodesPerLinePerFile {
         //              |fm:&@codemap::FileMap|{ slice::from_elem(fm.lines.len(), ~[]) }
         //          ).collect();
 
-        let mut npl=~NodesPerLinePerFile{file:~[]};
+        let mut npl=~NodesPerLinePerFile{file:Vec::new()};
 //      let mut fi=0;
 //      npl.file = slice::from_elem(dc.sess.codemap.files.len(),);
         let files = dc.codemap().files.borrow();
@@ -312,8 +293,8 @@ impl NodesPerLinePerFile {
             let num_lines=cmfile.lines.borrow();
             let num_lines = num_lines.len();
             npl.file.push(FileLineNodes{
-                nodes_per_line: slice::from_elem(num_lines,~[]),
-                def_nodes_per_line: slice::from_elem(num_lines,~[])
+                nodes_per_line: Vec::from_elem(num_lines,Vec::new()),
+                def_nodes_per_line: Vec::from_elem(num_lines,Vec::new())
             });
 //          fi+=1;
         };
@@ -325,13 +306,13 @@ impl NodesPerLinePerFile {
                     None=>{ },
                     Some(ifpe)=>{
 
-                        let f = &mut npl.file [ifp.file_index as uint];
-                        f.def_nodes_per_line [ifp.line as uint].push(*k);
+                        let  f = npl.file.get_mut(ifp.file_index as uint);
+                        f.def_nodes_per_line.get_mut(ifp.line as uint).push(*k);
 //                      dump!(ifp, f.nodes_per_line.len());
                         for li in range(ifp.line,ifpe.line+1) {
                             if li < f.nodes_per_line.len() as u32 {
 //                              dump!(li, *k)
-                                f.nodes_per_line[li as uint].push(*k)
+                                f.nodes_per_line.get_mut(li as uint).push(*k)
                             };
                         };
                     }
@@ -473,7 +454,7 @@ static link_to_refs:bool    =true;
 static link_debug:bool      =true;
 
 
-fn write_line_with_links(dst:&mut SourceCodeWriter<HtmlWriter>,dc:&RustFindCtx,fm:&codemap::FileMap,lib_path:&str, nmaps:&NodeMaps,xcm:&CrossCrateMap, line:&str, nodes:&[ast::NodeId]) {
+fn write_line_with_links(dst:&mut SourceCodeWriter<HtmlWriter>,dc:&RustFindCtx,fm:&codemap::FileMap,lib_path:&str, nmaps:&NodeMaps,xcm:&CrossCrateMap, line:&str, nodes:&Vec<ast::NodeId>) {
     // todo ... BREAK THIS FUNCTION UP!!!!
     // and there is a load of messy cut paste too.
 
@@ -892,7 +873,7 @@ impl<T:Ord+Clone> Extents<T> {
 
 /// Write a block of links to symbol references.
 /// Workaround for not having popup menus when you click on a symbol.
-fn write_symbol_references(doc:&mut HtmlWriter,dc:&RustFindCtx, fm:&codemap::FileMap, _:&str,  nmaps:&NodeMaps, _: &[~[ast::NodeId]]) {
+fn write_symbol_references(doc:&mut HtmlWriter,dc:&RustFindCtx, fm:&codemap::FileMap, _:&str,  nmaps:&NodeMaps, _: &Vec<Vec<ast::NodeId>>) {
 
 
     let depth=doc.depth();

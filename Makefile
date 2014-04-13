@@ -36,7 +36,7 @@ test0 : rustfind
 	./rustfind test_input0.rs -w -x $(RUSTSRC) $(RF_OPTS)
 	firefox html/test_input0.rs.html
 
-#make emacs ctags for this project
+#make emacs ctags for this project,
 tags:
 	ctags -e -f TAGS.emacs --options=$(RUSTSRC)/etc/ctags.rust -R .
 
@@ -121,7 +121,7 @@ help:
 	@echo "but its more useful if you build the main rust sourcetree first for reference"
 
 #Compile the main executable
-rustfind: rustfind.rs $(SRC) 
+rustfind: rustfind.rs $(SRC)  tags
 	rustc $(RUSTFLAGS) rustfind.rs
 
 install :rustfind

@@ -36,7 +36,10 @@ pub macro_rules! if_some {
 pub type JumpToRefMap = MultiMap<ast::NodeId, ast::NodeId>;
 pub type JumpToDefMap = HashMap<ast::NodeId,ast::DefId> ;
 
-// TODO Move to jumptodefmap. Its not part of HTML generation.
+/// NodeMaps, collects together:
+///  FNodeInfoMap -  map{NodeIds=>FNodeInfo} - universal AST node wrappers
+///  JumpToDefMap - connects nodes to DefIds (external nodes)
+/// JumpToRefMap - inverse of JumpToDefMap, but only needs internal crate nodes.
 pub struct NodeMaps<'a>  {
     pub node_info_map:&'a FNodeInfoMap,
     pub jump_def_map:&'a JumpToDefMap,

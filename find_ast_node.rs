@@ -189,6 +189,7 @@ macro_rules! dump{ ($($a:expr),*)=>
 
 /// main
 pub fn find_node_at_byte_pos(c:@ast::Crate,_location:codemap::BytePos)->AstNode_ {
+	fail!();
     let tree_loc=find_node_tree_loc_at_byte_pos(c,_location);
     return tree_loc.last().expect("Unable to find node").clone();
 }
@@ -1217,7 +1218,6 @@ pub fn get_node_source(tc:&ty::ctxt, nim:&FNodeInfoMap, did:ast::DefId)->~str {
     }
 }
 
-
 pub fn dump_node_source_for_single_file_only(text:&[u8], ns:&FNodeInfoMap, id:ast::NodeId) {
     match ns.find(&id) {
         None=>logi!("()"),
@@ -1225,4 +1225,11 @@ pub fn dump_node_source_for_single_file_only(text:&[u8], ns:&FNodeInfoMap, id:as
             dump_span(text, &info.span);
         }
     }
+}
+
+// Step thru everything here...
+fn verify_parent_links(infomap:&FNodeInfoMap) {
+	for (id,info) in infomap.iter() {
+//		let parent_info = infomap.find(&info.parent)
+	}
 }
