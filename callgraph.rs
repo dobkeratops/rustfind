@@ -36,26 +36,33 @@ pub fn dump_functions(nmaps:&NodeMaps) {
 /// Todo - seperate into callgraph iterator and file writer passing a closure..
 pub fn write_call_graph<'a>(xcm:&'a CrossCrateMap, nmaps:&NodeMaps, filename:&str) {
 	println!("Writing callgraph {}..",filename);
-	match fs::File::create(&posix::Path::new(filename)) {
-		Err(_) => println!("can't write callgraph {}", filename),
-		Ok(mut outf)=>
+	match (	fs::File::create(&posix::Path::new(filename.to_owned()+~".txt")),
+			fs::File::create(&posix::Path::new(filename.to_owned()+~".dot")),
+		)
+	{
+		(Ok(mut outf),Ok(mut dotf))=>
 		{
 			println!("writing callgraph file ..\n");
+			dotf.write_line("digraph callgraph {");
 			for (node_id, info) in nmaps.node_info_map.iter() {
 				let mut calls= HashSet::<&'a CrossCrateMapItem>::new();
 				info.as_fn_decl().map(
 					|(ref item, fn_decl)|{
 						let xcmi=xcm.find(&ast::DefId{krate:0,node:*node_id}).unwrap();
-						outf.write_line(format!("fn {}() {}:{}", str_of_ident(item.ident), xcmi.file_name,xcmi.line+1));
+						let caller_str = str_of_ident(item.ident);
+						outf.write_line(format!("fn {}() {}:{}", caller_str, xcmi.file_name,xcmi.line+1));
 						gather_call_graph_rec(&mut calls, xcm ,nmaps,  *node_id);
 			
 						for call_item in calls.iter() {
 							outf.write_line(format!("\tcalls {}() {}:{}",call_item.item_name, call_item.file_name, call_item.line+1));
+							dotf.write_line("\t"+caller_str  +" -> "+ call_item.item_name+"");
 						}
 					}
 				);
 			}
+			dotf.write_line("}");
 		}
+		_ => println!("can't write callgraph {}", filename),
 	}
 //	fail!();
 }

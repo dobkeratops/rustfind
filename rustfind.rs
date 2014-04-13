@@ -374,7 +374,7 @@ pub fn write_crate_as_html_and_rfx(dc:&RustFindCtx,lib_html_path:&str,opts: &RF_
         rust2html::write_crate_as_html_sub(dc,&nmaps,&xcm,lib_html_path,opts);
     }
 	if opts.write_callgraph {
-		callgraph::write_call_graph(&xcm,&nmaps, opts.output_dir.as_str().unwrap_or(".")+"/callgraph.txt");
+		callgraph::write_call_graph(&xcm,&nmaps, opts.output_dir.as_str().unwrap_or(".")+"/callgraph");
 	}
 }
 
