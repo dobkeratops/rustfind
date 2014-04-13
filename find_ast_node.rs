@@ -193,7 +193,37 @@ impl FNodeInfo {
 */
 }
 
-pub type FNodeInfoMap= HashMap<ast::NodeId,FNodeInfo>;
+//pub type FNodeInfoMap= HashMap<ast::NodeId,FNodeInfo>;
+
+/// Wrapper for holder of nodes, TODO - refactoring away from our local copy of the ast, wrap a cursor around theirs.
+pub struct FNodeInfoMap {
+	fni_hashmap:HashMap<ast::NodeId,FNodeInfo>
+}
+
+
+impl FNodeInfoMap {
+	pub fn new()->FNodeInfoMap{
+		FNodeInfoMap{ fni_hashmap: HashMap::new() }
+	}
+	pub fn find<'a>(&'a self,id:&ast::NodeId)->Option<&'a FNodeInfo> {
+		self.fni_hashmap.find(id)
+	}
+	pub fn find_mut<'a> (&'a mut self,id:&ast::NodeId)->Option<&'a mut FNodeInfo> {
+		self.fni_hashmap.find_mut(id)
+	}
+	pub fn insert(&mut self, id:ast::NodeId, v:FNodeInfo) {
+		self.fni_hashmap.insert(id,v);
+	}
+	pub fn find_or_insert<'a>(&'a mut self, id:ast::NodeId, v:FNodeInfo)->&'a mut FNodeInfo {
+		self.fni_hashmap.find_or_insert(id,v)
+	}
+	pub fn len(&self)->uint { self.fni_hashmap.len() }
+	pub fn iter<'a>(&'a self)->::collections::hashmap::Entries<'a,ast::NodeId, FNodeInfo>  {
+		self.fni_hashmap.iter()
+	}
+
+}
+
 
 static mut g_root_node:Option<ast::NodeId> =None;
 pub fn rf_set_root_node<'a> (nim:&'a FNodeInfoMap, root_node: ast::NodeId) {
@@ -840,7 +870,7 @@ pub struct FNodeInfoMapBuilder {
 impl FNodeInfoMapBuilder {
     pub fn new() -> FNodeInfoMapBuilder {
         FNodeInfoMapBuilder {
-            all_nodes: HashMap::new()
+            all_nodes: FNodeInfoMap::new()
         }
     }
 
