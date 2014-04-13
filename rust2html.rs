@@ -301,8 +301,8 @@ impl NodesPerLinePerFile {
         for (k,v) in nim.iter() {
             // TODO- only want the **DEF_NODES** for 'def_nodes_per_line', not all.
             // todo, this could be more direct, file index, line index, ...
-            v.span.lo.to_index_file_pos(dc.tycx_ref()).for_some(|ifp|{
-                match v.span.hi.to_index_file_pos(dc.tycx_ref()) {
+            v.rf_span().lo.to_index_file_pos(dc.tycx_ref()).for_some(|ifp|{
+                match v.rf_span().hi.to_index_file_pos(dc.tycx_ref()) {
                     None=>{ },
                     Some(ifpe)=>{
 
@@ -339,7 +339,7 @@ impl NodesPerLinePerFile {
 }
 pub fn node_color_index(ni:&FNodeInfo)->int {
     // TODO - map this a bit more intelligently..
-    match ni.kind.as_slice() {
+    match ni.rf_kind() {
         "fn"=>1,
         "add"|"sub"|"mul"|"div"|"assign"|"eq"|"le"|"gt"|"ge"|"ne"|"binop"|"assign_op"
         |"bitand"|"bitxor"|"bitor"|"shl"|"shr"|"not"|"neg"|"box"|"uniq"|"deref"|"addr_of"
@@ -492,11 +492,11 @@ fn write_line_with_links(dst:&mut SourceCodeWriter<HtmlWriter>,dc:&RustFindCtx,f
 //              let link_id=(x.node as i64)|(x.crate as i64<<48);
 //              let link_id=*n as i64 &15;
 
-                let os=node_info.span.lo.to_index_file_pos(dc.tycx_ref());
-                let oe=node_info.span.hi.to_index_file_pos(dc.tycx_ref());
+                let os=node_info.rf_span().lo.to_index_file_pos(dc.tycx_ref());
+                let oe=node_info.rf_span().hi.to_index_file_pos(dc.tycx_ref());
                 if os.is_some() && oe.is_some() {
                     let e=oe.unwrap(); let s=os.unwrap();
-                    let d = node_info.span.hi.to_uint() - node_info.span.lo.to_uint();    // todo - get the actual hrc node depth in here!
+                    let d = node_info.rf_span().hi.to_uint() - node_info.rf_span().lo.to_uint();    // todo - get the actual hrc node depth in here!
                     let xs = if dst.line_index <= s.line as uint {
                         s.col
                     } else {
@@ -646,7 +646,7 @@ fn resolve_link(link:i64, dc:&RustFindCtx,fm:&codemap::FileMap,lib_path:&str, nm
                 match nmaps.nim.find(&link) {
                     None=>~"",  // link outside the crate?
                     Some(link_node_info)=>{
-                        let oifp = link_node_info.span.lo.to_index_file_pos(dc.tycx);
+                        let oifp = link_node_info.rf_span().lo.to_index_file_pos(dc.tycx);
                         match oifp {
                             Some(ifp)=>{
                                 let link_str:~str="#"+(ifp.line+1).to_str();
@@ -750,7 +750,7 @@ fn find_defs_in_file(fm:&codemap::FileMap, nim:&FNodeInfoMap)->~[ast::NodeId] {
     // todo - functional way..
     let mut acc=~[];
     for (n,info) in nim.iter() {
-        if info.span.lo >= fm.start_pos && (info.span.lo < (fm.start_pos+codemap::BytePos(fm.src.len() as u32))) {
+        if info.rf_span().lo >= fm.start_pos && (info.rf_span().lo < (fm.start_pos+codemap::BytePos(fm.src.len() as u32))) {
             acc.push(*n);
         }
     }
@@ -885,7 +885,7 @@ fn write_symbol_references(doc:&mut HtmlWriter,dc:&RustFindCtx, fm:&codemap::Fil
         let opt_def_info = nmaps.node_info_map.find(&def_node);
         if !opt_def_info.is_some() {continue;}
         let def_info = opt_def_info.unwrap();
-        if !(def_info.kind==~"fn" || def_info.kind==~"struct" || def_info.kind==~"trait" || def_info.kind==~"enum" || def_info.kind==~"ty") { continue; }
+        if !(def_info.rf_kind()==~"fn" || def_info.rf_kind()==~"struct" || def_info.rf_kind()==~"trait" || def_info.rf_kind()==~"enum" || def_info.rf_kind()==~"ty") { continue; }
 
         let refs = nmaps.jump_ref_map.find(def_node);
         let max_links=30;   // todo - sort..
@@ -894,7 +894,7 @@ fn write_symbol_references(doc:&mut HtmlWriter,dc:&RustFindCtx, fm:&codemap::Fil
 
         if refs.len()>0 {
             let mut header_written=false;
-            let opt_def_tfp = def_info.span.lo.to_index_file_pos(dc.tycx_ref());
+            let opt_def_tfp = def_info.rf_span().lo.to_index_file_pos(dc.tycx_ref());
             if !opt_def_tfp.is_some() { continue;}
             let def_file_pos=opt_def_tfp.unwrap();
             let mut links_written=0 as uint;
@@ -905,14 +905,14 @@ fn write_symbol_references(doc:&mut HtmlWriter,dc:&RustFindCtx, fm:&codemap::Fil
                 .map(|&id|{
                     let oni=nmaps.node_info_map.find(&id); assert!(oni.is_some());
                     let ni=oni.unwrap();
-                    let oifp=ni.span.lo.to_index_file_pos(dc.tycx_ref());
+                    let oifp=ni.rf_span().lo.to_index_file_pos(dc.tycx_ref());
                     assert!(oifp.is_some()); let ifp=oifp.unwrap();
                     (ni,ifp,id)})
                 .collect::<~[(&FNodeInfo,ZIndexFilePos,u32)]>();
 
             let l=refs_iter.len();
             fn pri_of(x:&FNodeInfo) -> uint { 
-                if &"impl" == x.kind {
+                if &"impl" == x.rf_kind() {
                     0
                 } else {
                     0x8000
@@ -936,7 +936,7 @@ fn write_symbol_references(doc:&mut HtmlWriter,dc:&RustFindCtx, fm:&codemap::Fil
                     //let opt_ref_info = nim.find(r);
                     //if !opt_ref_info.is_some() {loop;}
                     //let ref_info = opt_ref_info.unwrap();
-                    //let opt_ref_tfp = byte_pos_to_index_file_pos(dc.tycx,ref_info.span.lo);
+                    //let opt_ref_tfp = byte_pos_to_index_file_pos(dc.tycx,ref_info.rf_span().lo);
                     //if !opt_ref_tfp.is_some() {loop;}
                     //let ref_tfp=opt_ref_tfp.unwrap();
 
@@ -1041,8 +1041,8 @@ impl ::rust2html::htmlwriter::HtmlWriter{ // todo, why doesn't that allow path r
         self.writeln("");
         infomap.find(&node_id).for_some( |info| {
 			// Get the extents of this node in the file.. TODO: a ranged filepos, surely?
-            let oifp=info.span.lo.to_index_file_pos(dc.tycx_ref());//.unwrap();
-            let oifpe=info.span.hi.to_index_file_pos(dc.tycx_ref());//.unwrap();
+            let oifp=info.rf_span().lo.to_index_file_pos(dc.tycx_ref());//.unwrap();
+            let oifpe=info.rf_span().hi.to_index_file_pos(dc.tycx_ref());//.unwrap();
             if (oifp.is_some() && oifpe.is_some())==true {
                 let node_file_pos=oifp.unwrap();
                 let node_end_file_pos=oifp.unwrap();
@@ -1052,7 +1052,7 @@ impl ::rust2html::htmlwriter::HtmlWriter{ // todo, why doesn't that allow path r
                 self.begin_tag_anchor("line"+(node_file_pos.line+1).to_str()+"_col"+node_file_pos.col.to_str() + "_refs" );
                 self.begin_tag("c43");
                 self.writeln(dc.codemap().files.borrow().get(node_file_pos.file_index as uint).name + ":" + (node_file_pos.line + 1).to_str() + ":" + node_file_pos.col.to_str()
-                            +"-"+(node_end_file_pos.line+1).to_str()+":"+node_file_pos.col.to_str() +" -" +info.kind + "- definition:");
+                            +"-"+(node_end_file_pos.line+1).to_str()+":"+node_file_pos.col.to_str() +" -" +info.rf_kind() + "- definition:");
                 self.end_tag();
 
                 self.begin_tag_link( "#"+(node_file_pos.line+1).to_str());
@@ -1129,7 +1129,7 @@ impl<'a> ToZIndexFilePos for (&'a FNodeInfoMap,ast::NodeId) {
         let oni=nim.find(&nid);
         if oni.is_some() {
             let ni=oni.unwrap();
-            ni.span.lo.to_index_file_pos(tc)
+            ni.rf_span().lo.to_index_file_pos(tc)
         } else {
             None
         }

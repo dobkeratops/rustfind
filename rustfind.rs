@@ -322,7 +322,7 @@ fn debug_test(dc:&RustFindCtx) {
         let nodetloc = find_node_tree_loc_at_byte_pos(dc.crate_,codemap::BytePos(test_cursor as u32));
         let node_info =  get_node_info_str(dc,&nodetloc);
         dump!(node_info);
-        println("node ast loc:"+(nodetloc.iter().map(|x| { x.get_id().to_str() })).collect::<Vec<~str>>().to_str());
+        println("node ast loc:"+(nodetloc.iter().map(|x| { x.rf_get_id().to_str() })).collect::<Vec<~str>>().to_str());
 
 
         if_some!(id in nodetloc.last().get_ref().ty_node_id() then {
@@ -335,7 +335,7 @@ fn debug_test(dc:&RustFindCtx) {
             let (def_id,opt_info)= def_info_from_node_id(dc,&node_info_map,id);
             if_some!(info in opt_info then{
                 logi!("src node=",id," def node=",def_id,
-                    " span=",format!("{:?}",info.span));
+                    " span=",format!("{:?}",info.rf_span()));
                 logi!("def source=", get_node_source(dc.tycx_ref(), &node_info_map, def_id));
             })
         })

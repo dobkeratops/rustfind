@@ -125,7 +125,7 @@ pub fn build_jump_to_def_map(dc:&RustFindCtx, nim: &FNodeInfoMap,nd:&HashMap<ast
 	let prof=::timer::Profiler::new("build_jump_to_def_map");
     let mut jdm=~HashMap::new();
     for (k,node_info) in nim.iter() {
-        match lookup_def_node_of_node(dc,&node_info.node, nim,nd) {
+        match lookup_def_node_of_node(dc,&node_info.rf_node(), nim,nd) {
             None=>{},
             Some(def_node_id)=>{
 //              if *k != def_node_id.node && def_node_id.crate==0 || (def_node_id.crate!=0)
@@ -207,7 +207,7 @@ pub fn lookup_def_at_text_file_pos_str(dc:&RustFindCtx,file_pos_str:&str, show_m
 pub fn node_id_from_text_file_pos_str(dc:&RustFindCtx, file_pos_str:&str)->Option<ast::NodeId> {
     match node_from_text_file_pos_str(dc, file_pos_str) {
         None=>None,
-        Some(an)=>an.get_id()
+        Some(an)=>an.rf_get_id()
     }
 }
 pub fn node_from_text_file_pos_str(dc:&RustFindCtx, file_pos_str:&str)->Option<AstNode_> {
@@ -230,7 +230,7 @@ pub fn lookup_def_of_node_tree_loc(dc:&RustFindCtx,node_tree_loc:&NodeTreeLoc,m:
 }
 
 pub fn lookup_def_of_node(dc: &RustFindCtx, node: &AstNode_, m: ShowDefMode)->Option<~str> {
-    io::println("def of node:"+node.get_id().unwrap_or(0).to_str());
+    io::println("def of node:"+node.rf_get_id().unwrap_or(0).to_str());
     let node_spans=build_node_info_map(dc.crate_);
     let node_def_node = build_node_def_node_table(dc);
     lookup_def_of_node_sub(dc,node,m,&node_spans,node_def_node)
@@ -249,7 +249,7 @@ pub fn lookup_def_of_node_sub(dc:&RustFindCtx,node:&AstNode_,m:ShowDefMode,nim:&
             match nim.find(&def_node_id.node) {
                 None=>None,
                 Some(def_info)=>{
-                    let loc=get_source_loc(dc,def_info.span.lo);
+                    let loc=get_source_loc(dc,def_info.rf_span().lo);
                     let def_pos_str=
                         loc.file.name + ":"+loc.line.to_str()+": "+
                             match m { SDM_LineCol=>loc.col.to_uint().to_str()+": ", _ =>~"" }+"\n";

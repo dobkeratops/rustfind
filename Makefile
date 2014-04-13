@@ -13,7 +13,7 @@ RUSTSRC=$(RUST_PATH)/src
 RUSTFLAGS = --opt-level=3 -A non-camel-case-types
 
 # generate HTML browser for the main sourcetree
-html: html_sub callgraph
+html: html_sub callgraph tags
 
 html_sub: rustfind
 	./rustfind rustfind.rs $(RF_LIBS) -x $(RUSTSRC) -o html/
@@ -40,6 +40,7 @@ test0 : rustfind
 
 #make emacs ctags for this project,
 tags:
+	echo $(RUSTSRC)
 	ctags -e -f TAGS.emacs --options=$(RUSTSRC)/etc/ctags.rust -R .
 
 callgraph : html_sub
@@ -128,7 +129,8 @@ help:
 	@echo "but its more useful if you build the main rust sourcetree first for reference"
 
 #Compile the main executable
-rustfind: rustfind.rs $(SRC)  tags
+
+rustfind: rustfind.rs $(SRC)
 	rustc $(RUSTFLAGS) rustfind.rs
 
 install :rustfind

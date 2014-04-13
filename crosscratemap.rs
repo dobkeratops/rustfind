@@ -11,6 +11,7 @@ use jumptodefmap::{JumpToDefMap};
 use codemaput::ToZTextFilePos;
 use ioutil;
 use rfindctx::{RustFindCtx, str_of_opt_ident};
+use find_ast_node::AstNodeAccessors;
 
 /*new file*/
 
@@ -129,15 +130,15 @@ pub fn cross_crate_map_read_into(dst:&mut CrossCrateMap,crate_num:int, crate_nam
 pub fn cross_crate_map_combine_current_crate(xcm:&mut CrossCrateMap,dc:&RustFindCtx, nim:&FNodeInfoMap, def_map:&HashMap<ast::NodeId, ast::DefId>, jdm:&JumpToDefMap) {
 	let (_,crate_name)=get_crate_name(dc);
 	for (node_id,node_info) in nim.iter() {
-		match node_info.span.lo.to_text_file_pos(dc.tycx_ref()) { // f this node has a place in the codemap..
+		match node_info.rf_span().lo.to_text_file_pos(dc.tycx_ref()) { // f this node has a place in the codemap..
 			Some(ref tfp)=>{
 			   xcm.insert(ast::DefId{krate:0, node:*node_id as u32,},
 					CrossCrateMapItem{
-						item_name:	str_of_opt_ident(node_info.ident),
+						item_name:	str_of_opt_ident(node_info.rf_get_ident()),
 						file_name:	tfp.name.clone(),
 						line:	tfp.line as uint,
 						col:	tfp.col as uint,
-						len:	(node_info.span.hi - node_info.span.lo).to_uint()
+						len:	(node_info.rf_span().hi - node_info.rf_span().lo).to_uint()
 					}
 				);
 			}
@@ -164,21 +165,21 @@ pub fn cross_crate_map_write(dc:&RustFindCtx, _:&str,nim:&FNodeInfoMap, _:&HashM
         let mut out_file = out;
         // todo - idents to a seperate block, they're rare.
         for (k,ni) in nim.iter() {
-            match ni.span.lo.to_text_file_pos(dc.tycx_ref()) {
+            match ni.rf_span().lo.to_text_file_pos(dc.tycx_ref()) {
                 Some(tfp)=>{
                     // new format, a little more verbose,
                     // and includes parent id for easier reconstruction of full AST
                     // "node" cratename id parent_id filename line col len type [ident]
                     if new_format {
                         try!(writeln!(&mut out_file, "node\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
-                            curr_crate_name_only, k, ni.parent_id, tfp.name, (tfp.line + 1), tfp.col,
-                            (ni.span.hi - ni.span.lo).to_uint(), ni.kind, str_of_opt_ident(ni.ident)));
+                            curr_crate_name_only, k, ni.rf_get_parent_id().unwrap_or(0), tfp.name, (tfp.line + 1), tfp.col,
+                            (ni.rf_span().hi - ni.rf_span().lo).to_uint(), ni.rf_kind(), str_of_opt_ident(ni.rf_get_ident())));
                     } else  {
                         // old format, relies on spans to reconstruct AST.
                         // cratename id filename line col len type [ident]
                         try!(writeln!(&mut out_file, "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
                             curr_crate_name_only, k, tfp.name, (tfp.line+1), tfp.col,
-                            (ni.span.hi-ni.span.lo).to_uint(), ni.kind, str_of_opt_ident(ni.ident)));
+                            (ni.rf_span().hi-ni.rf_span().lo).to_uint(), ni.rf_kind(), str_of_opt_ident(ni.rf_get_ident())));
                     }
                 },
                 None=>{}

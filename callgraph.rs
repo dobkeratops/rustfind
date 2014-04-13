@@ -164,33 +164,35 @@ fn gather_call_graph_rec<'s>(calls:&mut SetOfItems<'s>,xcm:&'s CrossCrateMap, nm
 	let node=nmaps.node_info_map.find(&node).unwrap();
 
 	// todo 'for child in iter_children(nmaps,node)' {
-	for &child_id in node.children.iter() {
-		let child_node = nmaps.node_info_map.find(&child_id).unwrap();
-		gather_call_graph_rec(calls, xcm,nmaps, child_id);
-		let target=match child_node.node {
-			astnode_expr(expr)=>{
-				match expr.node {
-					ast::ExprCall(ref expr,ref args)=>{
-						nmaps.jump_def_map.find(&child_id)
-					},
-					ast::ExprMethodCall(ref ident,ref typeargs,ref args)=>{
-						nmaps.jump_def_map.find(&child_id)
-					},
-					_=>{None}
-				}
-			},
-			_=>{None},
-		};
-		match target{
-			None=>{},
-			Some(x)=>{
-				match xcm.find(x) {
-					Some(xcm_item)=>{calls.insert((*x,xcm_item));},
-					None=>{} 
+//	for &child_id in node.children.iter() {
+	node.rf_visit_children(nmaps.node_info_map, |child_id, child_node|{
+//			let child_node = nmaps.node_info_map.find(&child_id).unwrap();
+			gather_call_graph_rec(calls, xcm,nmaps, child_id);
+			let target=match child_node.rf_node() {
+				astnode_expr(expr)=>{
+					match expr.node {
+						ast::ExprCall(ref expr,ref args)=>{
+							nmaps.jump_def_map.find(&child_id)
+						},
+						ast::ExprMethodCall(ref ident,ref typeargs,ref args)=>{
+							nmaps.jump_def_map.find(&child_id)
+						},
+						_=>{None}
+					}
+				},
+				_=>{None},
+			};
+			match target{
+				None=>{},
+				Some(x)=>{
+					match xcm.find(x) {
+						Some(xcm_item)=>{calls.insert((*x,xcm_item));},
+						None=>{} 
+					}
 				}
 			}
 		}
-	}
+	);
 }
 
 struct TraitInfo<'a> {
@@ -201,29 +203,33 @@ struct TraitInfo<'a> {
 	pub ti_functions:HashSet<DefId>,
 }
 
-fn gather_trait_graph_rec<'a>(tg:&mut HashMap<DefId,TraitInfo<'a>>, (xcm,nmaps):(&'a CrossCrateMap,&NodeMaps), node:ast::NodeId) 
+fn gather_trait_graph_rec<'a>(tg:&mut HashMap<DefId,TraitInfo<'a>>, (xcm,nmaps):(&'a CrossCrateMap,&NodeMaps), node_id:ast::NodeId) 
 {
 	// todo 'for child in iter_children(nmaps,node)' {
-	let node=nmaps.node_info_map.find(&node).unwrap();
-	for &child_id in node.children.iter() {
-		let child_node = nmaps.node_info_map.find(&child_id).unwrap();
+	let node=nmaps.node_info_map.find(&node_id).unwrap();
+	node.rf_visit_children(
+		nmaps.node_info_map,
+		|child_id, child_node| {
+//	for &child_id in node.children.iter() {
+//			let child_node = nmaps.node_info_map.find(&child_id).unwrap();
 
-		match child_node.node {
-			// is it in decl, or item?!
-			astnode_item(item)=> {
-				match item.node {
-					// to escape the pyramid of doom, we want to pass ::ItemTrait, but its not a type itself :( we hope rust gets this addition
-					ast::ItemTrait(ref g,ref tr, ref tm)=>{
-						gather_trait_graph_sub((g,tr,tm),tg,(xcm,nmaps),child_node);
-					},
-					_=>{}
+			match child_node.rf_node() {
+				// is it in decl, or item?!
+				astnode_item(item)=> {
+					match item.node {
+						// to escape the pyramid of doom, we want to pass ::ItemTrait, but its not a type itself :( we hope rust gets this addition
+						ast::ItemTrait(ref g,ref tr, ref tm)=>{
+							gather_trait_graph_sub((g,tr,tm),tg,(xcm,nmaps),child_node);
+						},
+						_=>{}
+					}
+				}
+				_=>{
 				}
 			}
-			_=>{
-			}
+			gather_trait_graph_rec(tg, (xcm,nmaps), child_id);
 		}
-		gather_trait_graph_rec(tg, (xcm,nmaps), child_id);
-	}
+	);
 }
 
 // we hope they will in future allow inference between functions in the same module-
@@ -235,7 +241,7 @@ fn gather_trait_graph_sub<'a>(
 		(xcm,nmaps):(&'a CrossCrateMap,&NodeMaps),
 		node:&FNodeInfo)
 {
-	println!("trait {}\n", str_of_opt_ident(node.ident));
+	println!("trait {}\n", str_of_opt_ident(node.rf_get_ident()));
 }
 
 // TODO: populate this 
