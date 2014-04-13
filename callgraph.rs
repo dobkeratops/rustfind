@@ -45,24 +45,41 @@ impl CG_Options {
 }
 /// Generate callgraph file.
 /// Todo - seperate into callgraph iterator and file writer passing a closure..
-pub fn write_call_graph(xcm:&CrossCrateMap, nmaps:&NodeMaps, filename:&str,opts:&CG_Options) {
-	println!("Writing callgraph {}..",filename);
-	match (	fs::File::create(&posix::Path::new(filename.to_owned()+~".txt")),
-			fs::File::create(&posix::Path::new(filename.to_owned()+~".dot")),
+type RefCCMItem<'a> =(DefId,&'a CrossCrateMapItem);
+type SetOfItems<'a> =HashSet<RefCCMItem<'a>>;
+
+pub fn write_call_graph(xcm:&CrossCrateMap, nmaps:&NodeMaps, outdirname:&str, filename:&str,opts:&CG_Options) {
+	println!("Writing callgraph {} {}..",outdirname, filename);
+	match (	fs::File::create(&posix::Path::new(outdirname+filename.to_owned()+~".txt")),
+			fs::File::create(&posix::Path::new(outdirname+filename.to_owned()+~".dot")),
 		)
 	{
 		(Ok(mut outf),Ok(mut dotf))=>
 		{
 			println!("writing callgraph file ..\n");
-			dotf.write_line("digraph callgraph {");
+			dotf.write_line("digraph "+ filename +" {");
+			dotf.write_line("\toverlap=false; ");
+			dotf.write_line("\tedge[length=5.0] ");
+			let mut fns_per_module:HashMap<&str,HashSet<RefCCMItem>> =HashMap::new();
+			let mut all_calls:HashSet<(RefCCMItem,RefCCMItem)> =HashSet::new();
+
+			// Traverse and collect.. 
 			for (node_id, info) in nmaps.node_info_map.iter() {
-				let mut calls:SetOfCalls =HashSet::new();
+				let mut calls:SetOfItems =HashSet::new();
 				info.as_fn_decl().map(
 					|(ref item, fn_decl)|{
-						let xcmi=xcm.find(&DefId{krate:0,node:*node_id}).unwrap();
+						let fn_defid=DefId{krate:0,node:*node_id};
+						let xcmi=xcm.find(&fn_defid).unwrap();
+
+						fns_per_module.insert_or_update_with(
+							xcmi.file_name.as_slice(),	// key,
+							HashSet::new(),	// new value if not found,
+							|k,v|{v.insert((fn_defid, xcmi));} // update the value if found.
+						);
 						let caller_str = str_of_ident(item.ident);
 						outf.write_line(format!("fn {}() {}:{}", caller_str, xcmi.file_name,xcmi.line+1));
 						gather_call_graph_rec(&mut calls, xcm ,nmaps,  *node_id);
+
 			
 						for &(ref defid,ref call_item) in calls.iter() {
 							outf.write_line(format!("\tcalls {}() {}:{}",call_item.item_name, call_item.file_name, call_item.line+1));
@@ -70,12 +87,40 @@ pub fn write_call_graph(xcm:&CrossCrateMap, nmaps:&NodeMaps, filename:&str,opts:
 							// i.e. show dependancy on module/crate.
 
 							if !(opts.local_only && defid.krate!=0) {
-								dotf.write_line("\t"+caller_str  +" -> "+ call_item.item_name+"");
+								all_calls.insert( ((fn_defid,xcmi), (*defid, *call_item)) );
 							}
 						}
 					}
 				);
 			}
+			// Write out a cluster for all the functions in a particular sourcefile.
+			// TODO - should be able to recursively cluster directories for this..
+			for (&modname,items) in fns_per_module.iter() {
+//				let modstr=::std::str::from_chars(modname.chars().map(|x|if x=='/'{'_'}else{x}));
+				let modstr:~str=modname.chars().map(|x|match x{'/'|'.'=>'_',_=>x}).collect();
+				if items.len()==0{ continue;}
+				if modstr.chars().nth(0)==Some('<') {continue;} // things like <std macros>
+				dotf.write_line("\tsubgraph cluster_"+modstr+"{");
+				dotf.write_line("\t\tlabel=\""+modname+"\"");
+				dotf.write_line("\t\tlabel=\""+modname+"\"");
+				for &(defid,xcmi) in items.iter() {
+					let url_name= xcmi.file_name+".html#"+(xcmi.line+1).to_str();
+					dotf.write_line("\t\t"+xcmi.item_name + "["+"label=\""+xcmi.item_name+"()\" URL=\""+ url_name  + "\"];");
+				}
+				dotf.write_line("\t}");
+			}
+			// Write out all the calls..
+			for &(f1,f2) in all_calls.iter() {
+				
+				dotf.write_line("\t"+ *fn_to_str(f1)  +" -> "+ *fn_to_str(f2)+";");
+			}
+
+			fn fn_to_str<'a>((def_id,xcmi):RefCCMItem<'a>)->&'a ~str {
+				&xcmi.item_name
+			}
+
+//			fn rank_within(items:&Set<RefCCMItem>, &Vec<(RefCCMItem,RefCCMItem>
+
 			dotf.write_line("}");
 		}
 		_ => println!("can't write callgraph {}", filename),
@@ -83,8 +128,6 @@ pub fn write_call_graph(xcm:&CrossCrateMap, nmaps:&NodeMaps, filename:&str,opts:
 //	fail!();
 }
 
-
-pub type SetOfCalls<'a> =HashSet<(DefId,&'a CrossCrateMapItem)>;
 
 /// calls closure for each caller-callee pair encountered in the whole crates' static callgraph, including both function and method calls.
 /// does so by traversing all the nodes, finding any that are function declarations, then calls a gather function that traverses the bodies looking for calls & method calls.
@@ -98,7 +141,7 @@ pub fn visit_call_graph<'a>(xcm:&'a CrossCrateMap, nmaps:&NodeMaps, f:|caller:(D
 				let caller_defid=ast::DefId{krate:0,node:*node_id};
 				let caller_ccmitem=xcm.find(&caller_defid).unwrap();
 
-				let mut calls:SetOfCalls=HashSet::new();
+				let mut calls:SetOfItems=HashSet::new();
 
 				gather_call_graph_rec(&mut calls, xcm ,nmaps,  *node_id);
 
@@ -113,7 +156,7 @@ pub fn visit_call_graph<'a>(xcm:&'a CrossCrateMap, nmaps:&NodeMaps, f:|caller:(D
 
 
 // todo - build Vec<(DefId/*caller*/,DefId/*callee*/)> 
-fn gather_call_graph_rec<'s>(calls:&mut SetOfCalls<'s>,xcm:&'s CrossCrateMap, nmaps:&NodeMaps, node:ast::NodeId) 
+fn gather_call_graph_rec<'s>(calls:&mut SetOfItems<'s>,xcm:&'s CrossCrateMap, nmaps:&NodeMaps, node:ast::NodeId) 
 {
 	let node=nmaps.node_info_map.find(&node).unwrap();
 	for &child_id in node.children.iter() {
@@ -145,7 +188,7 @@ fn gather_call_graph_rec<'s>(calls:&mut SetOfCalls<'s>,xcm:&'s CrossCrateMap, nm
 	}
 }
 
-// TODO: populate this chart!
+// TODO: populate this 
 pub struct FunctionUseGraph {
 	pub fn_per_type: HashMap<DefId, DefId>,
 	pub type_per_fn: HashMap<DefId, DefId>,

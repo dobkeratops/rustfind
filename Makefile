@@ -13,7 +13,9 @@ RUSTSRC=$(RUST_PATH)/src
 RUSTFLAGS = --opt-level=3 -A non-camel-case-types
 
 # generate HTML browser for the main sourcetree
-html: rustfind
+html: html_sub callgraph
+
+html_sub: rustfind
 	./rustfind rustfind.rs $(RF_LIBS) -x $(RUSTSRC) -o html/
 
 test_dump: rustfind
@@ -39,6 +41,11 @@ test0 : rustfind
 #make emacs ctags for this project,
 tags:
 	ctags -e -f TAGS.emacs --options=$(RUSTSRC)/etc/ctags.rust -R .
+
+callgraph : html_sub
+	neato -Tcmap html/callgraph.dot -o html/callgraph_cmap.html
+	neato -Tpng html/callgraph.dot -o html/callgraph.png
+	cat resources/callgraph_header.html html/callgraph_cmap.html resources/callgraph_footer.html > html/callgraph.html
 
 # Make the HTML view of the main rust sourcetree
 ifdef RUST_PATH
