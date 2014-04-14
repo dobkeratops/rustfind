@@ -1,5 +1,6 @@
 use syntax::codemap;
 use syntax::ast;
+use syntax::ast::DefId;
 use syntax::codemap::Pos;
 use rustc::middle::ty;
 use std::hash::Hash;
@@ -674,45 +675,65 @@ fn resolve_link(link:i64, dc:&RustFindCtx,fm:&codemap::FileMap,lib_path:&str, nm
 		// If this node is a definition, we write a link to references block(todo-page)-or TODO rustdoc page.
 		// link to refs block with link = neg(node_id)
         if (link as i32)<0{
-            let ifp= (nmaps.node_info_map,-((link as i32) as u32)).to_index_file_pos(dc.tycx_ref()).unwrap();
-            Some("#line"+(ifp.line+1).to_str()+"_col"+ifp.col.to_str()+"_refs")
+			symbol_refs_link_str(dc,fm, xcm, lib_path, nmaps, -((link as i32) as u32)) 
         } else
         {
             let def_crate = (link>>48) as u32;
             let def_node=(link&((1<<48)-1)) as u32;
-            match xcm.find(&ast::DefId{krate:def_crate,node:def_node}) {
-				// Write a LOCAL link in the same crate, but not necaserily the same page. we know line filename, index
-				// Write a CROSS CRATE link, to a different crate. use the Node Index.
-                Some(a) if def_crate>0 =>{
-    //                          "../gplsrc/rust/src/"+a.fname+".html"+
-                    Some(make_html_name_reloc(a.file_name,fm.name,lib_path)+
-                        "#n"+def_node.to_str())
-                },
-				// Write a LOCAL CRATE link, use 'file#line
-				//"#n"+def_node.to_str(), by node link
-				// TODO - we could do everything with nodes
-				// it might be possible to do way better with json/javascript..
-                None|_=>
-                {
-                    match (nmaps.node_info_map,def_node).to_index_file_pos(dc.tycx_ref()) {
-                        Some(node_file_pos)=>{
-                            let files = dc.codemap().files.borrow();
-                            Some(make_html_name_rel(files.get(node_file_pos.file_index as uint).name, fm.name) +
-                                "#" + (node_file_pos.line + 1).to_str())
-                        },
-						// Broken link. However, write out the create & node index for debug.
-						// its probably in a macro expansion.
-						// do we have enough info to at least link to the macro invocation?
-						None=>None
-                    }
-
-                }
-            }
+			make_def_link_str(dc,fm,xcm,lib_path,nmaps, &DefId{krate:def_crate,node:def_node})
         }
     } else {
 		None
     }
+}
 
+
+fn make_def_link_str(dc:&RustFindCtx, fm:&codemap::FileMap, xcm:&CrossCrateMap, lib_path:&str,nmaps:&NodeMaps,  defid:&DefId )->Option<~str>{
+	let files = dc.codemap().files.borrow();
+
+	match xcm.find(defid) {
+		// link to another crate - we use the node index, because we haven't got its'
+		// line table. ?! TODO: dont we hve the line table in 'crosscratemap'
+
+		Some(a) if defid.krate>0 =>{
+			Some(make_html_name_reloc(a.file_name,fm.name,lib_path)+
+				"#n"+defid.node.to_str())
+		},
+		// Local crate link:
+		Some(a)=>
+		{
+			match get_index_file_pos(nmaps.node_info_map, defid.node, dc.tycx_ref()) {
+				Some(pos)=>{
+					let files = dc.codemap().files.borrow();
+					Some(make_html_name_rel(files.get(pos.file_index as uint).name, fm.name) +
+						"#" + (pos.line + 1).to_str())
+				},
+				// Broken link. However, write out the create & node index for debug.
+				// its probably in a macro expansion, 
+				// TODO, can we link to macro invocation site?
+				None=>None
+			}
+		}
+		None=>None
+	}
+}
+
+fn symbol_refs_link_str(dc:&RustFindCtx, fm:&codemap::FileMap, xcm:&CrossCrateMap, lib_path:&str, nmaps:&NodeMaps, id:u32)->Option<~str>
+{
+	let refs = nmaps.jump_ref_map.find(id);
+	// if (num_refs >1) link to a refs page ... else just go to the ref..
+	match refs.len() {
+		0=> None,
+		1=> make_def_link_str(dc, fm, xcm, lib_path,nmaps, 
+				&DefId{krate:0,node:refs.iter().nth(0).unwrap()  }),
+				// todo -can we do this without unwrap, and without double-testing it.
+				// The pattern is, collection.map_either(for_one_item,  for_many_items)
+		},
+		_=>{
+			let ifp= get_index_file_pos(nmaps.node_info_map,id, dc.tycx_ref()).unwrap();
+			Some("#line"+(ifp.line+1).to_str()+"_col"+ifp.col.to_str()+"_refs")
+		}
+	}
 }
 
 
@@ -897,8 +918,9 @@ fn write_symbol_references(doc:&mut HtmlWriter,dc:&RustFindCtx, fm:&codemap::Fil
         let max_links=30;   // todo - sort..
         let max_short_links=60; // todo - sort..
 
-
-        if refs.len()>0 {
+		// If there's more than one reference we write a block of references.
+		// TODO - it should be a seperate page. symbol -> symbol refs; pad out that page with additional 
+        if refs.len()>1 {
             let mut header_written=false;
             let opt_def_tfp = def_info.rf_span().lo.to_index_file_pos(dc.tycx_ref());
             if !opt_def_tfp.is_some() { continue;}
@@ -962,7 +984,7 @@ fn write_symbol_references(doc:&mut HtmlWriter,dc:&RustFindCtx, fm:&codemap::Fil
                         newline=true;
                     }
 
-                    if links_written<(max_short_links+max_links) {
+                    if refs.len()<(max_short_links+max_links) {
                         if  links_written<max_links {
                             if newline==false {
                                 doc.writeln("");
@@ -973,7 +995,7 @@ fn write_symbol_references(doc:&mut HtmlWriter,dc:&RustFindCtx, fm:&codemap::Fil
 						let tagname=make_html_name_rel(rfm.name, fm.name) + "#" + (ref_ifp.line + 1).to_str();
 						let mut this_link_lines_shown=0;
 
-                        if  links_written<max_links {
+                        if  refs.len()<max_links {
                         	// Display a line from the referenced location, but
                             // step past any #[lang items] - we want to show a meaningful item
 							// also show some context, N lines behind, N lines ahead, like grep does..
@@ -1031,6 +1053,7 @@ fn write_symbol_references(doc:&mut HtmlWriter,dc:&RustFindCtx, fm:&codemap::Fil
                 }
             }
             if links_written < refs_iter.len() {
+				// todo - just write 'ubiquitous' and dont bother, for things like 'Option', Str, Vec..
                 doc.begin_tag("c40").writeln(".."+(refs_iter.len()-links_written).to_str()+"more..").end_tag();
             }
             if header_written {doc.writeln("");}
@@ -1039,6 +1062,7 @@ fn write_symbol_references(doc:&mut HtmlWriter,dc:&RustFindCtx, fm:&codemap::Fil
     doc.end_tag();
     doc.check_depth(depth);
 }
+
 
 impl ::rust2html::htmlwriter::HtmlWriter{ // todo, why doesn't that allow path reuse
 	// todo - i dont think these are really methods of 'htmlwriter'. 
@@ -1129,18 +1153,14 @@ impl ::rust2html::htmlwriter::HtmlWriter{ // todo, why doesn't that allow path r
 // things that are robust when some source changes, etc.
 // file_index:line_index:col_index:length
 
-impl<'a> ToZIndexFilePos for (&'a FNodeInfoMap,ast::NodeId) {
-    fn to_index_file_pos(&self,tc:&ty::ctxt)->Option<ZIndexFilePos> {
-        let (ref nim,nid)=*self;
-        let oni=nim.find(&nid);
-        if oni.is_some() {
-            let ni=oni.unwrap();
-            ni.rf_span().lo.to_index_file_pos(tc)
-        } else {
-            None
-        }
-    }
+
+fn get_index_file_pos(nim:&FNodeInfoMap, nid: ast::NodeId, tc:&ty::ctxt)->Option<ZIndexFilePos> {
+	match nim.find(&nid) {
+		Some(ni)=>ni.rf_span().lo.to_index_file_pos(tc),
+		None=>None
+	}
 }
+
 
 fn make_html_name(f: &str) -> ~str { 
     f + ".html"

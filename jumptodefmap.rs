@@ -33,6 +33,7 @@ pub macro_rules! if_some {
     );
 }
 
+// todo - a multi-crate build might want refs outside the crate?
 pub type JumpToRefMap = MultiMap<ast::NodeId, ast::NodeId>;
 pub type JumpToDefMap = HashMap<ast::NodeId,ast::DefId> ;
 
