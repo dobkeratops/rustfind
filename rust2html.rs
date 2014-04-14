@@ -62,17 +62,14 @@ pub fn make_html_from_source(dc: &RustFindCtx, fm: &codemap::FileMap, nmaps: &No
 	let time_stamp=file_get_time_stamp_str(&Path::new(fm.name.clone()));	
 	let git_str = get_git_branch_info();	// yikes, where?! cwd
 
-    write_head(&mut doc, out_file, options);
-
-
     let hash=get_str_hash(fm.name);
+	source_view_page_begin(&mut doc,out_file,options);
+
+
 //  let bg=(~[~"383838",~"34383c",~"3c3834",~"383c34",~"343c38",~"38343c",~"3a343a",
 //          ~"3a343a",~"36363a",~"363a36",~"3a3636",~"3a3a34",~"3a333a",~"343a3a",~"343a3c",~"343838"])[hash&15];
     // write the doc lines..
-    let body=doc.begin_tag_check("body");//,&[(~"style",~"background-color:#"+bg+";")]);
-    let div=doc.begin_tag_check("div");//,&[(~"style",~"background-color:#"+bg+";")]);
-//    let bg_tag=doc.begin_tag_check("bg"+(hash&15).to_str()); - todo -we had tinted different pages, doesn't seem to work well
-    let maintext=doc.begin_tag_check("maintext");
+
     let fstart = fm.start_pos;
     let max_digits=num_digits(fm.lines.borrow().len());
 
@@ -125,15 +122,25 @@ pub fn make_html_from_source(dc: &RustFindCtx, fm: &codemap::FileMap, nmaps: &No
         }
     }
     if options.write_references {
-        write_symbol_references(&mut doc,dc,fm,lib_path,nmaps, &fln.nodes_per_line);
+        write_symbol_references(&mut doc,dc,fm,xcm, lib_path,nmaps, &fln.nodes_per_line,options);
     }
 
-    doc.end_tag_check(maintext);
-//    doc.end_tag_check(bg_tag);
-    doc.end_tag_check(div);
-    doc.end_tag_check(body);
-
+	source_view_page_end(&mut doc,out_file,options);
     doc.doc
+}
+
+fn source_view_page_begin(doc:&mut HtmlWriter, out_file:&Path, options:&::RF_Options) {
+	// TODO- could RAII this..
+    write_head(doc, out_file, options);
+    doc.begin_tag("body");
+    doc.begin_tag("div");
+    doc.begin_tag("maintext");
+}
+fn source_view_page_end(doc:&mut HtmlWriter, _:&Path, _:&::RF_Options)
+{
+    doc.end_tag();//maintext
+    doc.end_tag();//div
+    doc.end_tag();//body
 }
 
 pub fn write_crate_as_html_sub(dc:&RustFindCtx, nmaps:&NodeMaps,
@@ -725,10 +732,9 @@ fn symbol_refs_link_str(dc:&RustFindCtx, fm:&codemap::FileMap, xcm:&CrossCrateMa
 	match refs.len() {
 		0=> None,
 		1=> make_def_link_str(dc, fm, xcm, lib_path,nmaps, 
-				&DefId{krate:0,node:refs.iter().nth(0).unwrap()  }),
+				&DefId{krate:0,node:*(refs.iter().nth(0).unwrap())  }),
 				// todo -can we do this without unwrap, and without double-testing it.
 				// The pattern is, collection.map_either(for_one_item,  for_many_items)
-		},
 		_=>{
 			let ifp= get_index_file_pos(nmaps.node_info_map,id, dc.tycx_ref()).unwrap();
 			Some("#line"+(ifp.line+1).to_str()+"_col"+ifp.col.to_str()+"_refs")
@@ -898,10 +904,29 @@ impl<T:Ord+Clone> Extents<T> {
     }
 }
 
+fn ref_page_file_name(fm:&codemap::FileMap, options:&::RF_Options,xcm:&CrossCrateMap, node_id:ast::NodeId)
+{
+	// todo-  we might write a page per symbol
+	let path=options.output_dir.join(
+			Path::new(
+				make_html_name(
+					fm.name.to_str()+"_n"+node_id.to_str()+"_refs")
+				)
+			);
+
+//	println!("ref_page_name would be {}",path.as_str());
+
+}
+
 /// Write a block of links to symbol references.
 /// Workaround for not having popup menus when you click on a symbol.
-fn write_symbol_references(doc:&mut HtmlWriter,dc:&RustFindCtx, fm:&codemap::FileMap, _:&str,  nmaps:&NodeMaps, _: &Vec<Vec<ast::NodeId>>) {
+fn write_symbol_references(doc:&mut HtmlWriter,dc:&RustFindCtx, fm:&codemap::FileMap,xcm:&CrossCrateMap, _:&str,  nmaps:&NodeMaps, _: &Vec<Vec<ast::NodeId>>,options:&::RF_Options) {
 
+	// Todo - from all references, collect file links. 'file ... references <files..>, referenced by<files..>'
+
+	// TODO:
+	// Make a page showing the references of other modules's symbols?
+	// 
 
     let depth=doc.depth();
     doc.begin_tag_ext("div",[(~"class",~"refblock")]);
@@ -915,13 +940,18 @@ fn write_symbol_references(doc:&mut HtmlWriter,dc:&RustFindCtx, fm:&codemap::Fil
         if !(def_info.rf_kind()==~"fn" || def_info.rf_kind()==~"struct" || def_info.rf_kind()==~"trait" || def_info.rf_kind()==~"enum" || def_info.rf_kind()==~"ty") { continue; }
 
         let refs = nmaps.jump_ref_map.find(def_node);
-        let max_links=30;   // todo - sort..
+        let max_verbose_links=20;   // todo - sort..
         let max_short_links=60; // todo - sort..
 
 		// If there's more than one reference we write a block of references.
 		// TODO - it should be a seperate page. symbol -> symbol refs; pad out that page with additional 
         if refs.len()>1 {
-            let mut header_written=false;
+			doc.writeln("");
+
+			ref_page_file_name(fm,options,xcm, def_node);
+			doc.write_refs_header(dc,  nmaps.node_info_map,xcm, fm,def_node);
+			doc.writeln_tagged("c43","references:- ");
+
             let opt_def_tfp = def_info.rf_span().lo.to_index_file_pos(dc.tycx_ref());
             if !opt_def_tfp.is_some() { continue;}
             let def_file_pos=opt_def_tfp.unwrap();
@@ -936,45 +966,45 @@ fn write_symbol_references(doc:&mut HtmlWriter,dc:&RustFindCtx, fm:&codemap::Fil
                     let oifp=ni.rf_span().lo.to_index_file_pos(dc.tycx_ref());
                     assert!(oifp.is_some()); let ifp=oifp.unwrap();
                     (ni,ifp,id)})
-                .collect::<~[(&FNodeInfo,ZIndexFilePos,u32)]>();
+                .collect::<~[(&FNodeInfo,ZIndexFilePos,ast::NodeId)]>();
 
             let l=refs_iter.len();
             fn pri_of(x:&FNodeInfo) -> uint { 
-                if &"impl" == x.rf_kind() {
-                    0
-                } else {
-                    0x8000
+				match x.rf_kind() {
+					"impl"=>0,
+					"fn"=>1,
+					"trait"=>2,
+					"struct"=>3,
+					_=>0x8000
                 }
             }
             // todo: we want to sort based on node type to find impls, but we dont quite find what we want..
-            refs_iter.mut_slice_to(l - 1).sort_by(|&(ni1, ref ifp1, _), &(ni2, ref ifp2, _)| {
-                use std::cmp::{Less, Greater};
-                if ((ifp1.file_index - curr_file) & 0x7fff) as uint +
-                        pri_of(ni1) <= ((ifp2.file_index - curr_file) & 0x7fff) as uint +
-                        pri_of(ni2) {
-                    Less
-                } else {
-                    Greater
-                }
-            });
+            refs_iter.mut_slice_to(l - 1).sort_by(
+				|&(ni1, ref ifp1, _), &(ni2, ref ifp2, _)| {
+					use std::cmp::{Less, Greater};
+	                if ((ifp1.file_index - curr_file) & 0x7fff) as uint +
+	                        pri_of(ni1) <= ((ifp2.file_index - curr_file) & 0x7fff) as uint +
+	                        pri_of(ni2) {
+	                    Less
+	                } else {
+	                    Greater
+	                }
+		        }
+			);
             let mut newline=true;
             let mut last_link_line=0;
-            for &(_, ref ref_ifp,ref id) in refs_iter.iter() {
-                if *id!=def_node {
-                    //let opt_ref_info = nim.find(r);
-                    //if !opt_ref_info.is_some() {loop;}
-                    //let ref_info = opt_ref_info.unwrap();
-                    //let opt_ref_tfp = byte_pos_to_index_file_pos(dc.tycx,ref_info.rf_span().lo);
-                    //if !opt_ref_tfp.is_some() {loop;}
-                    //let ref_tfp=opt_ref_tfp.unwrap();
 
-                    if header_written==false {
-                        if newline==false {doc.writeln("");}
-                        header_written=true;
-                        doc.write_refs_header(dc,nmaps.node_info_map,fm,def_node);
-                        doc.writeln_tagged("c43","references:-");
-                        newline=true;
-                    };
+			let num_links=refs_iter.len();
+			let lines_per_link = match refs_iter.len() {
+				x if x<10=>5,
+				x if x<20=>3,
+				x if x<30=>1,
+				_=>0,
+			};
+
+			for &(_, ref ref_ifp,ref id) in refs_iter.iter() {
+                if *id!=def_node {
+
                     // Write a reference to the file, if we're looking a new file now
                     if curr_file!=ref_ifp.file_index {
                     	last_link_line=!0; // invalid value 
@@ -983,80 +1013,63 @@ fn write_symbol_references(doc:&mut HtmlWriter,dc:&RustFindCtx, fm:&codemap::Fil
                         doc.write_file_ref(dc,fm,curr_file as uint);
                         newline=true;
                     }
+					// too many to show, just show filenames. 
+					// TODO: if too many filenames, just show modules
+					if lines_per_link==0 {continue;}	
 
-                    if refs.len()<(max_short_links+max_links) {
-                        if  links_written<max_links {
-                            if newline==false {
-                                doc.writeln("");
-                            }
-                        }
-                        let files = dc.codemap().files.borrow();
-                        let rfm = &files.get(ref_ifp.file_index as uint);
-						let tagname=make_html_name_rel(rfm.name, fm.name) + "#" + (ref_ifp.line + 1).to_str();
-						let mut this_link_lines_shown=0;
+					let files = dc.codemap().files.borrow();
+					let rfm = &files.get(ref_ifp.file_index as uint);
+					let tagname=make_html_name_rel(rfm.name, fm.name) + "#" + (ref_ifp.line + 1).to_str();
+					let mut this_link_lines_shown=0;
 
-                        if  refs.len()<max_links {
-                        	// Display a line from the referenced location, but
-                            // step past any #[lang items] - we want to show a meaningful item
-							// also show some context, N lines behind, N lines ahead, like grep does..
-							let lines_of_context:int=1;
-//                            let  mut ref_line_index = ref_ifp.line as uint;
-							// prefer signed numbers,we're dealing with offsets, they dont want to wrapround..
-							let mut ref_line_index = ::std::cmp::max(last_link_line+1 as int, ref_ifp.line as int-lines_of_context);
-							let end_line = ref_ifp.line as int + lines_of_context;
+                    if lines_per_link>0 {
+                        if newline==false {
+							
+						}
 
-							// if we skipped anything, write a seperator
-							if ref_line_index>last_link_line+1 as int && (last_link_line>0) {
-								doc.writeln("--");
+                       	// Display a line from the referenced location, but
+						// step past any #[lang items] - we want to show a meaningful item
+						// also show some context, N lines behind, N lines ahead, like grep does..
+					//	let  mut ref_line_index = ref_ifp.line as uint;
+						// prefer signed numbers,we're dealing with offsets, they dont want to wrapround..
+						let lines_of_context:int=1;//(lines_per_link-1)/2;
+						let mut ref_line_index = ::std::cmp::max(last_link_line+1 as int, ref_ifp.line as int-lines_of_context);
+						let end_line = ref_ifp.line as int + lines_of_context;
+						// if we skipped anything, write a seperator
+						if ref_line_index>last_link_line+1 as int && (last_link_line>0) {
+							doc.writeln("--");
+						}
+
+						// todo ... make a set of the lines to show, make an expanded set around them..
+						doc.begin_tag_link(tagname);
+						while ref_line_index<=end_line {
+							// todo - we want to highlight the line of the definition, but
+							// we need to account for if we skipped it..
+							let (src_line,i)=get_source_line_filtered(&***rfm, ref_line_index as uint); 
+							if (i as int)<=end_line {
+								doc.write_tagged(if i as u32==ref_ifp.line{&"c41"}else{&"c40"},(i+1).to_str()+&": ");
+								doc.writeln_tagged(if i as u32==ref_ifp.line{&"c1"}else{&"c2"}, src_line);
+								last_link_line=i as int;
 							}
+							ref_line_index = i as int+1;
+							newline=true;
+							
+						}
+						doc.end_tag();
 
+					} else {
+
+                       	if  num_links<200 {
 	                        doc.begin_tag_link(tagname);
-							while ref_line_index<=end_line {
-								// todo - we want to highlight the line of the definition, but
-								// we need to account for if we skipped it..
-								let (src_line,i)=get_source_line_filtered(&***rfm, ref_line_index as uint); 
-								if (i as int)<=end_line {
-		                            doc.write_tagged("c40",(i+1).to_str()+&": ");
-		                            doc.writeln(src_line);
-		                            last_link_line=i as int;
-									this_link_lines_shown+=1;
-								}
-								ref_line_index = i as int+1;
-								newline=true;
-								
-							}
+                            doc.write_tagged("c40","("+(ref_ifp.line+1).to_str()+")");
+   	                        newline=false;
+   	                        links_written+=1;
+   	                        last_link_line=ref_ifp.line as int+1;
 	                        doc.end_tag();
-							links_written+=this_link_lines_shown;
-
-/*
-                            let  mut ref_line_index = ref_ifp.line as uint;
-							let (src_line,_)=get_source_line_filtered(&***rfm,ref_line_index);
-                            if last_link_line !=ref_line_index { // dont write multiple links on the same line.
-	                            doc.write_tagged("c40",(ref_ifp.line+1).to_str()+&": ");
-                            	last_link_line=ref_line_index;
-	                            doc.writeln(src_line);
-	                            newline=true;
-	                            links_written+=1;
-						   }
-*/
-                        } else {
-                        	if last_link_line != ref_ifp.line as int +1 {
-		                        doc.begin_tag_link(tagname);
-	                            doc.write_tagged("c40","("+(ref_ifp.line+1).to_str()+")");
-    	                        newline=false;
-    	                        links_written+=1;
-    	                        last_link_line=ref_ifp.line as int+1;
-		                        doc.end_tag();
-							}
                         }
                     }
                 }
             }
-            if links_written < refs_iter.len() {
-				// todo - just write 'ubiquitous' and dont bother, for things like 'Option', Str, Vec..
-                doc.begin_tag("c40").writeln(".."+(refs_iter.len()-links_written).to_str()+"more..").end_tag();
-            }
-            if header_written {doc.writeln("");}
         }
     }
     doc.end_tag();
@@ -1066,7 +1079,7 @@ fn write_symbol_references(doc:&mut HtmlWriter,dc:&RustFindCtx, fm:&codemap::Fil
 
 impl ::rust2html::htmlwriter::HtmlWriter{ // todo, why doesn't that allow path reuse
 	// todo - i dont think these are really methods of 'htmlwriter'. 
-    fn write_refs_header(&mut self,dc:&RustFindCtx,infomap:&FNodeInfoMap, fm:&codemap::FileMap, node_id:ast::NodeId) {
+    fn write_refs_header(&mut self,dc:&RustFindCtx,infomap:&FNodeInfoMap,xcm:&CrossCrateMap, fm:&codemap::FileMap, node_id:ast::NodeId) {
     	let depth=self.depth();
         self.writeln("");
         infomap.find(&node_id).for_some( |info| {
