@@ -85,7 +85,7 @@ pub struct FNodeInfo {
 //    pub ident:Option<ast::Ident>,
     kind:~str,
     span:codemap::Span,
-    node:AstNode_,
+    node:AstNode_,			// todo- get rid of this and just make this a cache of spans for linking.
     parent_id:ast::NodeId,	// todo: vector of child nodes aswell?
 	children:Vec<ast::NodeId>,
 }
@@ -519,7 +519,7 @@ impl KindToStr for ast::Expr {
 impl AstNode_ {
     // Accessor for the node_id to use for getting definition
     // TODO - clarify by wrapping access to def_map here?
-    pub fn ty_node_id(&self)->Option<ast::NodeId> {
+    pub fn rf_ty_node_id(&self)->Option<ast::NodeId> {
         match *self {
             astnode_ty(ty)=>
                 match ty.node {

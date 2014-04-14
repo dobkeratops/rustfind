@@ -638,7 +638,7 @@ fn write_line_with_links(dst:&mut SourceCodeWriter<HtmlWriter>,dc:&RustFindCtx,f
     write_line_attr_links(dst,line,color,link, resolver );
 }
 
-fn resolve_link(link:i64, dc:&RustFindCtx,fm:&codemap::FileMap,lib_path:&str, nmaps:&NodeMaps,xcm:&CrossCrateMap)->~str {
+fn resolve_link(link:i64, dc:&RustFindCtx,fm:&codemap::FileMap,lib_path:&str, nmaps:&NodeMaps,xcm:&CrossCrateMap)->Option<~str> {
 /*
     if link_debug==false {
         if link!=no_link {
@@ -675,7 +675,7 @@ fn resolve_link(link:i64, dc:&RustFindCtx,fm:&codemap::FileMap,lib_path:&str, nm
 		// link to refs block with link = neg(node_id)
         if (link as i32)<0{
             let ifp= (nmaps.node_info_map,-((link as i32) as u32)).to_index_file_pos(dc.tycx_ref()).unwrap();
-            "#line"+(ifp.line+1).to_str()+"_col"+ifp.col.to_str()+"_refs"
+            Some("#line"+(ifp.line+1).to_str()+"_col"+ifp.col.to_str()+"_refs")
         } else
         {
             let def_crate = (link>>48) as u32;
@@ -685,8 +685,8 @@ fn resolve_link(link:i64, dc:&RustFindCtx,fm:&codemap::FileMap,lib_path:&str, nm
 				// Write a CROSS CRATE link, to a different crate. use the Node Index.
                 Some(a) if def_crate>0 =>{
     //                          "../gplsrc/rust/src/"+a.fname+".html"+
-                    make_html_name_reloc(a.file_name,fm.name,lib_path)+
-                        "#n"+def_node.to_str()
+                    Some(make_html_name_reloc(a.file_name,fm.name,lib_path)+
+                        "#n"+def_node.to_str())
                 },
 				// Write a LOCAL CRATE link, use 'file#line
 				//"#n"+def_node.to_str(), by node link
@@ -697,24 +697,26 @@ fn resolve_link(link:i64, dc:&RustFindCtx,fm:&codemap::FileMap,lib_path:&str, nm
                     match (nmaps.node_info_map,def_node).to_index_file_pos(dc.tycx_ref()) {
                         Some(node_file_pos)=>{
                             let files = dc.codemap().files.borrow();
-                            make_html_name_rel(files.get(node_file_pos.file_index as uint).name, fm.name) +
-                                "#" + (node_file_pos.line + 1).to_str()
+                            Some(make_html_name_rel(files.get(node_file_pos.file_index as uint).name, fm.name) +
+                                "#" + (node_file_pos.line + 1).to_str())
                         },
 						// Broken link. However, write out the create & node index for debug.
-                        None=>~"crate_id="+def_crate.to_str()+" node_id="+def_node.to_str()
+						// its probably in a macro expansion.
+						// do we have enough info to at least link to the macro invocation?
+						None=>None
                     }
 
                 }
             }
         }
     } else {
-        ~"no link"
+		None
     }
 
 }
 
 
-fn write_line_attr_links(dst:&mut SourceCodeWriter<HtmlWriter>,text_line:&str,color:&[int],links:&[i64], resolve_link: |i64| -> ~str) {
+fn write_line_attr_links(dst:&mut SourceCodeWriter<HtmlWriter>,text_line:&str,color:&[int],links:&[i64], resolve_link: |i64| -> Option<~str>) {
     // emit a span..
     let no_color=-1;
     let mut curr_col=no_color;
@@ -735,7 +737,11 @@ fn write_line_attr_links(dst:&mut SourceCodeWriter<HtmlWriter>,text_line:&str,co
                 dst.doc.begin_tag(color_index_to_tag(curr_col));
             }
             if curr_link !=no_link {
-                dst.doc.begin_tag_link( resolve_link(links[x]) );
+				let link=resolve_link(links[x]);
+				match link {
+					Some(link_target)=>{dst.doc.begin_tag_link(link_target);},
+					None=> {dst.doc.begin_tag("nop");},
+				}
             }
         }
         dst.doc.write_u8_(text_line[x]);

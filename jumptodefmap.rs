@@ -46,74 +46,72 @@ pub struct NodeMaps<'a>  {
     pub jump_ref_map:&'a JumpToRefMap
 }
 
+pub fn lookup_def_of_expr(dc:&RustFindCtx, expr:&ast::Expr, nodeinfomap:&FNodeInfoMap, _: &HashMap<ast::NodeId,ast::DefId>)->Option<ast::DefId>
+{
+	match expr.node {
+		// handle methods-calls
+		ast::ExprMethodCall(ref call_ident, ref call_type_params, ref call_args)=>{
+		// Currently unused
+		//				let rec_ty_node= astnode_expr(*receiver).ty_node_id();
+		//				let rec_ty_node1= dc.tycx.node_types.find(&(*id as uint));
 
-pub fn lookup_def_node_of_node(dc:&RustFindCtx,node:&AstNode_, nodeinfomap:&FNodeInfoMap, _: &HashMap<ast::NodeId,ast::DefId>)->Option<ast::DefId> {
+			let method_map =dc.ca.maps.method_map;
+			let method_call=typeck::MethodCall{expr_id:expr.id,  autoderef:0}; // TODO is that e.id or call_ident...
+			//cfg[DEBUG] io::println(format!("e.id={:?} call_ident={:?}", e.id, call_ident.name));
+			match method_map.borrow().get(&method_call).origin {
+				typeck::MethodStatic(def_id)=>
+						return Some(def_id),
+				typeck::MethodObject(_)=>
+						return None,
+				typeck::MethodParam(mp)=>{
+					let trait_method_def_ids = dc.tycx_ref().trait_method_def_ids.borrow();
+					match trait_method_def_ids.find(&mp.trait_id) {
+						None=>{},
+						Some(method_def_ids)=>{
+							return Some(*method_def_ids.get(mp.method_num))
+						}
+					}
+				}
+			}
+		},
+		// handle struct-fields? "object.field"
+		ast::ExprField(ref object_expr, ref ident, _)=>{
+			// we want the type of the object..
+			let node_types = dc.tycx_ref().node_types.borrow();
+			let obj_ty=node_types.find(&(object_expr.id as uint));
+			let tydef=/*rf_ast_ut::*/auto_deref_ty(ty::get(*obj_ty.unwrap()));
+			match tydef.sty {
+				ty::ty_struct(def,_)=> {
+					let node_to_show=/*rf_ast_ut::*/find_named_struct_field(dc.tycx_ref(), def.node, ident).unwrap_or(def);
+					return Some(node_to_show);//mk_result(dc,m,node_spans,node_to_show,"(struct_field)");
+				},
+				_=>return None
+			}
+		},
+		_=>{}
+	};
+	None
+}
 
-    match *node {
-        astnode_expr(e)=>match e.node {
-            // handle methods-calls
-            ast::ExprMethodCall(ref call_ident, ref call_type_params, ref call_args)=>{
-                // Currently unused
-//              let rec_ty_node= astnode_expr(*receiver).ty_node_id();
-//              let rec_ty_node1= dc.tycx.node_types.find(&(*id as uint));
 
-                let method_map =dc.ca.maps.method_map;
-				let method_call=typeck::MethodCall{expr_id:e.id,  autoderef:0}; // TODO is that e.id or call_ident...
-				//cfg[DEBUG] io::println(format!("e.id={:?} call_ident={:?}", e.id, call_ident.name));
-                match method_map.borrow().get(&method_call).origin {
-                    typeck::MethodStatic(def_id)=>
-							return Some(def_id),
-                    typeck::MethodObject(_)=>
-                            return None,
-                    typeck::MethodParam(mp)=>{
-                        let trait_method_def_ids = dc.tycx_ref().trait_method_def_ids.borrow();
-                        match trait_method_def_ids.find(&mp.trait_id) {
-                            None=>{},
-                            Some(method_def_ids)=>{
-                                return Some(*method_def_ids.get(mp.method_num))
-                            }
-                        }
-                    }
-                }
-            },
-            // handle struct-fields? "object.field"
-            ast::ExprField(ref object_expr, ref ident, _)=>{
-                // we want the type of the object..
-                let node_types = dc.tycx_ref().node_types.borrow();
-                let obj_ty=node_types.find(&(object_expr.id as uint));
-                let tydef=/*rf_ast_ut::*/auto_deref_ty(ty::get(*obj_ty.unwrap()));
-                match tydef.sty {
-                    ty::ty_struct(def,_)=> {
-                        let node_to_show=/*rf_ast_ut::*/find_named_struct_field(dc.tycx_ref(), def.node, ident).unwrap_or(def);
-                        return Some(node_to_show);//mk_result(dc,m,node_spans,node_to_show,"(struct_field)");
-                    },
-                    _=>return None
-                }
-            }
-            _=>{}
+// TODO - Do this job as a visitor of the original rust AST.
+pub fn lookup_def_node_of_node(dc:&RustFindCtx,node:&AstNode_, nodeinfomap:&FNodeInfoMap, ndm: &HashMap<ast::NodeId,ast::DefId>)->Option<ast::DefId> {
+
+	match *node {
+        astnode_expr(e)=>{
+			match lookup_def_of_expr(dc, e, nodeinfomap, ndm) {
+				Some(x)=>return Some(x),
+				None=>{}
+			}
         },
-        _=>{}
-
-    }
+        _=>{},
+    };
 
     // handle everything else
-    match node.ty_node_id() {
+    match node.rf_ty_node_id() {
         Some(id) =>{
             let (def_id, _)= def_info_from_node_id(dc,nodeinfomap,id);
             return if def_id != ast::DefId{krate:0,node:id} {Some(def_id)} else {None}
-/*          match opt_info {
-                Some(info)=> {
-                    return Some(def_id);
-                },
-                _=>{ println("can't find def for"+node.get_id().to_str()+".ty_node_id="+id.to_str()); //return None;
-                    //let (def_id,opt_info)= def_info_from_node_id(dc,nodeinfomap,node.get_id().unwrap());
-                    //match opt_info {
-                    //  Some(info)=> {return Some(def_id);}
-                    //  None=>{}
-                    //}
-                }
-            }
-*/
         },
         None=> {}
     };
@@ -128,7 +126,6 @@ pub fn build_jump_to_def_map(dc:&RustFindCtx, nim: &FNodeInfoMap,nd:&HashMap<ast
         match lookup_def_node_of_node(dc,&node_info.rf_node(), nim,nd) {
             None=>{},
             Some(def_node_id)=>{
-//              if *k != def_node_id.node && def_node_id.crate==0 || (def_node_id.crate!=0)
                 {
                     jdm.insert(*k,def_node_id);
                 }
@@ -137,6 +134,25 @@ pub fn build_jump_to_def_map(dc:&RustFindCtx, nim: &FNodeInfoMap,nd:&HashMap<ast
     }
     jdm
 }
+
+// Replacement to eliminate our AST copy!
+/*
+struct JumpToDefMapVisitor {
+	dc:&RustFindCtx,
+	nim:&FNodeInfoMap,
+	nd:&HashMap<st::NodeId,asd::DefId>,
+}
+impl<E> Visitor<E> for JumpToDefMapVisitor {
+	fn visit_expr(&mut self, expr:&Expr, e:E) {
+
+		
+		
+		// continue...
+		walk_expr(self,expr,e);	
+	}
+}
+*/
+
 
 pub fn def_info_from_node_id<'a,'b>(dc:&'a RustFindCtx, node_info:&'b FNodeInfoMap, id:ast::NodeId)->(ast::DefId,Option<&'b FNodeInfo>) {
     let crate_num=0;

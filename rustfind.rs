@@ -325,7 +325,7 @@ fn debug_test(dc:&RustFindCtx) {
         println("node ast loc:"+(nodetloc.iter().map(|x| { x.rf_get_id().to_str() })).collect::<Vec<~str>>().to_str());
 
 
-        if_some!(id in nodetloc.last().get_ref().ty_node_id() then {
+        if_some!(id in nodetloc.last().get_ref().rf_ty_node_id() then {
             logi!("source=",get_node_source(dc.tycx_ref(), &node_info_map,ast::DefId{krate:0,node:id}));
             if_some!(t in safe_node_id_to_type(dc.tycx_ref(), id) then {
                 println!("typeinfo: {:?}",
