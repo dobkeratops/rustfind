@@ -49,7 +49,8 @@ type RefCCMItem<'a> =(DefId,&'a CrossCrateMapItem);
 type SetOfItems<'a> =HashSet<RefCCMItem<'a>>;
 type TraitMap<'a> =HashMap<DefId,TraitInfo<'a>>;
 
-pub fn write_call_graph(nmaps:&NodeMaps, outdirname:&str, filename:&str,opts:&CG_Options) {
+// TODO: Use mangled symbols for the nodes.
+pub fn write_call_graph<'a>(nmaps:&'a NodeMaps, outdirname:&str, filename:&str,opts:&CG_Options) {
 
 	let mut tg:TraitMap =HashMap::new();
 //	gather_trait_graph(&tg, (xcm,nmaps), rf_get_root_node(nmaps.node_info_map));
@@ -57,52 +58,31 @@ pub fn write_call_graph(nmaps:&NodeMaps, outdirname:&str, filename:&str,opts:&CG
 	visit_call_graph( nmaps, |x,y|{});
 
 	println!("Writing callgraph {} {}..",outdirname, filename);
-	match (	fs::File::create(&posix::Path::new(outdirname+filename.to_owned()+~".txt")),
-			fs::File::create(&posix::Path::new(outdirname+filename.to_owned()+~".dot")),
-		)
+	match fs::File::create(&posix::Path::new(outdirname+filename.to_owned()+~".dot"),
 	{
-		(Ok(mut outf),Ok(mut dotf))=>
+		Ok(mut dotf)=>
 		{
 			println!("writing callgraph file ..\n");
 			dotf.write_line("digraph "+ filename +" {");
-//			dotf.write_line("\toverlap=false; ");
-//			dotf.write_line("\tnode[fontsize=8, width=0.2height=0.05] ");
 			let mut fns_per_module:HashMap<&str,HashSet<RefCCMItem>> =HashMap::new();
-			let mut all_calls:HashSet<(RefCCMItem,RefCCMItem)> =HashSet::new();
+			let mut all_calls:HashSet<(RefCCMItem<'a>,RefCCMItem<'a>)> =HashSet::new();
 			dotf.write_line("\tnode [style=filled, color=lightgrey ]");
 
-			// Traverse and collect.. 
-			for (node_id, info) in nmaps.node_info_map.iter() {
-				let mut calls:SetOfItems =HashSet::new();
-				info.rf_as_fn_decl().map(
-					|(ref item, fn_decl)|{
-						let fn_defid=DefId{krate:0,node:*node_id};
-						let xcmi=nmaps.rf_find_source(&fn_defid).unwrap();
-
-						fns_per_module.insert_or_update_with(
-							xcmi.file_name.as_slice(),	// key,
-							HashSet::new(),	// new value if not found,
-							|k,v|{v.insert((fn_defid, xcmi));} // update the value if found.
-						);
-						let caller_str = str_of_ident(item.ident);
-						outf.write_line(format!("fn {}() {}:{}", caller_str, xcmi.file_name,xcmi.line+1));
-						gather_call_graph_rec(&mut calls, nmaps,  *node_id);
-
-			
-						for &(ref defid,ref call_item) in calls.iter() {
-							outf.write_line(format!("\tcalls {}() {}:{}",call_item.item_name, call_item.file_name, call_item.line+1));
-							// TODO: actually 'local-only' should gather external nodes into one-
-							// i.e. show dependancy on module/crate.
-
-							if !(opts.local_only && defid.krate!=0) {
-								all_calls.insert( ((fn_defid,xcmi), (*defid, *call_item)) );
-							}
-						}
+			visit_call_graph(nmaps, // We miss do notation :(
+				|caller,callee| {	
+					for x in [caller,callee].iter() {
+						fns_per_module.insert_or_update_with(x.val1().file_name.as_slice(), HashSet::new(), |k,v|{v.insert(*x);});
 					}
-				);
-			}
+
+					if !(opts.local_only && callee.val0().krate!=0) {
+						all_calls.insert( (caller, callee) );
+					}
+				}
+			);
+
 			// Write out a cluster for all the functions in a particular sourcefile.
 			// TODO - should be able to recursively cluster directories for this..
+			// TODO: Generalize to modules.
 			for (&modname,items) in fns_per_module.iter() {
 //				let modstr=::std::str::from_chars(modname.chars().map(|x|if x=='/'{'_'}else{x}));
 				let modstr:~str=modname.chars().map(|x|match x{'/'|'.'=>'_',_=>x}).collect();
@@ -121,12 +101,13 @@ pub fn write_call_graph(nmaps:&NodeMaps, outdirname:&str, filename:&str,opts:&CG
 				dotf.write_line("\t}");
 			}
 			// Write out all the calls..
+			dotf.write_line("edge [len=4.0];");
 			for &(f1,f2) in all_calls.iter() {
 				let fstr1=fn_to_dotfile_symbol(f1);
 				let fstr2=fn_to_dotfile_symbol(f2);
 				if fstr1.len()>0 && fstr2.len()>0 {
 					
-					dotf.write_line("\t"+ fstr1 +" -> "+ fstr2 + "[len=4.0]"
+					dotf.write_line("\t"+ fstr1 +" -> "+ fstr2 
 //						if is_main(f1)|| is_main(f2) {" [len=10.0];"} else {" [len=4.0];"}
 					);
 				}
@@ -143,12 +124,10 @@ pub fn write_call_graph(nmaps:&NodeMaps, outdirname:&str, filename:&str,opts:&CG
 			}
 
 //			fn rank_within(items:&Set<RefCCMItem>, &Vec<(RefCCMItem,RefCCMItem>
-
 			dotf.write_line("}");
 		}
 		_ => println!("can't write callgraph {}", filename),
 	}
-//	fail!();
 }
 
 
@@ -158,7 +137,7 @@ pub fn write_call_graph(nmaps:&NodeMaps, outdirname:&str, filename:&str,opts:&CG
 
 //static mut dbg1:HashSet<NodeId> =HashSet::new()
 static debug_callgraph:bool=false;
-pub fn visit_call_graph<'a>(nmaps:&'a NodeMaps, f:|caller:RefCCMItem, callee:RefCCMItem|)
+pub fn visit_call_graph<'a>(nmaps:&'a NodeMaps, f:|caller:RefCCMItem<'a>, callee:RefCCMItem<'a>|)
 {
 //	let mut dbg_calls_found_recursively=0;
 	for (node_id, info) in nmaps.node_info_map.iter() {
@@ -229,6 +208,7 @@ struct TraitInfo<'a> {
 	pub ti_inherits:HashSet<DefId>,
 	pub ti_functions:HashSet<DefId>,
 }
+
 
 fn gather_trait_graph_rec<'a>(tg:&mut HashMap<DefId,TraitInfo<'a>>, nmaps:&'a NodeMaps, node_id:ast::NodeId) 
 {
