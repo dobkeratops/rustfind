@@ -41,11 +41,6 @@ pub type JumpToDefMap = HashMap<ast::NodeId,ast::DefId> ;
 ///  FNodeInfoMap -  map{NodeIds=>FNodeInfo} - universal AST node wrappers
 ///  JumpToDefMap - connects nodes to DefIds (external nodes)
 /// JumpToRefMap - inverse of JumpToDefMap, but only needs internal crate nodes.
-pub struct NodeMaps<'a>  {
-    pub node_info_map:&'a FNodeInfoMap,
-    pub jump_def_map:&'a JumpToDefMap,
-    pub jump_ref_map:&'a JumpToRefMap
-}
 
 pub fn lookup_def_of_expr(dc:&RustFindCtx, expr:&ast::Expr, nodeinfomap:&FNodeInfoMap, _: &HashMap<ast::NodeId,ast::DefId>)->Option<ast::DefId>
 {
@@ -297,6 +292,7 @@ pub fn make_jump_to_def_map(dc:&RustFindCtx)->( FNodeInfoMap, ~HashMap<ast::Node
 
 
 /// K:[V]  insert(K, V) for many V;  find(K)->[V]
+/// todo - can just compose it as hashmap<K,Vec<V>>
 pub struct MultiMap<K,V> {
     next_index:uint,
     indices:HashMap<K,uint>,

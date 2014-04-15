@@ -10,6 +10,7 @@ extern crate serialize;
 extern crate collections;
 extern crate time;
 extern crate libc;
+extern crate log;
 
 use std::io::println;
 
@@ -20,8 +21,9 @@ use std::{os,local_data};
 use std::cell::RefCell;
 use collections::{HashMap,HashSet};
 use std::path::Path;
-use jumptodefmap::{MultiMap,NodeMaps};
+use jumptodefmap::{MultiMap};
 use std::path::posix;
+//pub use super::NodeMaps;
 
 use getopts::{optmulti, optopt, optflag, getopts};
 
@@ -34,8 +36,10 @@ use jumptodefmap::{lookup_def_at_text_file_pos_str, make_jump_to_def_map, def_in
 use rfindctx::{RustFindCtx,ctxtkey};
 pub use codemaput::{ZTextFilePos,ZTextFilePosLen,get_span_str,ToZTextFilePos,ZIndexFilePos,ToZIndexFilePos};
 use rsfind::{SDM_LineCol,SDM_Source,SDM_GeditCmd};
-use crosscratemap::CrossCrateMap;
+use crosscratemap::{CrossCrateMap,CrossCrateMapItem};
 use timer::Profiler;
+use jumptodefmap::*;
+use find_ast_node::*;
 
 pub mod rf_common;
 pub mod find_ast_node;
@@ -76,7 +80,17 @@ impl RF_Options {
         }
     }
 }
-
+pub struct NodeMaps<'a>  {
+    pub node_info_map:&'a FNodeInfoMap,
+    pub jump_def_map:&'a JumpToDefMap,
+    pub jump_ref_map:&'a JumpToRefMap,
+	pub xcmap:&'a CrossCrateMap,
+}
+impl<'a> NodeMaps<'a> {
+	pub fn rf_find_source(&'a self,defid:&ast::DefId)->Option<&'a CrossCrateMapItem>{
+		self.xcmap.find(defid)
+	}
+}
 
 pub macro_rules! tlogi{
     ($($a:expr),*)=>(println!((file!()+":"+line!().to_str()+": " $(+$a.to_str())*) ))
@@ -383,24 +397,27 @@ pub fn write_crate_as_html_and_rfx(dc:&RustFindCtx,lib_html_path:&str,opts: &RF_
             def2refs.insert(ndef.node,nref);
         }
     };
-    let nmaps=NodeMaps { node_info_map:&info_map, jump_def_map:jump_def_map, jump_ref_map:def2refs};
 
 
 
 	// combine_current_create: Allows us to use 'xcm' alone to resolve DefIds elsewhere.
 	// existing codepath also uses local info in 'jump_maps' to do the same job, we can simplify that out.
 	crosscratemap::cross_crate_map_combine_current_crate(&mut xcm, dc,&info_map,def_map,jump_def_map); 
-	
     crosscratemap::cross_crate_map_write(dc,lib_html_path, &info_map,def_map,jump_def_map);
+
+	// Finally collect these maps together for convinience. We always seem to need all of them.
+    let nmaps=NodeMaps { node_info_map:&info_map, jump_def_map:jump_def_map, jump_ref_map:def2refs,xcmap: &xcm};
+
+
     if opts.write_html {
 		let mut tm=::timer::Profiler::new("write_crate_as_html_and_rfx");
-        rust2html::write_crate_as_html_sub(dc,&nmaps,&xcm,lib_html_path,opts);
+        rust2html::write_crate_as_html_sub(dc,&nmaps,lib_html_path,opts);
     }
 	if !opts.write_callgraph {
 		return;
 	}
 	let dirname=opts.output_dir.as_str().unwrap_or("");
 	let dirname=if dirname.len()>0{dirname+"/"}else{~""};
-	callgraph::write_call_graph(&xcm,&nmaps, dirname,"callgraph", &opts.callgraph_opt);
+	callgraph::write_call_graph(&nmaps, dirname,"callgraph", &opts.callgraph_opt);
 }
 

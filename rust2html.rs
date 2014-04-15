@@ -13,7 +13,8 @@ use codemaput::{ZIndexFilePos,ToZIndexFilePos};
 use find_ast_node::{FNodeInfoMap,FNodeInfo};
 use rfindctx::{RustFindCtx};
 use crosscratemap::{CrossCrateMap};
-use jumptodefmap::{JumpToDefMap,JumpToRefMap,NodeMaps,MultiMap};
+use jumptodefmap::{JumpToDefMap,JumpToRefMap,MultiMap};
+pub use super::NodeMaps;
 use rsfind::MyOption;
 use timer::Profiler;
 use indexpage;
@@ -51,7 +52,7 @@ fn file_get_time_stamp_str(fpath:&Path)->~str {
 
 /// Takes populated node maps (NodeMaps)&'CrossCrateMap, plus a 'filemap' from crate-analysis, and generates an HTML view of the source with links.
 pub fn make_html_from_source(dc: &RustFindCtx, fm: &codemap::FileMap, nmaps: &NodeMaps,
-                 xcm: &CrossCrateMap, fln: &FileLineNodes, lib_path: &str, 
+                 fln: &FileLineNodes, lib_path: &str, 
                  out_file: &Path, options: &::RF_Options) -> ~str {
     // todo - Rust2HtmlCtx { fm,nim,jdm,jrm } .. cleanup common intermediates
 	let mut p=Profiler::new("make_html");
@@ -116,13 +117,13 @@ pub fn make_html_from_source(dc: &RustFindCtx, fm: &codemap::FileMap, nmaps: &No
             scw.doc.check_depth(depth);
             
             
-            write_line_with_links(&mut scw,dc,fm,lib_path, nmaps,xcm, line_str, fln.nodes_per_line.get(line));
+            write_line_with_links(&mut scw,dc,fm,lib_path, nmaps, line_str, fln.nodes_per_line.get(line));
             scw.doc.writeln("");
     //      doc.writeln(markup_line);
         }
     }
     if options.write_references {
-        write_symbol_references(&mut doc,dc,fm,xcm, lib_path,nmaps, &fln.nodes_per_line,options);
+        write_symbol_references(&mut doc,dc,fm, lib_path,nmaps, &fln.nodes_per_line,options);
     }
 
 	source_view_page_end(&mut doc,out_file,options);
@@ -144,7 +145,7 @@ fn source_view_page_end(doc:&mut HtmlWriter, _:&Path, _:&::RF_Options)
 }
 
 pub fn write_crate_as_html_sub(dc:&RustFindCtx, nmaps:&NodeMaps,
-	xcm:&CrossCrateMap,lib_path:&str, options: &::RF_Options) {
+	lib_path:&str, options: &::RF_Options) {
 
 	//println!("output dir={}",options.output_dir.as_str().unwrap_or(""));
 	indexpage::write_index_html(&Path::new("."), &[~"rs",~"cpp",~"h",~"c"],options);
@@ -158,7 +159,7 @@ pub fn write_crate_as_html_sub(dc:&RustFindCtx, nmaps:&NodeMaps,
         if is_valid_filename(cm_file.name) {
             let html_name = options.output_dir.join(Path::new(make_html_name(cm_file.name)));
             println!("generating {}: {}.. ", i.to_str(), html_name.display());
-            let doc_str=make_html_from_source(dc, &**cm_file, nmaps,xcm, npl.file.get(i) , lib_path,
+            let doc_str=make_html_from_source(dc, &**cm_file, nmaps,npl.file.get(i) , lib_path,
                                   &html_name, options);
 
 			file_write_bytes_as(&html_name, doc_str.as_bytes() );
@@ -462,7 +463,7 @@ static link_to_refs:bool    =true;
 static link_debug:bool      =true;
 
 
-fn write_line_with_links(dst:&mut SourceCodeWriter<HtmlWriter>,dc:&RustFindCtx,fm:&codemap::FileMap,lib_path:&str, nmaps:&NodeMaps,xcm:&CrossCrateMap, line:&str, nodes:&Vec<ast::NodeId>) {
+fn write_line_with_links(dst:&mut SourceCodeWriter<HtmlWriter>,dc:&RustFindCtx,fm:&codemap::FileMap,lib_path:&str, nmaps:&NodeMaps, line:&str, nodes:&Vec<ast::NodeId>) {
     // todo ... BREAK THIS FUNCTION UP!!!!
     // and there is a load of messy cut paste too.
 
@@ -642,11 +643,11 @@ fn write_line_with_links(dst:&mut SourceCodeWriter<HtmlWriter>,dc:&RustFindCtx,f
             x+=1;
         }
     }
-    let resolver=|x|resolve_link(x,dc,fm,lib_path, nmaps,xcm);
+    let resolver=|x|resolve_link(x,dc,fm,lib_path, nmaps);
     write_line_attr_links(dst,line,color,link, resolver );
 }
 
-fn resolve_link(link:i64, dc:&RustFindCtx,fm:&codemap::FileMap,lib_path:&str, nmaps:&NodeMaps,xcm:&CrossCrateMap)->Option<~str> {
+fn resolve_link(link:i64, dc:&RustFindCtx,fm:&codemap::FileMap,lib_path:&str, nmaps:&NodeMaps)->Option<~str> {
 /*
     if link_debug==false {
         if link!=no_link {
@@ -682,23 +683,22 @@ fn resolve_link(link:i64, dc:&RustFindCtx,fm:&codemap::FileMap,lib_path:&str, nm
 		// If this node is a definition, we write a link to references block(todo-page)-or TODO rustdoc page.
 		// link to refs block with link = neg(node_id)
         if (link as i32)<0{
-			symbol_refs_link_str(dc,fm, xcm, lib_path, nmaps, -((link as i32) as u32)) 
+			symbol_refs_link_str(dc,fm, lib_path, nmaps, -((link as i32) as u32)) 
         } else
         {
             let def_crate = (link>>48) as u32;
             let def_node=(link&((1<<48)-1)) as u32;
-			make_def_link_str(dc,fm,xcm,lib_path,nmaps, &DefId{krate:def_crate,node:def_node})
+			make_def_link_str(dc,fm,lib_path,nmaps, &DefId{krate:def_crate,node:def_node})
         }
     } else {
 		None
     }
 }
 
-
-fn make_def_link_str(dc:&RustFindCtx, fm:&codemap::FileMap, xcm:&CrossCrateMap, lib_path:&str,nmaps:&NodeMaps,  defid:&DefId )->Option<~str>{
+fn make_def_link_str(dc:&RustFindCtx, fm:&codemap::FileMap, lib_path:&str,nmaps:&NodeMaps,  defid:&DefId )->Option<~str>{
 	let files = dc.codemap().files.borrow();
 
-	match xcm.find(defid) {
+	match nmaps.rf_find_source(defid) {
 		// link to another crate - we use the node index, because we haven't got its'
 		// line table. ?! TODO: dont we hve the line table in 'crosscratemap'
 
@@ -725,13 +725,13 @@ fn make_def_link_str(dc:&RustFindCtx, fm:&codemap::FileMap, xcm:&CrossCrateMap, 
 	}
 }
 
-fn symbol_refs_link_str(dc:&RustFindCtx, fm:&codemap::FileMap, xcm:&CrossCrateMap, lib_path:&str, nmaps:&NodeMaps, id:u32)->Option<~str>
+fn symbol_refs_link_str(dc:&RustFindCtx, fm:&codemap::FileMap, lib_path:&str, nmaps:&NodeMaps, id:u32)->Option<~str>
 {
 	let refs = nmaps.jump_ref_map.find(id);
 	// if (num_refs >1) link to a refs page ... else just go to the ref..
 	match refs.len() {
 		0=> None,
-		1=> make_def_link_str(dc, fm, xcm, lib_path,nmaps, 
+		1=> make_def_link_str(dc, fm, lib_path,nmaps, 
 				&DefId{krate:0,node:*(refs.iter().nth(0).unwrap())  }),
 				// todo -can we do this without unwrap, and without double-testing it.
 				// The pattern is, collection.map_either(for_one_item,  for_many_items)
@@ -904,7 +904,7 @@ impl<T:Ord+Clone> Extents<T> {
     }
 }
 
-fn ref_page_file_name(fm:&codemap::FileMap, options:&::RF_Options,xcm:&CrossCrateMap, node_id:ast::NodeId)
+fn ref_page_file_name(fm:&codemap::FileMap, nmaps:&NodeMaps,options:&::RF_Options, node_id:ast::NodeId)
 {
 	// todo-  we might write a page per symbol
 	let path=options.output_dir.join(
@@ -920,7 +920,7 @@ fn ref_page_file_name(fm:&codemap::FileMap, options:&::RF_Options,xcm:&CrossCrat
 
 /// Write a block of links to symbol references.
 /// Workaround for not having popup menus when you click on a symbol.
-fn write_symbol_references(doc:&mut HtmlWriter,dc:&RustFindCtx, fm:&codemap::FileMap,xcm:&CrossCrateMap, _:&str,  nmaps:&NodeMaps, _: &Vec<Vec<ast::NodeId>>,options:&::RF_Options) {
+fn write_symbol_references(doc:&mut HtmlWriter,dc:&RustFindCtx, fm:&codemap::FileMap, _:&str,  nmaps:&NodeMaps, _: &Vec<Vec<ast::NodeId>>,options:&::RF_Options) {
 
 	// Todo - from all references, collect file links. 'file ... references <files..>, referenced by<files..>'
 
@@ -948,9 +948,9 @@ fn write_symbol_references(doc:&mut HtmlWriter,dc:&RustFindCtx, fm:&codemap::Fil
         if refs.len()>1 {
 			doc.writeln("");
 
-			ref_page_file_name(fm,options,xcm, def_node);
-			doc.write_refs_header(dc,  nmaps.node_info_map,xcm, fm,def_node);
-			doc.writeln_tagged("c43","references:- ");
+			ref_page_file_name(fm,nmaps,options, def_node);
+			doc.write_refs_header(dc,  nmaps,  fm,def_node);
+			doc.writeln_tagged("c43","references:- "+refs.len().to_str());
 
             let opt_def_tfp = def_info.rf_span().lo.to_index_file_pos(dc.tycx_ref());
             if !opt_def_tfp.is_some() { continue;}
@@ -1079,10 +1079,10 @@ fn write_symbol_references(doc:&mut HtmlWriter,dc:&RustFindCtx, fm:&codemap::Fil
 
 impl ::rust2html::htmlwriter::HtmlWriter{ // todo, why doesn't that allow path reuse
 	// todo - i dont think these are really methods of 'htmlwriter'. 
-    fn write_refs_header(&mut self,dc:&RustFindCtx,infomap:&FNodeInfoMap,xcm:&CrossCrateMap, fm:&codemap::FileMap, node_id:ast::NodeId) {
+    fn write_refs_header(&mut self,dc:&RustFindCtx,nmaps:&NodeMaps, fm:&codemap::FileMap, node_id:ast::NodeId) {
     	let depth=self.depth();
         self.writeln("");
-        infomap.find(&node_id).for_some( |info| {
+        nmaps.node_info_map.find(&node_id).for_some( |info| {
 			// Get the extents of this node in the file.. TODO: a ranged filepos, surely?
             let oifp=info.rf_span().lo.to_index_file_pos(dc.tycx_ref());//.unwrap();
             let oifpe=info.rf_span().hi.to_index_file_pos(dc.tycx_ref());//.unwrap();

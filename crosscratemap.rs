@@ -41,8 +41,8 @@ impl<S> std::hash::Hash<S> for CrossCrateMapItem {
 pub type CrossCrateMap = HashMap<ast::DefId,CrossCrateMapItem>;
 
 
-fn get_def_id_name(xcm:&CrossCrateMap, def_id:&ast::DefId)->~str {
-	xcm.find(def_id).map(|x|x.item_name.clone()).unwrap_or(~"")
+fn get_def_id_name<'a>(xcm:&'a CrossCrateMap, def_id:&ast::DefId)->&'a str {
+	xcm.find(def_id).map(|x|x.item_name.as_slice()).unwrap_or(&"")
 }
 
 pub trait FindNode {
