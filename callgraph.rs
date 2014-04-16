@@ -40,7 +40,7 @@ pub struct CG_Options {
 }
 impl CG_Options {
 	pub fn new()->CG_Options {
-		CG_Options{local_only:false}
+		CG_Options{local_only:true}
 	}	
 }
 /// Generate callgraph file.
@@ -58,7 +58,7 @@ pub fn write_call_graph<'a>(nmaps:&'a NodeMaps, outdirname:&str, filename:&str,o
 
 	gather_use_graph( nmaps, &|x,y|{});
 
-	println!("Writing callgraph {} {}..",outdirname, filename);
+//	println!("Writing callgraph {} {}..",outdirname, filename);
 	match fs::File::create(&posix::Path::new(outdirname+filename.to_owned()+~".dot")) {
 		Ok(mut dotf)=>{ write_call_graph_sub(nmaps,outdirname, filename,opts, &mut dotf);},
 		_ => println!("can't write callgraph {}", filename),
@@ -325,7 +325,7 @@ fn gather_use_graph_item<'a>(nmaps:&'a NodeMaps<'a>, edge_fn: &|RefCCMItem<'a>, 
 			CG_Enum
 		}
 		ast::ItemImpl(ref generics,ref opt_trait_ref,ty,ref vec_method)=>{
-			println!("Impl Trait.. for {} for {}",str_of_ident(item.ident), ::syntax::print::pprust::ty_to_str(ty),  );
+//			println!("Impl Trait.. for {} for {}",str_of_ident(item.ident), ::syntax::print::pprust::ty_to_str(ty),  );
 			// impl X for Y means an edge Y->X, (or the other way round? whatever, an edge.)
 			match nmaps.jump_def_map.find(&ty.id) {None=>{},Some(ty_defid)=>
 				match nmaps.xcmap.find(ty_defid) {None=>{},Some(ccmi)=>
@@ -401,12 +401,12 @@ fn gather_fn_decl<'a> (edge_ends:&mut SetOfItems<'a>, nmaps:&'a NodeMaps<'a>, ed
 }
 
 fn gather_trait_ref<'a>(edge_ends:&mut SetOfItems<'a>, nmaps:&'a NodeMaps<'a>, tr:&ast::TraitRef) {
-	println!(" trait..{}", ::syntax::print::pprust::path_to_str(&tr.path) );
+//	println!(" trait..{}", ::syntax::print::pprust::path_to_str(&tr.path) );
 	match nmaps.jump_def_map.find(&tr.ref_id) {None=>{},
 		Some(defid)=>{
 			match nmaps.xcmap.find(defid) {None=>{},
 				Some(ref ccmitem) =>{
-					println!(" trait..{} .. ok", ::syntax::print::pprust::path_to_str(&tr.path) );
+//					println!(" trait..{} .. ok", ::syntax::print::pprust::path_to_str(&tr.path) );
 					edge_ends.insert( (*defid, *ccmitem,CG_Trait) );
 				}
 			}
@@ -436,7 +436,7 @@ fn gather_type<'s>(
 			// node_id .. get its def ?
 			match nmaps.jump_def_map.find(&ty.id) {
 				None=>{
-					println!(" ty_path def not found {} :(\n", ty.id);
+//					println!(" ty_path def not found {} :(\n", ty.id);
 				},
 				Some(def_id)=>{
 					// pyramid of dooom..
@@ -445,7 +445,7 @@ fn gather_type<'s>(
 						Some(xcm_item)=>{
 							let kind = CG_Struct;
 //			let node_info=nmaps.node_info_map.find(def_id);
-							println!(" ty_path {}\n", xcm_item.item_name);
+//							println!(" ty_path {}\n", xcm_item.item_name);
 							calls.insert((*def_id, xcm_item, kind)   );
 			
 							match *opt_typarambound {None=>{},
@@ -473,66 +473,6 @@ fn gather_type<'s>(
 	}
 	
 }
-
-
-struct TraitInfo<'a> {
-	pub ti_defid: RefCCMItem<'a>,
-	pub ti_name:~str,
-	pub ti_module:DefId,
-	pub ti_inherits:HashSet<DefId>,
-	pub ti_functions:HashSet<DefId>,
-}
-
-
-fn gather_trait_graph_rec<'a>(tg:&mut HashMap<DefId,TraitInfo<'a>>, nmaps:&'a NodeMaps, node_id:ast::NodeId) 
-{
-	// todo 'for child in iter_children(nmaps,node)' {
-	let node=nmaps.node_info_map.find(&node_id).unwrap();
-	node.rf_visit_children(
-		nmaps.node_info_map,
-		|child_id, child_node| {
-//	for &child_id in node.children.iter() {
-//			let child_node = nmaps.node_info_map.find(&child_id).unwrap();
-
-			match child_node.rf_node() {
-				// is it in decl, or item?!
-				astnode_item(item)=> {
-					match item.node {
-						// to escape the pyramid of doom, we want to pass ::ItemTrait, but its not a type itself :( we hope rust gets this addition
-						ast::ItemTrait(ref g,ref tr, ref tm)=>{
-							gather_trait_graph_sub((g,tr,tm),tg,nmaps,child_node);
-						},
-						_=>{}
-					}
-				}
-				_=>{
-				}
-			}
-			gather_trait_graph_rec(tg, nmaps, child_id);
-		}
-	);
-}
-
-// we hope they will in future allow inference between functions in the same module-
-// easier to break up and refactor.
-// the only reason we're writing this function is to reduce indentation above.
-fn gather_trait_graph_sub<'a>(
-		(g,tr,rm):(&ast::Generics,&Vec<ast::TraitRef>,&Vec<ast::TraitMethod>),
-		tg:&mut HashMap<DefId, TraitInfo<'a>>,
-		nmaps:&'a NodeMaps,
-		node:&FNodeInfo)
-{
-	println!("trait {}\n", str_of_opt_ident(node.rf_get_ident()));
-}
-
-// TODO: populate this 
-pub struct FunctionUseGraph {
-	pub fn_per_type: HashMap<DefId, DefId>,
-	pub type_per_fn: HashMap<DefId, DefId>,
-	pub common_pairs: HashSet<(DefId,DefId)>
-}
-
-
 
 
 
