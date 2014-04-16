@@ -8,6 +8,7 @@ extern crate rustc;
 extern crate getopts;
 extern crate serialize;
 extern crate collections;
+
 extern crate time;
 extern crate libc;
 extern crate log;
@@ -85,10 +86,14 @@ pub struct NodeMaps<'a>  {
     pub jump_def_map:&'a JumpToDefMap,
     pub jump_ref_map:&'a JumpToRefMap,
 	pub xcmap:&'a CrossCrateMap,
+	pub krate: &'a ast::Crate,
 }
 impl<'a> NodeMaps<'a> {
 	pub fn rf_find_source(&'a self,defid:&ast::DefId)->Option<&'a CrossCrateMapItem>{
 		self.xcmap.find(defid)
+	}
+	pub fn rf_find_local_node(&'a self,node:ast::NodeId)->Option<&'a CrossCrateMapItem> {
+		self.xcmap.find(&ast::DefId{krate:0,node:node})
 	}
 }
 
@@ -398,15 +403,13 @@ pub fn write_crate_as_html_and_rfx(dc:&RustFindCtx,lib_html_path:&str,opts: &RF_
         }
     };
 
-
-
 	// combine_current_create: Allows us to use 'xcm' alone to resolve DefIds elsewhere.
 	// existing codepath also uses local info in 'jump_maps' to do the same job, we can simplify that out.
 	crosscratemap::cross_crate_map_combine_current_crate(&mut xcm, dc,&info_map,def_map,jump_def_map); 
     crosscratemap::cross_crate_map_write(dc,lib_html_path, &info_map,def_map,jump_def_map);
 
 	// Finally collect these maps together for convinience. We always seem to need all of them.
-    let nmaps=NodeMaps { node_info_map:&info_map, jump_def_map:jump_def_map, jump_ref_map:def2refs,xcmap: &xcm};
+    let nmaps=NodeMaps { node_info_map:&info_map, jump_def_map:jump_def_map, jump_ref_map:def2refs,xcmap: &xcm, krate:dc.crate_};
 
 
     if opts.write_html {
@@ -420,4 +423,6 @@ pub fn write_crate_as_html_and_rfx(dc:&RustFindCtx,lib_html_path:&str,opts: &RF_
 	let dirname=if dirname.len()>0{dirname+"/"}else{~""};
 	callgraph::write_call_graph(&nmaps, dirname,"callgraph", &opts.callgraph_opt);
 }
+
+
 

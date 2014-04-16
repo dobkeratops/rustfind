@@ -26,7 +26,7 @@ pub macro_rules! logi{
     ($($a:expr),*)=>(println!("{}", $($a.to_str())*) )
 }
 
-type AstSPtr<T> =ast::P<T>;
+pub type AstSPtr<T> =ast::P<T>;
 
 // Wrappers to prepare for de-@
 #[inline]
@@ -47,6 +47,12 @@ fn 	mkAstSPtr2<T: 'static>(a:T)->AstSPtr<T> {
 // todo: looks like RustC does have this, "syntax::ast_map::Node" ?
 // refactor ou code to use that.
 /// wrapper enum for the varios ast:: node types.
+
+#[deriving(Clone,Eq,TotalEq,Hash)]
+pub enum CG_Kind {	// typedef this, so we can swap in a rust identifier. its *not* the ast object itself.
+	CG_Trait,CG_Struct,CG_Enum,CG_Fn,CG_Mod, CG_None
+}
+
 #[deriving(Clone)]
 pub enum AstNode_ { 
 	// todo: CamelCase
@@ -143,6 +149,9 @@ impl FNodeInfo {
 			astnode_item(item)=>Some(item),
 			_=>None,
 		}
+	}
+	pub fn rf_as_ast_node<'a>(&'a self)->&'a AstNode_ {
+		&self.node
 	}
 
 	/// Single wrapper to acess as function declaration.

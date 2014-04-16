@@ -46,10 +46,10 @@ fn get_def_id_name<'a>(xcm:&'a CrossCrateMap, def_id:&ast::DefId)->&'a str {
 }
 
 pub trait FindNode {
-	fn find_node<'a>(&'a self,id:NodeId)->&'a CrossCrateMapItem;
+	fn find_local_node<'a>(&'a self,id:NodeId)->&'a CrossCrateMapItem;
 }
 impl FindNode for CrossCrateMap {
-	fn find_node<'a>(&'a self, id:NodeId)->&'a CrossCrateMapItem {
+	fn find_local_node<'a>(&'a self, id:NodeId)->&'a CrossCrateMapItem {
 		let item_defid = ast::DefId{krate:0, node:id};
 		let xcmi=self.find(&item_defid).unwrap();
 		xcmi

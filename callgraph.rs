@@ -40,12 +40,13 @@ pub struct CG_Options {
 }
 impl CG_Options {
 	pub fn new()->CG_Options {
-		CG_Options{local_only:true}
+		CG_Options{local_only:false}
 	}	
 }
 /// Generate callgraph file.
 /// Todo - seperate into callgraph iterator and file writer passing a closure..
-type RefCCMItem<'a> =(DefId,&'a CrossCrateMapItem);
+#[deriving(Clone,Eq,TotalEq,Hash)]
+type RefCCMItem<'a> =(DefId,&'a CrossCrateMapItem,CG_Kind);
 type SetOfItems<'a> =HashSet<RefCCMItem<'a>>;
 type TraitMap<'a> =HashMap<DefId,TraitInfo<'a>>;
 
@@ -55,80 +56,162 @@ pub fn write_call_graph<'a>(nmaps:&'a NodeMaps, outdirname:&str, filename:&str,o
 	let mut tg:TraitMap =HashMap::new();
 //	gather_trait_graph(&tg, (xcm,nmaps), rf_get_root_node(nmaps.node_info_map));
 
-	visit_call_graph( nmaps, |x,y|{});
+	gather_use_graph( nmaps, &|x,y|{});
 
 	println!("Writing callgraph {} {}..",outdirname, filename);
-	match fs::File::create(&posix::Path::new(outdirname+filename.to_owned()+~".dot"),
-	{
-		Ok(mut dotf)=>
-		{
-			println!("writing callgraph file ..\n");
-			dotf.write_line("digraph "+ filename +" {");
-			let mut fns_per_module:HashMap<&str,HashSet<RefCCMItem>> =HashMap::new();
-			let mut all_calls:HashSet<(RefCCMItem<'a>,RefCCMItem<'a>)> =HashSet::new();
-			dotf.write_line("\tnode [style=filled, color=lightgrey ]");
-
-			visit_call_graph(nmaps, // We miss do notation :(
-				|caller,callee| {	
-					for x in [caller,callee].iter() {
-						fns_per_module.insert_or_update_with(x.val1().file_name.as_slice(), HashSet::new(), |k,v|{v.insert(*x);});
-					}
-
-					if !(opts.local_only && callee.val0().krate!=0) {
-						all_calls.insert( (caller, callee) );
-					}
-				}
-			);
-
-			// Write out a cluster for all the functions in a particular sourcefile.
-			// TODO - should be able to recursively cluster directories for this..
-			// TODO: Generalize to modules.
-			for (&modname,items) in fns_per_module.iter() {
-//				let modstr=::std::str::from_chars(modname.chars().map(|x|if x=='/'{'_'}else{x}));
-				let modstr:~str=modname.chars().map(|x|match x{'/'|'.'=>'_',_=>x}).collect();
-				if items.len()==0{ continue;}
-				if modstr.chars().nth(0)==Some('<') {continue;} // things like <std macros>
-				dotf.write_line("\tsubgraph cluster_"+modstr+"{");
-				dotf.write_line("\t\tlabel=\""+modname+"\"");
-				dotf.write_line("\t\tstyle=filled");
-				dotf.write_line("\t\tcolor=darkgrey");
-				for &(defid,xcmi) in items.iter() {
-					let url_name= xcmi.file_name+".html#"+(xcmi.line+1).to_str();
-					dotf.write_line("\t\t"+fn_to_dotfile_symbol((defid,xcmi)) + "["+
-						if is_main((defid,xcmi)){"style=filled,fontcolor=white color=blue, "}else{" "/*"style=filled, color=lightgrey "*/}+
-						"label=\""+xcmi.item_name+"()\" URL=\""+ url_name  + "\"];");
-				}
-				dotf.write_line("\t}");
-			}
-			// Write out all the calls..
-			dotf.write_line("edge [len=4.0];");
-			for &(f1,f2) in all_calls.iter() {
-				let fstr1=fn_to_dotfile_symbol(f1);
-				let fstr2=fn_to_dotfile_symbol(f2);
-				if fstr1.len()>0 && fstr2.len()>0 {
-					
-					dotf.write_line("\t"+ fstr1 +" -> "+ fstr2 
-//						if is_main(f1)|| is_main(f2) {" [len=10.0];"} else {" [len=4.0];"}
-					);
-				}
-			}
-
-			fn fn_to_dotfile_symbol((def_id,xcmi):RefCCMItem)-> ~str {
-				// TODO: this should be the symbols' qualified module pathname
-				// its only coincidentally correlated with the filename+symbol most of the time.
-				let pathname:~str=xcmi.file_name.chars().map(|x|match x{'/'|'.'=>'_',_=>x}).collect(); 
-				pathname +"_"+xcmi.item_name
-			}
-			fn is_main((def_id,xcmi):RefCCMItem)->bool{
-				xcmi.item_name.as_slice()=="main"
-			}
-
-//			fn rank_within(items:&Set<RefCCMItem>, &Vec<(RefCCMItem,RefCCMItem>
-			dotf.write_line("}");
-		}
+	match fs::File::create(&posix::Path::new(outdirname+filename.to_owned()+~".dot")) {
+		Ok(mut dotf)=>{ write_call_graph_sub(nmaps,outdirname, filename,opts, &mut dotf);},
 		_ => println!("can't write callgraph {}", filename),
 	}
 }
+
+fn write_call_graph_sub<'a>(nmaps:&'a NodeMaps, outdirname:&str, filename:&str,opts:&CG_Options, dotf:&mut fs::File) {
+	println!("writing callgraph file ..\n");
+	dotf.write_line("digraph "+ filename +" {");
+	let mut items_per_module:HashMap<&str,HashSet<RefCCMItem>> =HashMap::new();
+	let mut all_calls:HashSet<(RefCCMItem<'a>,RefCCMItem<'a>)> =HashSet::new();
+	dotf.write_line("\tnode [style=filled, color=lightgrey, fontsize=12 ]");
+
+	// Gather items with call-graph links,
+	gather_use_graph(nmaps, // We miss do notation :( but maybe we could encapsulate the traversal in an iterator?
+		&|caller,callee| {
+			for x in [caller,callee].iter() {
+				items_per_module.insert_or_update_with(x.val1().file_name.as_slice(), HashSet::new(), |k,v|{v.insert(*x);});
+			}
+			if !(opts.local_only && callee.val0().krate!=0) {
+				all_calls.insert( (caller, callee) );
+			}
+		}
+	);
+
+	// Gather definitions.
+	// can't we write submodules directly?
+	for (&node_id,info) in nmaps.node_info_map.iter() {
+		let ccmitem = nmaps.rf_find_local_node(node_id);
+		let kind=match info.rf_node() {
+			
+			astnode_item(item)=>match item.node{
+				ast::ItemEnum(_,_)=>CG_Enum,
+				ast::ItemStruct(_,_)=>CG_Struct,
+				ast::ItemTrait(_,_,_)=>CG_Trait,
+				_=>CG_None,
+			},
+			_=>CG_None,
+		};
+
+		match (ccmitem,kind) {
+			(_,CG_None)|(None,_)=>{},
+			(Some(ccmitem),kind)=>{items_per_module.insert_or_update_with(
+				ccmitem.file_name.as_slice(),
+				HashSet::new(),
+				|k,v|{v.insert((ast::DefId{krate:0,node:node_id},ccmitem,kind));}
+				);
+			},
+		}
+	}
+
+	// Write out a cluster for all the functions in a particular sourcefile.
+	// TODO - should be able to recursively cluster directories for this..
+	// TODO: Generalize to modules.
+	for (&modname,items) in items_per_module.iter() {
+//				let modstr=::std::str::from_chars(modname.chars().map(|x|if x=='/'{'_'}else{x}));
+		let modstr:~str=modname.chars().map(|x|match x{'/'|'.'=>'_',_=>x}).collect();
+		if items.len()==0{ continue;}
+		if modstr.chars().nth(0)==Some('<') {continue;} // things like <std macros>
+		dotf.write_line("\tsubgraph cluster_"+modstr+"{");
+//				dotf.write_line("\t\tlabel=\""+modname+"\";");
+//				dotf.write_line("\t\tcolor=darkgrey;");
+		for &(defid,xcmi,kind) in items.iter() {
+
+			match to_dotfile_symbol((defid,xcmi,kind)) {
+				None=>{},
+				Some(symbol)=> {
+					let url_name= xcmi.file_name+".html#"+(xcmi.line+1).to_str();
+					dotf.write_line("\t\t"+symbol + "["+
+						if is_main((defid,xcmi,kind)){
+							"fontcolor=white, color=black, fontsize=32, "}
+						else{
+							match kind {
+								CG_Trait=>"fontcolor=yellow, fontsize=16, ",
+								CG_Struct=>"fontcolor=red, fontsize=16, ",
+								CG_Enum=>"fontcolor=darkgreen, fontsize=16, ",
+								_=>" "
+							}
+						}+
+						"label=\""+match kind{CG_Fn=>"fn",CG_Enum=>"enum",CG_Trait=>"trait",CG_Struct=>"struct",_=>""}
+						+" "
+						+xcmi.item_name+"\""
+						+" URL=\""+ url_name  + "\"];"
+					);
+				}
+			}
+		}
+		dotf.write_line("\t}");
+	}
+	// Write out all the calls..
+	dotf.write_line("\tedge [len=4.0];");
+	for &(f1,f2) in all_calls.iter() {
+		match (to_dotfile_symbol(f1), to_dotfile_symbol(f2)) {
+			(Some(fstr1),Some(fstr2))=>{
+				dotf.write_line("\t"+ fstr1 +" -> "+ fstr2 );
+			}
+			_=>{}
+		}
+	}
+	dotf.write_line("}");
+}
+enum Shape {
+	Square,
+	Rect,
+	
+}
+
+trait Pear {
+	fn foo_apple1(&self);
+	fn foo_banana1(&self);
+}
+
+trait Apple {
+	fn foo_apple(&self);
+	fn foo_banana(&self);
+}
+struct FooFooFoo;
+struct BarBarBar;
+trait FooBar : Apple+Pear{
+	fn FooBarBazMethod(x:FooFooFoo){
+		foo_foo_foo();		
+	}
+}
+impl Pear for BarBarBar {
+	fn foo_apple1(&self){}
+	fn foo_banana1(&self){}
+}
+
+fn foo_foo_foo(){
+}
+
+fn to_dotfile_symbol((def_id,xcmi,kind):RefCCMItem)-> Option<~str> {
+	// TODO: this should be the symbols' qualified module pathname
+	// its only coincidentally correlated with the filename+symbol most of the time.
+//	let pathname:~str=xcmi.file_name.chars().map(|x|match x{'/'|'<'|'>'|'.'=>'_',_=>x}).collect(); 
+	let fname=xcmi.file_name +"_"+xcmi.item_name;
+//	let cleaned_up_name:~str=
+	if  xcmi.item_name.chars().filter(|&x|match x{'<'|'>'|'.'|':'=>true,_=>false}).len()>0 
+		|| (xcmi.item_name.chars().nth(0)==Some('_') && xcmi.item_name.chars().nth(1)==Some('_'))
+	{
+		None // dont return if we had non symbol characters - its a generated item (eg deriving)
+	}
+	else {
+		let filtered:~str=xcmi.file_name.chars().map(|x|match x{'/'|'<'|'>'|'.'=>'_',_=>x}).collect();
+		let concat=filtered+"_"+ xcmi.item_name;
+		if concat.len()>0 { Some(concat)} else {None}
+	}
+//	cleaned_up_name
+}
+fn is_main((def_id,xcmi,kind):RefCCMItem)->bool{
+	xcmi.item_name.as_slice()=="main" && kind==CG_Fn
+}
+
 
 
 /// calls closure for each caller-callee pair encountered in the whole crates' static callgraph, including both function and method calls.
@@ -136,63 +219,62 @@ pub fn write_call_graph<'a>(nmaps:&'a NodeMaps, outdirname:&str, filename:&str,o
 /// requires populated CrossCrateMap and NodeMaps
 
 //static mut dbg1:HashSet<NodeId> =HashSet::new()
+
 static debug_callgraph:bool=false;
-pub fn visit_call_graph<'a>(nmaps:&'a NodeMaps, f:|caller:RefCCMItem<'a>, callee:RefCCMItem<'a>|)
+
+//type EdgeFn<'a> = 'a|RefCCMItem<'a>, RefCCMItem<'a>|;
+
+pub fn gather_use_graph<'a>(nmaps:&'a NodeMaps, edge_fn: &|RefCCMItem<'a>, RefCCMItem<'a>|)
 {
-//	let mut dbg_calls_found_recursively=0;
-	for (node_id, info) in nmaps.node_info_map.iter() {
-		info.rf_as_fn_decl().map(
-			|(ref fn_item, fn_decl)|{
-				let caller_defid=ast::DefId{krate:0,node:*node_id};
-				let caller_ccmitem=nmaps.rf_find_source(&caller_defid).unwrap();
-
-				let mut calls:SetOfItems=HashSet::new();
-				gather_call_graph_rec(&mut calls, nmaps,  *node_id);
-
-				if debug_callgraph{
-					println!("{}() {}:{}",caller_ccmitem.item_name, caller_ccmitem.file_name, caller_ccmitem.line+1);
-				}
-				for &(ref defid,call_ccmitem) in calls.iter() {
-					if debug_callgraph{
-						println!("\tcalls  {}() {}:{}",call_ccmitem.item_name, call_ccmitem.file_name, call_ccmitem.line+1);
-					}
-					f((caller_defid, caller_ccmitem), (*defid,call_ccmitem));
-				}
-			}
-		);
-	}
+	gather_use_graph_module(nmaps, edge_fn, &nmaps.krate.module);
 }
 
-fn gather_call_graph_rec<'s>(calls:&mut SetOfItems<'s>,nmaps:&'s NodeMaps, node:ast::NodeId)
-{
-	let node=nmaps.node_info_map.find(&node).unwrap();
+pub fn gather_use_graph_module<'a>(nmaps:&'a NodeMaps, edge_fn: &|RefCCMItem<'a>, RefCCMItem<'a>|, module:&ast::Mod) {
 
-	// todo 'for child in iter_children(nmaps,node)' {
-//	for &child_id in node.children.iter() {
+	for &item in module.items.iter() {
+//		let item_shared_ref = *item; // we know its valid/ lets unsafe transmute it :(
+//		let item_ref:&'a ast::Item = unsafe {::std::cast::transmute(item_shared_ref)};
+		gather_use_graph_item(nmaps,edge_fn, &*item);
+	}
+
+}
+
+fn gather_use_graph_rec<'a>(edges:&mut SetOfItems<'a>,nmaps:&'a NodeMaps, edge_fn:&|RefCCMItem<'a>, RefCCMItem<'a>|, node_id:ast::NodeId)
+{
+	let node=nmaps.node_info_map.find(&node_id);
+	if !node.is_some() {return;}
+	let node=node.unwrap();
+
+
 	node.rf_visit_children(
 		nmaps.node_info_map,
 		|child_id, child_node|{
-			gather_call_graph_rec(calls, nmaps, child_id);
+			gather_use_graph_rec(edges, nmaps, edge_fn, child_id);
 			let target=match child_node.rf_node() {
 				// get the callee .. caution, its the fncalls's 'callee_expr'.id, not the caller node itself..
 				astnode_expr(expr)=>{
 					match expr.node {
 						ast::ExprCall( ref call_expr,ref args)=>{
-							nmaps.jump_def_map.find(&call_expr.id)
+							(nmaps.jump_def_map.find(&call_expr.id),CG_Fn)
 						},
 						ast::ExprMethodCall(ref ident,ref typeargs,ref args)=>{
-							nmaps.jump_def_map.find(&child_id)
+							(nmaps.jump_def_map.find(&child_id),CG_Fn)
 						},
-						_=>{None}
+						_=>{(None,CG_None)}
 					}
 				},
-				_=>{None},
+				astnode_item(item)=>{
+					gather_use_graph_item(nmaps, edge_fn, &(*item));
+					(None,CG_None)
+				},
+				_=>{(None,CG_None)},
 			};
+			// todo: for clarity of flow, make this a sub called above - insert(calls,nmaps,target).
 			match target{
-				None=>{},
-				Some(x)=>{
+				(None,_)=>{},
+				(Some(x),kind)=>{
 					match nmaps.rf_find_source(x) {
-						Some(xcm_item)=>{calls.insert((*x,xcm_item));},
+						Some(xcm_item)=>{edges.insert((*x,xcm_item,kind));},
 						None=>{/*println!("call with no source \n", )*/} 
 					}
 				}
@@ -200,6 +282,198 @@ fn gather_call_graph_rec<'s>(calls:&mut SetOfItems<'s>,nmaps:&'s NodeMaps, node:
 		}
 	);
 }
+fn gather_node_id_def<'s>(calls:&mut SetOfItems<'s>, nmaps:&'s NodeMaps, node_id:ast::NodeId) {
+	match nmaps.jump_def_map.find(&node_id) { None=>{},
+		Some(def_id)=>{
+			match nmaps.xcmap.find(def_id) { None=>{},
+				Some(xcm_item)=>{
+					calls.insert((*def_id, xcm_item, CG_Struct));
+				},
+			}
+		}
+	}
+}
+
+// todo - walk generics..
+fn gather_use_graph_item<'a>(nmaps:&'a NodeMaps<'a>, edge_fn: &|RefCCMItem<'a>, RefCCMItem<'a>|, item:&ast::Item) {
+	// todo: VisitChildren can actually be done here, using the AST itself.
+	// we dont traverse 'block' for the minute because its' done above.
+	// using the ast directly is easier, but only when we have *everything* implemented.
+
+	let caller_defid=ast::DefId{krate:0,node: item.id};
+	let opt_caller=nmaps.rf_find_source(&caller_defid);
+
+	let mut edge_ends:SetOfItems=HashSet::new();
+
+	let src_kind:CG_Kind= match item.node {
+		ast::ItemEnum(ref enum_def,ref generics)=>{
+			for variant in enum_def.variants.iter() {
+				match variant.node.kind {
+					ast::TupleVariantKind(ref vec_variant_args)=> {
+						for t in vec_variant_args.iter() {
+							gather_type(&mut edge_ends, nmaps, t.ty);
+						}
+					},
+					ast::StructVariantKind(struct_def)=> {
+						for struct_field in struct_def.fields.iter() {
+							gather_type(&mut edge_ends, nmaps, /*node, (child_id,child_node),*/&(*struct_field.node.ty));
+						}
+					},
+//					_=>{}
+				}
+			}
+			CG_Enum
+		}
+		ast::ItemImpl(ref generics,ref opt_trait_ref,ty,ref vec_method)=>{
+			println!("Impl Trait.. for {} for {}",str_of_ident(item.ident), ::syntax::print::pprust::ty_to_str(ty),  );
+			// impl X for Y means an edge Y->X, (or the other way round? whatever, an edge.)
+			match nmaps.jump_def_map.find(&ty.id) {None=>{},Some(ty_defid)=>
+				match nmaps.xcmap.find(ty_defid) {None=>{},Some(ccmi)=>
+					{edge_ends.insert( (*ty_defid,ccmi, CG_Struct) );}
+				}
+			};
+			match *opt_trait_ref {
+				Some(ref trait_ref)=>{
+					gather_trait_ref(&mut edge_ends, nmaps,trait_ref);
+				},
+				None=>{}
+			}
+			gather_type(&mut edge_ends, nmaps, &(*ty));
+			for method in vec_method.iter() {
+				gather_fn_decl(&mut edge_ends, nmaps,edge_fn,  method.decl, Some(&(*method.body)));
+			}
+			CG_Struct
+		}
+		ast::ItemTrait(ref generics,ref vec_trait_ref,ref vec_trait_method)=>{
+			for trait_ref in vec_trait_ref.iter() {
+				gather_trait_ref(&mut edge_ends, nmaps, trait_ref);
+			}
+			for t in vec_trait_method.iter() {
+				match *t {
+					ast::Required(ref tm)=>{
+						gather_fn_decl(&mut edge_ends, nmaps,edge_fn,  tm.decl, None);
+					}
+					ast::Provided(method)=>{
+						gather_fn_decl(&mut edge_ends, nmaps,edge_fn,  method.decl, Some(&*method.body));
+					}
+				}
+			}
+			// handle trait function declarations..
+			CG_Trait
+		}
+		ast::ItemFn(p_fn_decl, ref fn_style, ref abi, ref generics, p_block)=> {
+			gather_fn_decl(&mut edge_ends, nmaps,edge_fn,  p_fn_decl, Some(&*p_block));
+			CG_Fn
+		}
+		ast::ItemStruct(ref struct_def,ref generics)=>{
+			for struct_field in struct_def.fields.iter() {
+				gather_type(&mut edge_ends, nmaps, /*node, (child_id,child_node),*/&(*struct_field.node.ty));
+			}
+			CG_Struct
+		}
+		// nested module - todo: build a module-graph aswell - and do the collapse-logic here
+		ast::ItemMod(ref mod_)=> {
+			gather_use_graph_module(nmaps, edge_fn, mod_);
+			CG_None
+		}
+		_=>{CG_None}
+	};
+
+	for &(ref other_defid,other_ccmitem,other_kind) in edge_ends.iter() {
+		if debug_callgraph{
+			println!("\tcalls  {}() {}:{}",other_ccmitem.item_name, other_ccmitem.file_name, other_ccmitem.line+1);
+		}
+		if opt_caller.is_some() {
+			(*edge_fn)((caller_defid, opt_caller.unwrap(),src_kind), (*other_defid,other_ccmitem,other_kind));
+
+		}
+	}
+}
+
+fn gather_fn_decl<'a> (edge_ends:&mut SetOfItems<'a>, nmaps:&'a NodeMaps<'a>, edge_fn: &|RefCCMItem<'a>, RefCCMItem<'a>| ,  p_fn_decl:&ast::FnDecl, opt_block:Option<&ast::Block>){ 
+	for arg in p_fn_decl.inputs.iter() {
+		gather_type(edge_ends,nmaps, arg.ty);
+	}
+	gather_type(edge_ends,nmaps,p_fn_decl.output);
+	match opt_block { None=>{},Some(block)=>
+		gather_use_graph_rec(edge_ends, nmaps,edge_fn, block.id),	// get edges from function body.
+	}
+}
+
+fn gather_trait_ref<'a>(edge_ends:&mut SetOfItems<'a>, nmaps:&'a NodeMaps<'a>, tr:&ast::TraitRef) {
+	println!(" trait..{}", ::syntax::print::pprust::path_to_str(&tr.path) );
+	match nmaps.jump_def_map.find(&tr.ref_id) {None=>{},
+		Some(defid)=>{
+			match nmaps.xcmap.find(defid) {None=>{},
+				Some(ref ccmitem) =>{
+					println!(" trait..{} .. ok", ::syntax::print::pprust::path_to_str(&tr.path) );
+					edge_ends.insert( (*defid, *ccmitem,CG_Trait) );
+				}
+			}
+		}
+	}
+}
+
+
+fn gather_type<'s>(
+		calls:&mut SetOfItems<'s>,
+		nmaps:&'s NodeMaps, 
+//		node:&FNodeInfo, 
+//		(child_id,child_node):(ast::NodeId, &FNodeInfo),
+		ty:&ast::Ty) 
+{
+	// iterate the type possibilities..
+	match ty.node {
+		ast::TyBox(t)=>gather_type(calls,nmaps,t),
+		ast::TyUniq(t)=>gather_type(calls,nmaps,t),
+		ast::TyVec(t)=>gather_type(calls,nmaps,t),
+		ast::TyFixedLengthVec(t,expr)=>gather_type(calls,nmaps,t),
+		ast::TyPtr(mut_ty)=>gather_type(calls,nmaps,mut_ty.ty),
+		ast::TyRptr(opt_lifetime,mut_ty)=>gather_type(calls,nmaps,mut_ty.ty),
+//		ast::TyRptr(mut_ty)=>gather_type(calls,nmaps,mut_ty),
+		ast::TyTup(ref vty)=>for ty in vty.iter(){ gather_type(calls,nmaps, &(**(ty)));},
+		ast::TyPath(ref path,ref opt_typarambound, ref node_id)=>{
+			// node_id .. get its def ?
+			match nmaps.jump_def_map.find(&ty.id) {
+				None=>{
+					println!(" ty_path def not found {} :(\n", ty.id);
+				},
+				Some(def_id)=>{
+					// pyramid of dooom..
+					match nmaps.xcmap.find(def_id) {
+						None=>{},
+						Some(xcm_item)=>{
+							let kind = CG_Struct;
+//			let node_info=nmaps.node_info_map.find(def_id);
+							println!(" ty_path {}\n", xcm_item.item_name);
+							calls.insert((*def_id, xcm_item, kind)   );
+			
+							match *opt_typarambound {None=>{},
+								Some(ref owned_slice_ty_param_bound)=>{
+									for ty_param_bound in owned_slice_ty_param_bound.iter(){	
+										match *ty_param_bound {
+											ast::TraitTyParamBound(ref trait_ref)=>{},//gather_trait_ref(calls,nmaps,trait_ref),
+											_=>{}
+										}
+									}
+								},
+							}
+						}
+					}
+				}
+			}
+		}
+//		ast::Typeof(ref expr)=>{} /* gather_expr .. */
+//		ast::TyBareFn(ref expr)=>{} /* gather_expr .. */
+//		ast::TyProc(ref expr)=>{} /* gather_expr .. */
+		_=>{},
+
+
+
+	}
+	
+}
+
 
 struct TraitInfo<'a> {
 	pub ti_defid: RefCCMItem<'a>,
