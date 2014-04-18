@@ -416,8 +416,12 @@ pub fn write_crate_as_html_and_rfx(dc:&RustFindCtx,lib_html_path:&str,opts: &RF_
 	if !opts.write_callgraph {
 		return;
 	}
-	let dirname=opts.output_dir.as_str().unwrap_or("");
-	let dirname=if dirname.len()>0{dirname+"/"}else{~""};
-	callgraph::write_call_graph(&nmaps, dirname,"callgraph", &opts.callgraph_opt);
+	let mut filename = opts.output_dir.clone(); filename.push("callgraph.dot");
+	println!("Writing callgraph {}...",filename.display());
+	match callgraph::write_call_graph(&nmaps, &filename, "callgraph", &opts.callgraph_opt) {
+		Ok(_) => {},
+		Err(e) => println!("{}: {}", filename.display(), e),
+	}
+
 }
 
