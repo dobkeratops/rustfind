@@ -58,7 +58,7 @@ pub fn write_call_graph<'a>(nmaps:&'a NodeMaps, outdirname:&str, filename:&str,o
 	visit_call_graph( nmaps, |x,y|{});
 
 	println!("Writing callgraph {} {}..",outdirname, filename);
-	match fs::File::create(&posix::Path::new(outdirname+filename.to_owned()+~".dot"),
+	match fs::File::create(&posix::Path::new(outdirname+filename.to_owned()+~".dot"))
 	{
 		Ok(mut dotf)=>
 		{
