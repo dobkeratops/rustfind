@@ -24,6 +24,16 @@ use rfindctx::*;
 // build a call graph.
 // we also want to build a graph of users of types - including types.
 
+/*
+
+todo: Use the mangled symbols as symbol idents, and get proper paths showable,
+write proper module heirachy
+write links between modules
+
+find a graph layout engine that can use the submodules intelligently.
+
+*/
+
 pub fn dump_functions(nmaps:&NodeMaps) {
 	for (node_id, info) in nmaps.node_info_map.iter() {
 		info.rf_as_fn_decl().map(|(ref item, fn_decl)|{
@@ -48,13 +58,10 @@ impl CG_Options {
 #[deriving(Clone,Eq,TotalEq,Hash)]
 type RefCCMItem<'a> =(DefId,&'a CrossCrateMapItem,CG_Kind);
 type SetOfItems<'a> =HashSet<RefCCMItem<'a>>;
-type TraitMap<'a> =HashMap<DefId,TraitInfo<'a>>;
+
 
 // TODO: Use mangled symbols for the nodes.
 pub fn write_call_graph<'a>(nmaps:&'a NodeMaps, outdirname:&str, filename:&str,opts:&CG_Options) {
-
-	let mut tg:TraitMap =HashMap::new();
-//	gather_trait_graph(&tg, (xcm,nmaps), rf_get_root_node(nmaps.node_info_map));
 
 	gather_use_graph( nmaps, &|x,y|{});
 
@@ -118,9 +125,8 @@ fn write_call_graph_sub<'a>(nmaps:&'a NodeMaps, outdirname:&str, filename:&str,o
 		let modstr:~str=modname.chars().map(|x|match x{'/'|'.'=>'_',_=>x}).collect();
 		if items.len()==0{ continue;}
 		if modstr.chars().nth(0)==Some('<') {continue;} // things like <std macros>
-		dotf.write_line("\tsubgraph cluster_"+modstr+"{");
-//				dotf.write_line("\t\tlabel=\""+modname+"\";");
-//				dotf.write_line("\t\tcolor=darkgrey;");
+		// todo: use mangled module name
+		module_subgraph_begin(dotf,2, modstr, modstr.slice_to(modname.rfind('.').unwrap_or(modname.len())));
 		for &(defid,xcmi,kind) in items.iter() {
 
 			match to_dotfile_symbol((defid,xcmi,kind)) {
@@ -146,7 +152,7 @@ fn write_call_graph_sub<'a>(nmaps:&'a NodeMaps, outdirname:&str, filename:&str,o
 				}
 			}
 		}
-		dotf.write_line("\t}");
+		module_subgraph_end(dotf, 2);
 	}
 	// Write out all the calls..
 	dotf.write_line("\tedge [len=4.0];");
@@ -160,36 +166,29 @@ fn write_call_graph_sub<'a>(nmaps:&'a NodeMaps, outdirname:&str, filename:&str,o
 	}
 	dotf.write_line("}");
 }
-enum Shape {
-	Square,
-	Rect,
+fn indent(depth:uint)->&'static str{
+	let tabs=&'static "\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t";
+	if depth<tabs.len() {tabs.slice_to(depth)} else {tabs}
+}
+fn module_subgraph_begin(dotf:&mut fs::File,  depth:uint, mangled_name:&str,module_name:&str) {
+	let indentstr=indent(depth);
+	dotf.write_line(indent(depth)+"subgraph cluster_"+mangled_name+"{");
+	let indentstr1=indent(depth+1);
+	dotf.write_line(indentstr+"graph[");
+	let indentstr2=indent(depth+2);
+	dotf.write_line(indentstr2+"style=filled,");
+	dotf.write_line(indentstr2+"color=grey,");
+	dotf.write_line(indentstr2+"label="+module_name);
+	dotf.write_line(indentstr2+"];");
+	dotf.write_line(indentstr2+"node [style=filled, color=white];"+module_name);
 	
+//				dotf.write_line("\t\tlabel=\""+modname+"\";");
+//				dotf.write_line("\t\tcolor=darkgrey;");
 }
 
-trait Pear {
-	fn foo_apple1(&self);
-	fn foo_banana1(&self);
+fn  module_subgraph_end(dotf:&mut fs::File, depth:uint) {
+	dotf.write_line(indent(depth)+"}");
 }
-
-trait Apple {
-	fn foo_apple(&self);
-	fn foo_banana(&self);
-}
-struct FooFooFoo;
-struct BarBarBar;
-trait FooBar : Apple+Pear{
-	fn FooBarBazMethod(x:FooFooFoo){
-		foo_foo_foo();		
-	}
-}
-impl Pear for BarBarBar {
-	fn foo_apple1(&self){}
-	fn foo_banana1(&self){}
-}
-
-fn foo_foo_foo(){
-}
-
 fn to_dotfile_symbol((def_id,xcmi,kind):RefCCMItem)-> Option<~str> {
 	// TODO: this should be the symbols' qualified module pathname
 	// its only coincidentally correlated with the filename+symbol most of the time.
@@ -293,6 +292,9 @@ fn gather_node_id_def<'s>(calls:&mut SetOfItems<'s>, nmaps:&'s NodeMaps, node_id
 		}
 	}
 }
+
+
+
 
 // todo - walk generics..
 fn gather_use_graph_item<'a>(nmaps:&'a NodeMaps<'a>, edge_fn: &|RefCCMItem<'a>, RefCCMItem<'a>|, item:&ast::Item) {

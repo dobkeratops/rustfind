@@ -10,6 +10,9 @@ pub use rfindctx::*;
 use rustc::middle::ty;
 use rfindctx::{RustFindCtx,};
 use codemaput::{ZTextFilePos,ToZIndexFilePos,dump_span,get_span_str};
+//pub use visit_rust_ast::FNodeInfoMapBuilder;
+//use visit_rust_ast;
+pub use visit_rust_ast::{FNodeInfoMapBuilder,push_span,push_spanned,FNodeInfoMapBuilder_new,Finder};
 
 // find_ast_node
 
@@ -30,12 +33,12 @@ pub type AstSPtr<T> =ast::P<T>;
 
 // Wrappers to prepare for de-@
 #[inline]
-fn 	mkAstSPtr<T>(a:@T)->AstSPtr<T> {
+pub fn 	mkAstSPtr<T>(a:@T)->AstSPtr<T> {
 	a
 }
 // Wrappers to prepare for de-@
 #[inline]
-fn 	mkAstSPtrClone<T: 'static + Clone>(a:&T)->AstSPtr<T> {
+pub fn 	mkAstSPtrClone<T: 'static + Clone>(a:&T)->AstSPtr<T> {
 	ast::P((*a).clone())
 }
 fn 	mkAstSPtr2<T: 'static>(a:T)->AstSPtr<T> {
@@ -89,12 +92,20 @@ pub enum AstNode_ {
 pub struct FNodeInfo {
 //	pub id:	ast::NodeId,					// id of this node.
 //    pub ident:Option<ast::Ident>,
-    kind:~str,
-    span:codemap::Span,
-    node:AstNode_,			// todo- get rid of this and just make this a cache of spans for linking.
-    parent_id:ast::NodeId,	// todo: vector of child nodes aswell?
-	children:Vec<ast::NodeId>,
+    pub kind:~str,
+    pub span:codemap::Span,
+    pub node:AstNode_,			// todo- get rid of this and just make this a cache of spans for linking.
+    pub parent_id:ast::NodeId,	// todo: vector of child nodes aswell?
+	pub children:Vec<ast::NodeId>,
 }
+
+//pub struct FNodeInfoMapBuilder {
+//	pub all_nodes: FNodeInfoMap
+//}
+
+
+
+
 
 
 //.. TODO - does it make sense to cache an ident here? not all nodes have one
@@ -206,7 +217,7 @@ impl FNodeInfo {
 
 /// Wrapper for holder of nodes, TODO - refactoring away from our local copy of the ast, wrap a cursor around theirs.
 pub struct FNodeInfoMap {
-	fni_hashmap:HashMap<ast::NodeId,FNodeInfo>
+	pub fni_hashmap:HashMap<ast::NodeId,FNodeInfo>
 }
 
 
@@ -345,7 +356,7 @@ pub fn build_node_info_map(c:AstSPtr<ast::Crate>)-> FNodeInfoMap {
     // todo-lambdas, big fcuntion but remove the extraneous symbols
 	let prof=::timer::Profiler::new("build_node_info_map");
 
-    let mut vt = FNodeInfoMapBuilder::new();
+    let mut vt = FNodeInfoMapBuilder_new();
 
     visit::walk_crate(&mut vt, c, 0);
     vt.all_nodes
@@ -800,327 +811,14 @@ impl AstNodeAccessors for AstNode_ {
         }
     }
 }
-fn item_get_ident(a:&ast::Item)->Option<ast::Ident> { Some(a.ident) }
-
-fn expr_get_ident(_ :&ast::Expr)->Option<ast::Ident> {
-    None
-}
 
 
-#[deriving(Clone)]
-pub struct FindAstNodeSt {
-    result: NodeTreeLoc,        // todo - full tree path, all the parent nodes.
-    location: u32,
-    stop: bool,
-//  node_spans: HashMap<ast::node_id,codemap::span>
-}
+
 
 pub fn get_ast_node_of_node_id(info:&FNodeInfoMap,id:ast::NodeId)->Option<AstNode_> {
     match info.find(&id) {
         None=>None,
         Some(node_info)=>Some(node_info.node)
-    }
-}
-
-fn rf_push_parent_child(spt:&mut FNodeInfoMap, parent_id:ast::NodeId, child_id: ast::NodeId) {
-	let parent_node = spt.find_mut(&parent_id);
-	match (parent_node) {
-		Some(p)=> p.children.push(child_id),
-		_=>{},
-	}
-}
-
-pub fn push_span(spt:&mut FNodeInfoMap,node_id:ast::NodeId, parent:ast::NodeId, _:Option<ast::Ident>,k:&str, s:codemap::Span,nd:AstNode_) {
-	// grr. we would really like to traverse children and gather array of ptrs to chilren as a child pointer, 
-	// instead we're 'push_back' reallocing all over the place, yuk.
-
-    spt.insert(node_id,
-		FNodeInfo{
-//			id: node_id,
-//			ident:nd.rf_get_ident(),
-			kind:k.to_str(),
-			span:s,node:nd,
-			parent_id:parent,
-			children:Vec::new()
-		}
-	);
-	rf_push_parent_child(spt, parent,node_id);
-
-}
-
-pub fn push_spanned<T:AstNodeAccessors>(spt:&mut FNodeInfoMap,k:&str,s:&codemap::Spanned<T>,ast_node:AstNode_,parent:ast::NodeId) {
-    match s.node.rf_get_id() {
-        Some(node_id)=>{
-			spt.insert(node_id,
-				FNodeInfo{
-//					id:node_id, 
-//					ident:ast_node.rf_get_ident(),
-					kind:k.to_str(),
-					span:s.span,
-					node:ast_node,
-					parent_id:parent,
-					children:Vec::new()
-				}
-			);
-			rf_push_parent_child(spt, parent,node_id);
-		},
-        None=>{}
-    }
-}
-
-pub fn span_contains(x: u32, s: codemap::Span)->bool {
-    BytePos(x)>=s.lo && BytePos(x)<s.hi
-}
-
-pub struct FNodeInfoMapBuilder {
-	all_nodes: FNodeInfoMap
-}
-
-impl FNodeInfoMapBuilder {
-    pub fn new() -> FNodeInfoMapBuilder {
-        FNodeInfoMapBuilder {
-            all_nodes: FNodeInfoMap::new()
-        }
-    }
-
-    pub fn trait_ref(&mut self, tr:&ast::TraitRef, p: ast::NodeId) {
-        push_span(&mut self.all_nodes, tr.ref_id, p,None, "trait_ref", tr.path.span, astnode_trait_ref(mkAstSPtrClone(tr)) );
-    }
-
-    pub fn variant(&mut self, va:&ast::Variant, p: ast::NodeId) {
-        push_span(&mut self.all_nodes, va.node.id,p, Some(va.node.name),"variant", va.span, astnode_variant(mkAstSPtrClone(&va.node)))
-//       visit_item(va,(s,va.node.id,v)) - TODO , are we actually suppoed to iterate here? why was't it done
-    }
-}
-
-impl Visitor<ast::NodeId> for FNodeInfoMapBuilder {
-    // use default impl
-//   fn visit_view_item(&mut self, a:&ast::ViewItem, p: ast::NodeId) {
-//       walk_view_item(self, a, s);
-//   }
-
-    fn visit_generics(&mut self, g:&ast::Generics, p: ast::NodeId) {
-        for typ in g.ty_params.iter() {
-            // unfortunately no span for type param
-//           push_span(&mut self.node_spans, g.def_id.id, Some(g.ident), "ty_param_def", g.def_id.span, astnode_ty_param_def(tp))
-            for type_bound in typ.bounds.iter() {
-                match type_bound {
-                    &ast::TraitTyParamBound(ref tr) => {
-                        self.trait_ref(tr, p);
-                    }
-                    _ => {}
-                }
-            }
-        }
-
-        visit::walk_generics(self, g, p);
-    }
-
-    fn visit_item(&mut self, a:&ast::Item, p: ast::NodeId) {
-        push_span(&mut self.all_nodes,a.id,p,item_get_ident(a),a.kind_to_str(),a.span,astnode_item(mkAstSPtrClone(a)));
-
-        // TODO: Push nodes for type-params... since we want to click on their defs...
-        match a.node {
-            ast::ItemImpl(_, ref o_traitref, _, ref methods) => {
-//               self.visit_generics(g, p);
-                match *o_traitref {
-                    None => {}
-                    Some(ref tr) => self.trait_ref(tr, p),
-                }
-
-                for m in methods.iter() {
-                    push_span(&mut self.all_nodes, m.id, p, Some(a.ident), "method", m.span, astnode_method(*m));
-                }
-            }
-            ast::ItemEnum(ref ed, _) => {
-                for v in ed.variants.iter() {
-                    self.variant(*v, p);
-                }
-            }
-            ast::ItemTrait(_, ref tr, _) => {
-                for t in tr.iter() {
-                    self.trait_ref(t, p);
-                }
-            }
-            _ => {}
-        }
-
-        visit::walk_item(self, a, a.id);
-    }
-
-    fn visit_local(&mut self, a:&ast::Local, p: ast::NodeId) {
-        push_span(&mut self.all_nodes, a.id, p, None, "local", a.span, astnode_local(@*a.clone())); // How to remove this?!
-
-        visit::walk_local(self, a, a.id);
-    }
-
-    fn visit_block(&mut self, a: &ast::Block, p: ast::NodeId) {
-        push_span(&mut self.all_nodes, a.id, p, None, "block", a.span, astnode_none);
-
-        visit::walk_block(self, a, a.id);
-    }
-
-    fn visit_stmt(&mut self, a:&ast::Stmt, p: ast::NodeId) {
-        push_spanned(&mut self.all_nodes, "stmt", a, astnode_stmt(mkAstSPtrClone(a)), p);
-
-        visit::walk_stmt(self, a, p);
-    }
-
-    // we do nothing yet, use default impl
-//   fn visit_arm(&mut self, a:&ast::Arm, p: ast::NodeId) {}
-
-    fn visit_pat(&mut self, a: &ast::Pat, p: ast::NodeId) {
-        push_span(&mut self.all_nodes, a.id, p, None, "pat", a.span, astnode_pat(mkAstSPtrClone(a)));
-
-        visit::walk_pat(self, a, a.id);
-    }
-
-    fn visit_decl(&mut self, a:&ast::Decl, p: ast::NodeId) {
-        push_spanned(&mut self.all_nodes, "decl", a, astnode_decl(@*a), p);
-
-        visit::walk_decl(self, a, p);
-    }
-    // we do nothing, use default for now
-//   fn visit_struct_def(&mut self, s)
-
-    fn visit_expr(&mut self, a:&ast::Expr, p: ast::NodeId) {
-        push_span(&mut self.all_nodes, a.id, p, expr_get_ident(a), a.kind_to_str(), a.span, astnode_expr(mkAstSPtrClone(a)));
-
-        visit::walk_expr(self, a, a.id);
-    }
-
-    // default, we do nothing
-//   fn visit_expr_post()
-
-    fn visit_ty(&mut self, a:&ast::Ty, p: ast::NodeId) {
-        push_span(&mut self.all_nodes, a.id, p, None, "ty", a.span, astnode_ty(mkAstSPtrClone(a)));
-
-        visit::walk_ty(self, a, a.id);
-    }
-
-    // default, we do nothing
-//   fn visit_fn()
-
-    fn visit_struct_field(&mut self, a: &ast::StructField, p: ast::NodeId) {
-        push_spanned(&mut self.all_nodes, "struct_field", a, astnode_struct_field(mkAstSPtrClone(a)), p);
-
-        visit::walk_struct_field(self, a, p);
-    }
-
-    fn visit_ty_method(&mut self, a:&ast::TypeMethod, p: ast::NodeId) {
-        push_span(&mut self.all_nodes, a.id, p, Some(a.ident), "type_method", a.span, astnode_ty_method(mkAstSPtrClone(a)));
-
-        visit::walk_ty_method(self, a, a.id);
-    }
-}
-
-pub struct Finder {
-    env: FindAstNodeSt
-}
-
-impl Finder {
-    fn new (location: u32) -> Finder {
-        let env = FindAstNodeSt{
-            result:~[astnode_root], location:location, stop:false
-
-        };
-        Finder {
-            env: env
-        }
-    }
-}
-
-
-
-impl Visitor<()> for Finder {
-    fn visit_view_item(&mut self, a:&ast::ViewItem, _: ()) {
-        if span_contains(self.env.location, a.span) {
-            self.env.result.push(astnode_view_item(mkAstSPtrClone(a)));;
-        }
-        visit::walk_view_item(self, a, ());
-    }
-
-    fn visit_item(&mut self, a:&ast::Item, _: ()) {
-        if span_contains(self.env.location, a.span) {
-            self.env.result.push(astnode_item(mkAstSPtrClone(a)));
-        }
-        visit::walk_item(self, a, ());
-    }
-
-    fn visit_local(&mut self, a:&ast::Local, _: ()) {
-        if span_contains(self.env.location, a.span) {
-            self.env.result.push(astnode_local(@*a.clone()));
-        }
-
-        visit::walk_local(self, a, ());
-    }
-
-    fn visit_block(&mut self, a:&ast::Block, _: ()) {
-        if span_contains(self.env.location, a.span) {
-            self.env.result.push(astnode_block(mkAstSPtrClone(a)));
-        }
-
-        visit::walk_block(self, a, ());
-    }
-
-    fn visit_stmt(&mut self, a:&ast::Stmt, _: ()) {
-        if span_contains(self.env.location, a.span) {
-            self.env.result.push(astnode_stmt(mkAstSPtrClone(a)));
-        }
-
-        visit::walk_stmt(self, a, ());
-    }
-
-    fn visit_arm(&mut self, a:&ast::Arm, _: ()) {
-           // The whole arm doesn't have a span.
-//       if span.contains(self.env.location, a.span) {
-//           self.env.result.push(astnode_pat(a));
-//       }
-        visit::walk_arm(self, a, ());
-    }
-
-    fn visit_pat(&mut self, a: &ast::Pat, _: ()) {
-        if span_contains(self.env.location, a.span) {
-            self.env.result.push(astnode_pat(mkAstSPtrClone(a)));
-        }
-
-        visit::walk_pat(self, a, ());
-    }
-
-    fn visit_decl(&mut self, a:&ast::Decl, _: ()) {
-        if span_contains(self.env.location, a.span) {
-            self.env.result.push(astnode_decl(@*a));
-        }
-
-        visit::walk_decl(self, a, ());
-    }
-
-    fn visit_expr(&mut self, a:&ast::Expr, _: ()) {
-        if span_contains(self.env.location, a.span) {
-            self.env.result.push(astnode_expr(mkAstSPtrClone(a)));
-        }
-
-        visit::walk_expr(self, a, ());
-    }
-
-    fn visit_ty(&mut self, a:&ast::Ty, _: ()) {
-        if span_contains(self.env.location, a.span) {
-            self.env.result.push(astnode_ty(mkAstSPtrClone(a)));
-        }
-
-        visit::walk_ty(self, a, ());
-    }
-
-    // use default impl for now as we don't do anything here
-//   fn visit_fn(fk:&vist::fn_kind, fd:&as::fn_decl, body:&ast::Block,
-//       sp:codemap::Span, nid:ast::NodeId, s:  FindAstNodeSt) {}
-
-    fn visit_struct_field(&mut self, a: &ast::StructField, _: ()) {
-        if span_contains(self.env.location, a.span) {
-            self.env.result.push(astnode_struct_field(mkAstSPtrClone(a)));
-        }
-
-        visit::walk_struct_field(self, a, ());
     }
 }
 
@@ -1267,54 +965,6 @@ pub fn get_def_id(curr_crate:ast::CrateNum,src_def:ast::Def)->Option<ast::DefId>
         ast::DefLabel(id)=>mk(id),
         ast::DefMethod(d,_)=>Some(d)
     }
-}
-
-/*
-impl ToJsonStr for JumpToDefMap {
-    pub fn to_json_str(&self)->~str {
-        let mut acc=~"";
-        for (&k,&v) in self.iter() {
-            acc.push_str("\t\t{ node_id:"+k.to_str()+", def_node_id:"+ v.to_str()+" },\n");
-        }
-        acc
-    }
-}
-*/
-
-pub fn byte_pos_from_text_file_pos_str(dc:&RustFindCtx,filepos:&str)->Option<codemap::BytePos> {
-    let toks=filepos.split(':').collect::<~[_]>();
-    if toks.len()<3 { return None; }
-//  let t0:()=toks[0];
-
-//  let line:Option<uint> = FromStr::from_str(toks[1]);
-//  if_some!(line in FromStr::from_str(toks[1]) then {
-//      if_some!(col in FromStr::from_str(toks[2]) then {
-    let line: Option<u32> = from_str(toks[1]);
-    let col:Option<u32> = from_str(toks[2]);
-    if line.is_some() && col.is_some() {
-        //todo - if no column specified, just lookup everything on that line!
-        let l0 = line.unwrap()-1;
-        let c0= col.unwrap()-1;
-        let foo= ZTextFilePos::new(toks[0],l0,c0).to_byte_pos(dc.tycx_ref());
-        return foo;
-    }
-    return None;
-}
-
-pub fn build_node_def_node_table(dc:&RustFindCtx)->~HashMap<ast::NodeId, ast::DefId>
-{
-    let mut r=~HashMap::new();
-    let curr_crate_id_hack=0;   // TODO WHAT IS CRATE ID REALLY?!
-
-    for (id, _t) in dc.tycx_ref().node_types.borrow().iter() { //range(0, dc.tycx.next_id.get() as uint) { 
-        //let id = id as ast::NodeId;
-        if_some!(def in dc.tycx_ref().def_map.borrow().find(&(*id as u32)) then { // finds a def..
-            if_some!(did in get_def_id(curr_crate_id_hack,*def) then {
-                r.insert(*id as ast::NodeId,did);
-            })
-        });
-    }
-    r
 }
 
 pub fn def_node_id_from_node_id(dc:&RustFindCtx, id:ast::NodeId)->ast::NodeId {

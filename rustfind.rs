@@ -59,6 +59,8 @@ pub mod jumptodefmap;
 pub mod timer;
 pub mod indexpage;
 pub mod callgraph;
+pub mod visit_rust_ast;
+
 pub struct RF_Options {
 	pub write_file_path:bool,
 	pub write_references:bool,

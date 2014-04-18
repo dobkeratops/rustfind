@@ -10,10 +10,10 @@ use std::hash::Hash;
 //use rustc::middle::typeck::*;-
 
 use find_ast_node::{FNodeInfoMap, FNodeInfo, AstNode_, NodeTreeLoc, find_node_tree_loc_at_byte_pos,
-    build_node_def_node_table, build_node_info_map, get_node_source, astnode_expr,
-    get_def_id, byte_pos_from_text_file_pos_str, ToJsonStr, ToJsonStrFc, AstNodeAccessors};
+    build_node_info_map, get_node_source, astnode_expr,
+    get_def_id,  ToJsonStr, ToJsonStrFc, AstNodeAccessors};
 use rfindctx::{RustFindCtx,get_source_loc};
-use codemaput::ZTextFilePos;
+use codemaput::{ZTextFilePos,byte_pos_from_text_file_pos_str};
 use rf_ast_ut::{auto_deref_ty, find_named_struct_field};
 use util::flatten_to_str_ng; //todo - why is qualifying manually not working?!
 use timer::Timer;
@@ -316,5 +316,35 @@ impl<'a,K:Hash+TotalEq,V> MultiMap<K,V> {
             Some(&ix)=> ix
         };
         self.items[ix].push(v);
+    }
+}
+
+pub fn build_node_def_node_table(dc:&RustFindCtx)->~HashMap<ast::NodeId, ast::DefId>
+{
+    let mut r=~HashMap::new();
+    let curr_crate_id_hack=0;   // TODO WHAT IS CRATE ID REALLY?!
+
+    for (id, _t) in dc.tycx_ref().node_types.borrow().iter() { //range(0, dc.tycx.next_id.get() as uint) { 
+        //let id = id as ast::NodeId;
+        if_some!(def in dc.tycx_ref().def_map.borrow().find(&(*id as u32)) then { // finds a def..
+            if_some!(did in get_def_id(curr_crate_id_hack,*def) then {
+                r.insert(*id as ast::NodeId,did);
+            })
+        });
+    }
+    r
+}
+
+
+pub fn def_node_id_from_node_id(dc:&RustFindCtx, id:ast::NodeId)->ast::NodeId {
+    let crate_num=0;    // TODO - whats crate Id really???
+    match dc.tycx_ref().def_map.borrow().find(&id) { // finds a def..
+        Some(a)=>{
+            match get_def_id(crate_num,*a) {
+                Some(b)=>b.node,
+                None=>id
+            }
+        },
+        None=>(id)  // no definition? say its its own definition
     }
 }

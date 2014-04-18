@@ -1,4 +1,5 @@
 use rf_common::*;
+use rfindctx::RustFindCtx;
 use std::from_str::FromStr;
 use syntax::ast;
 use syntax::codemap;
@@ -377,8 +378,22 @@ pub fn dump_span(text: &[u8], sp: &codemap::Span) {
 }
 
 
+pub fn byte_pos_from_text_file_pos_str(dc:&RustFindCtx,filepos:&str)->Option<codemap::BytePos> {
+    let toks=filepos.split(':').collect::<~[_]>();
+    if toks.len()<3 { return None; }
+//  let t0:()=toks[0];
 
-
-
-
-
+//  let line:Option<uint> = FromStr::from_str(toks[1]);
+//  if_some!(line in FromStr::from_str(toks[1]) then {
+//      if_some!(col in FromStr::from_str(toks[2]) then {
+    let line: Option<u32> = from_str(toks[1]);
+    let col:Option<u32> = from_str(toks[2]);
+    if line.is_some() && col.is_some() {
+        //todo - if no column specified, just lookup everything on that line!
+        let l0 = line.unwrap()-1;
+        let c0= col.unwrap()-1;
+        let foo= ZTextFilePos::new(toks[0],l0,c0).to_byte_pos(dc.tycx_ref());
+        return foo;
+    }
+    return None;
+}
