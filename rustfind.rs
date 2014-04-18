@@ -21,7 +21,6 @@ use std::{os,local_data};
 use std::cell::RefCell;
 use collections::{HashMap,HashSet};
 use std::path::Path;
-use jumptodefmap::{MultiMap};
 use std::path::posix;
 //pub use super::NodeMaps;
 
@@ -29,9 +28,6 @@ use getopts::{optmulti, optopt, optflag, getopts};
 
 use syntax::{parse,ast,codemap};
 use syntax::codemap::Pos;
-use find_ast_node::{safe_node_id_to_type,get_node_info_str,find_node_tree_loc_at_byte_pos,ToJsonStr,ToJsonStrFc,AstNodeAccessors,get_node_source};
-use jumptodefmap::{lookup_def_at_text_file_pos_str, make_jump_to_def_map, def_info_from_node_id,
-    lookup_def_at_text_file_pos, dump_json};
 
 use rfindctx::{RustFindCtx,ctxtkey};
 pub use codemaput::{ZTextFilePos,ZTextFilePosLen,get_span_str,ToZTextFilePos,ZIndexFilePos,ToZIndexFilePos};
@@ -381,7 +377,7 @@ fn debug_test(dc:&RustFindCtx) {
 
 pub fn write_crate_as_html_and_rfx(dc:&RustFindCtx,lib_html_path:&str,opts: &RF_Options) {
     let mut xcm:CrossCrateMap=HashMap::new();
-	let tm=Profiler::new("write_crate_as_html_and_rfx");
+	let _tm=Profiler::new("write_crate_as_html_and_rfx");
 
     dc.cstore().iter_crate_data(|i,md| {
         println!("loading cross crate data {} {}", i, md.name);
@@ -410,14 +406,18 @@ pub fn write_crate_as_html_and_rfx(dc:&RustFindCtx,lib_html_path:&str,opts: &RF_
 
 
     if opts.write_html {
-		let mut tm=::timer::Profiler::new("write_crate_as_html_and_rfx");
+		let _tm=Profiler::new("write_crate_as_html_and_rfx");
         rust2html::write_crate_as_html_sub(dc,&nmaps,lib_html_path,opts);
     }
 	if !opts.write_callgraph {
 		return;
 	}
-	let dirname=opts.output_dir.as_str().unwrap_or("");
-	let dirname=if dirname.len()>0{dirname+"/"}else{~""};
-	callgraph::write_call_graph(&nmaps, dirname,"callgraph", &opts.callgraph_opt);
+	let mut filename = opts.output_dir.clone(); filename.push("callgraph.dot");
+	println!("Writing callgraph {}...",filename.display());
+	match callgraph::write_call_graph(&nmaps, &filename, "callgraph", &opts.callgraph_opt) {
+		Ok(_) => {},
+		Err(e) => println!("{}: {}", filename.display(), e),
+	}
+
 }
 

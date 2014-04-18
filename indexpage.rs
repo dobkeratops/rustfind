@@ -1,9 +1,6 @@
 use rust2html::htmlwriter::HtmlWriter;
-use std::str;
-use std::io::{File, UserDir};
-use std::io::fs::{mkdir_recursive,copy,walk_dir};
+use std::io::fs::walk_dir;
 use collections::hashmap::HashMap;
-use collections::hashmap::HashSet;
 use rust2html;
 use std::cmp;
 use std::vec::Vec;

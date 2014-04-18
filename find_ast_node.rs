@@ -151,7 +151,7 @@ impl FNodeInfo {
 
 	pub fn rf_as_fn_decl<'a>(&'a self)->
 			Option<(AstSPtr<ast::Item>,
-				(ast::P<ast::FnDecl>, ast::Purity, abi::Abi, ast::Generics, ast::P<ast::Block>)
+				(ast::P<ast::FnDecl>, ast::FnStyle, abi::Abi, ast::Generics, ast::P<ast::Block>)
 				)>
 	{
 		let x=self.rf_as_item().map(
@@ -334,7 +334,7 @@ pub fn find_node_tree_loc_at_byte_pos(c:AstSPtr<ast::Crate>,_location:codemap::B
 
 pub fn build_node_info_map(c:AstSPtr<ast::Crate>)-> FNodeInfoMap {
     // todo-lambdas, big fcuntion but remove the extraneous symbols
-	let prof=::timer::Profiler::new("build_node_info_map");
+	let _prof=Profiler::new("build_node_info_map");
 
     let mut vt = FNodeInfoMapBuilder::new();
 
@@ -350,7 +350,7 @@ pub fn node_spans_table_to_json_sub(dc:&RustFindCtx,ns:&FNodeInfoMap)->~str {
 
     // emit in a form more useable by external tools.
     // not a serialization of the data used here.
-    let mut r=~"";
+    let mut r= StrBuf::new();
 //  for ns.iter().advance |(k,v)| {
     for (k,v) in ns.iter() {
         //let (_,line,_)=byte_pos_to_file_line_col(c,*v.span.lo);
@@ -371,7 +371,7 @@ pub fn node_spans_table_to_json_sub(dc:&RustFindCtx,ns:&FNodeInfoMap)->~str {
             r.push_str(format!("\t\\{node_id:{:u},\tkind:\"{:s}\"\trspan\\{lo:{:u},hi:{:u}\\}\\}\n",*k,v.kind, lo, hi));
         }
     }
-    r
+    r.into_owned()
 }
 
 impl ToJsonStrFc for FNodeInfoMap {
@@ -382,13 +382,13 @@ impl ToJsonStrFc for FNodeInfoMap {
 
 impl ToJsonStr for HashMap<ast::NodeId,ast::DefId> {
     fn to_json_str(&self)->~str {
-        let mut r=~"[\n";
+        let mut r=StrBuf::from_str("[\n");
 //      for self.iter().advance|(&key,&value)| {
         for (&key,&value) in self.iter() {
             r.push_str(format!("\t\\{node_id:{:?},\tdef_id:\\{crate_:{:?},node:{:?}\\}\\},\n", key, value.krate,value.node));
         }
         r.push_str("]\n");
-        r
+        r.into_owned()
     }
 }
 
@@ -1118,7 +1118,7 @@ impl Visitor<()> for Finder {
 pub fn get_node_info_str(dc:&RustFindCtx,node:&NodeTreeLoc)->~str
 {
     fn path_to_str(path:&ast::Path)->~str {
-        let mut acc=~"";
+        let mut acc=StrBuf::new();
         let mut first=true;
 //      for path.idents.iter().advance |x|{
         for x in path.segments.iter() {
@@ -1126,7 +1126,7 @@ pub fn get_node_info_str(dc:&RustFindCtx,node:&NodeTreeLoc)->~str
             acc=acc.append(token::get_ident(x.identifier).get());
             first=false
         }
-        acc
+        acc.into_owned()
         // typeparams too... path.types?
     }
     fn pat_to_str(dc:&RustFindCtx,p:&ast::Pat)->~str{
@@ -1263,7 +1263,7 @@ pub fn get_def_id(curr_crate:ast::CrateNum,src_def:ast::Def)->Option<ast::DefId>
 /*
 impl ToJsonStr for JumpToDefMap {
     pub fn to_json_str(&self)->~str {
-        let mut acc=~"";
+        let mut acc=StrBuf::new();
         for (&k,&v) in self.iter() {
             acc.push_str("\t\t{ node_id:"+k.to_str()+", def_node_id:"+ v.to_str()+" },\n");
         }

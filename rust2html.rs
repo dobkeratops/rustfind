@@ -3,8 +3,6 @@ use syntax::ast;
 use syntax::ast::DefId;
 use syntax::codemap::Pos;
 use rustc::middle::ty;
-use std::hash::Hash;
-use collections::HashMap;
 use std::slice;
 use std::cmp;
 use std::io;
@@ -12,8 +10,6 @@ use std::io::fs;
 use codemaput::{ZIndexFilePos,ToZIndexFilePos};
 use find_ast_node::{FNodeInfoMap,FNodeInfo};
 use rfindctx::{RustFindCtx};
-use crosscratemap::{CrossCrateMap};
-use jumptodefmap::{JumpToDefMap,JumpToRefMap,MultiMap};
 pub use super::NodeMaps;
 use rsfind::MyOption;
 use timer::Profiler;
@@ -55,7 +51,7 @@ pub fn make_html_from_source(dc: &RustFindCtx, fm: &codemap::FileMap, nmaps: &No
                  fln: &FileLineNodes, lib_path: &str, 
                  out_file: &Path, options: &::RF_Options) -> ~str {
     // todo - Rust2HtmlCtx { fm,nim,jdm,jrm } .. cleanup common intermediates
-	let mut p=Profiler::new("make_html");
+	let _p=Profiler::new("make_html");
 //	::callgraph::dump_callgraph(xcm, nmaps);
 
     let mut doc= HtmlWriter::new();
@@ -127,7 +123,7 @@ pub fn make_html_from_source(dc: &RustFindCtx, fm: &codemap::FileMap, nmaps: &No
     }
 
 	source_view_page_end(&mut doc,out_file,options);
-    doc.doc
+    doc.doc.into_owned()
 }
 
 fn source_view_page_begin(doc:&mut HtmlWriter, out_file:&Path, options:&::RF_Options) {
@@ -213,16 +209,13 @@ pub fn write_head(doc:&mut HtmlWriter, out_file: &Path, options: &::RF_Options) 
 
 /// spawns git to find version info for the source tree here.
 pub fn get_git_branch_info()->~str {
-	use std::io;
 	use std::io::process;
-	use std::os;
 	use std::str;
-	use std::io::pipe;
 
 	match process::Process::output("git",&[~"branch",~"-v"]) {
 		Err(_)=>{},
 		Ok(out)=> {
-			let mut curr_branch=~"";
+			let mut curr_branch=StrBuf::new();
 			for line in str::from_utf8(out.output.as_slice()).unwrap_or("").lines() {
 				if line.chars().nth(0).unwrap_or('\0')=='*' { return line.to_owned();}
 			}
@@ -247,14 +240,14 @@ fn num_digits(a:uint)->uint{
     n
 }
 fn pad_to_length(a:&str,l:uint,pad:&str)->~str {
-    let mut acc=~" ";
+    let mut acc=StrBuf::from_str(" ");
     let mut i=(l-a.len()) as int;
     while i>0 {
         acc.push_str(pad);
         i-=1;//pad.len() as int;
     }
     acc.push_str(a);
-    acc
+    acc.into_owned()
 }
 
 /// Struct to accumulate nodes sorted for each line of the file.
@@ -1135,13 +1128,13 @@ impl ::rust2html::htmlwriter::HtmlWriter{ // todo, why doesn't that allow path r
         let file_delim_col=&"c1";
         let name_parts = file_name.split('/').collect::<~[&str]>();
         let num_dirs=name_parts.len()-1;
-        let mut link_target=~"./";
+        let mut link_target=StrBuf::from_str("./");
 
 
         for _ in range(0,num_dirs) {link_target.push_str("../");}
         self.write("    ");
-        let t0=self.begin_tag_link(link_target+"index.html").depth(); self.write("(index<- )"); self.end_tag_check(t0); self.write("    ").depth();
-        let t1=self.begin_tag_link(link_target).depth(); self.write("    ./"); self.end_tag_check(t1);
+        let t0=self.begin_tag_link(link_target.as_slice()+"index.html").depth(); self.write("(index<- )"); self.end_tag_check(t0); self.write("    ").depth();
+        let t1=self.begin_tag_link(link_target.as_slice()).depth(); self.write("    ./"); self.end_tag_check(t1);
 
         for (i,x) in name_parts.iter().enumerate() {
             let is_dir = i < num_dirs;
@@ -1150,7 +1143,7 @@ impl ::rust2html::htmlwriter::HtmlWriter{ // todo, why doesn't that allow path r
             else { link_target.push_str(".html");}
             
             let fpc=self.begin_tag(file_path_col).depth();
-            let fpl=self.begin_tag_link(link_target).depth(); self.write(*x);
+            let fpl=self.begin_tag_link(link_target.as_slice()).depth(); self.write(*x);
             self.end_tag_check(fpl);/*link*/
 			self.end_tag_check(fpc);/*file_path_col*/
             if is_dir {self.write_tagged(file_delim_col,"/");}
@@ -1187,18 +1180,21 @@ fn count_chars_in(f:&str, x:char)->uint{
 
 
 fn make_html_name_reloc(f:&str, origin:&str, reloc:&str)->~str {
-    let mut acc=~"";
+    let mut acc=StrBuf::new();
     if reloc.len()>0 {
 //		printf("relocating path to %s"+str);
-        acc=reloc.to_owned();
-        if acc.chars().last().unwrap()!='/' { acc.push_char('/');}
+        acc=if reloc.chars().last().unwrap()!='/' {
+            StrBuf::from_str(reloc).append("/")
+        } else {
+            StrBuf::from_str(reloc)
+        }
     }else {
         for _ in range(0,count_chars_in(origin,'/')) {
             acc.push_str("../");
         }
     }
     acc.push_str(f);
-    make_html_name(acc)
+    make_html_name(acc.into_owned())
 }
 fn make_html_name_rel(f:&str, origin:&str)->~str {
     make_html_name_reloc(f,origin,"")

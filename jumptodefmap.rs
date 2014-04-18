@@ -16,7 +16,6 @@ use rfindctx::{RustFindCtx,get_source_loc};
 use codemaput::ZTextFilePos;
 use rf_ast_ut::{auto_deref_ty, find_named_struct_field};
 use util::flatten_to_str_ng; //todo - why is qualifying manually not working?!
-use timer::Timer;
 //use super::rf_use_ast;
 
 
@@ -116,7 +115,7 @@ pub fn lookup_def_node_of_node(dc:&RustFindCtx,node:&AstNode_, nodeinfomap:&FNod
 
 pub fn build_jump_to_def_map(dc:&RustFindCtx, nim: &FNodeInfoMap,nd:&HashMap<ast::NodeId,ast::DefId>)->~JumpToDefMap{
 // todo: NodeId->AStNode  .. lookup_def_ inner functionality extracted
-	let prof=::timer::Profiler::new("build_jump_to_def_map");
+	let _prof=Profiler::new("build_jump_to_def_map");
     let mut jdm=~HashMap::new();
     for (k,node_info) in nim.iter() {
         match lookup_def_node_of_node(dc,&node_info.rf_node(), nim,nd) {
@@ -283,7 +282,7 @@ pub fn lookup_def_of_node_sub(dc:&RustFindCtx,node:&AstNode_,m:ShowDefMode,nim:&
 
 pub fn make_jump_to_def_map(dc:&RustFindCtx)->( FNodeInfoMap, ~HashMap<ast::NodeId,ast::DefId>,~JumpToDefMap)
 {
-    let mut t = Profiler::new("make_jdm");
+    let _t = Profiler::new("make_jdm");
     let nim=build_node_info_map(dc.crate_);
     let ndm=build_node_def_node_table(dc);
     let jdm=build_jump_to_def_map(dc, &nim,ndm);

@@ -44,7 +44,7 @@ pub struct Profiler {
 
 static  mut g_depth:int=0;	// TODO - use an appropriate primitive, threadsafe, howto?
 
-/// helper to automatically profile a scope block. place a "let p=Profiler::new("my_profiler")" at the begining of a scope, time is reported at the end using drop. Care would be needed if you were profiling other drops..
+/// helper to automatically profile a scope block. place a "let _p=Profiler::new("my_profiler")" at the begining of a scope, time is reported at the end using drop. Care would be needed if you were profiling other drops..
 impl Profiler {
 	// todo - cfg(profile)..
 	pub fn new(n:&'static str)->Profiler{
@@ -76,7 +76,7 @@ pub fn format_as_time(total_time: u64) -> ~str {
                        - minutes * MIN_MULTIPLIER 
                        - seconds * SEC_MULTIPLIER;
 
-    let mut time_string = ~"";
+    let mut time_string = StrBuf::new();
     if hours > 0 {
         time_string.push_str(format!("{}:", hours as int));
     }
@@ -111,12 +111,12 @@ pub fn format_as_time(total_time: u64) -> ~str {
 
     //time_string += format!(" ({})", total_time);
 
-    return time_string;
+    return time_string.into_owned()
 }
 
 fn format_number(num: u64) -> ~str {
     let repr = num.to_str();
-    let mut ret_val = ~"";
+    let mut ret_val = StrBuf::new();
     let mut index = 0;
     let length = repr.len();
 
@@ -129,7 +129,7 @@ fn format_number(num: u64) -> ~str {
         index += 1;
     }
 
-    return ret_val
+    return ret_val.into_owned()
 }
 
 #[test]

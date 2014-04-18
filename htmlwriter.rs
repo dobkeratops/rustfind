@@ -2,7 +2,7 @@ use rf_common::*;
 use std::iter::range_inclusive;
 
 pub struct HtmlWriter {
-    pub doc:~str,
+    pub doc:StrBuf,
     pub tag_stack:~[~str],
     pub xlat:HashMap<char, ~str>,
 }
@@ -29,7 +29,7 @@ fn mk_xlat_table()-> HashMap<char,~str>
 /// helper object for building html docs, puts tags in a stack for convinient close
 
 impl<'a> HtmlWriter {
-    pub fn new()->HtmlWriter { HtmlWriter { doc:~"", tag_stack:~[], xlat:mk_xlat_table()}}
+    pub fn new()->HtmlWriter { HtmlWriter { doc:StrBuf::new(), tag_stack:~[], xlat:mk_xlat_table()}}
 
     pub fn write_quoted_str(&'a mut self, a:&str)->&'a mut HtmlWriter {
         self.doc.push_str("\"");
@@ -134,8 +134,8 @@ impl<'a> HtmlWriter {
 	    	fail!(format!("check_depth should be {} it is {}", depth, self.depth()))
 	    }
 	}
-	pub fn as_str<'s>(&'s self)->&'s ~str {
-		return &self.doc;
+	pub fn as_str<'s>(&'s self)->&'s str {
+		self.doc.as_slice()
 	}
 	pub fn as_bytes<'s>(&'s self)->&'s[u8]{
 		return self.doc.as_bytes();

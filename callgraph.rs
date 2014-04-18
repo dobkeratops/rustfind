@@ -1,25 +1,13 @@
-use syntax::codemap;
 use syntax::ast;
 use syntax::ast::DefId;
-use syntax::codemap::Pos;
-use rustc::middle::ty;
-use std::io::fs;
 use std::path::posix;
-use std::hash::Hash;
 use collections::{HashMap,HashSet};
-use std::slice;
-use std::cmp;
-use std::io;
+use std::io::IoResult;
 use std::io::fs;
-use codemaput::{ZIndexFilePos,ToZIndexFilePos};
-use find_ast_node::{FNodeInfoMap,FNodeInfo,AstNode_};
-use rfindctx::{RustFindCtx};
-use crosscratemap::{CrossCrateMap,CrossCrateMapItem};
+use crosscratemap::CrossCrateMapItem;
+use find_ast_node::{FNodeInfo, astnode_item, astnode_expr};
 pub use super::NodeMaps;
-use rsfind::MyOption;
-use timer::Profiler;
-use find_ast_node::*;
-use rfindctx::*;
+use rfindctx::{str_of_ident, str_of_opt_ident};
 
 // build a call graph.
 // we also want to build a graph of users of types - including types.
@@ -50,23 +38,21 @@ type SetOfItems<'a> =HashSet<RefCCMItem<'a>>;
 type TraitMap<'a> =HashMap<DefId,TraitInfo<'a>>;
 
 // TODO: Use mangled symbols for the nodes.
-pub fn write_call_graph<'a>(nmaps:&'a NodeMaps, outdirname:&str, filename:&str,opts:&CG_Options) {
+pub fn write_call_graph<'a>(nmaps:&'a NodeMaps, filename: &posix::Path, name:&str, opts:&CG_Options) -> IoResult<()> {
 
 	let mut tg:TraitMap =HashMap::new();
 //	gather_trait_graph(&tg, (xcm,nmaps), rf_get_root_node(nmaps.node_info_map));
 
 	visit_call_graph( nmaps, |x,y|{});
 
-	println!("Writing callgraph {} {}..",outdirname, filename);
-	match fs::File::create(&posix::Path::new(outdirname+filename.to_owned()+~".dot"),
+	let mut dotf = try!(fs::File::create(filename));
 	{
-		Ok(mut dotf)=>
 		{
 			println!("writing callgraph file ..\n");
-			dotf.write_line("digraph "+ filename +" {");
+			try!(dotf.write_line("digraph "+ name +" {"));
 			let mut fns_per_module:HashMap<&str,HashSet<RefCCMItem>> =HashMap::new();
 			let mut all_calls:HashSet<(RefCCMItem<'a>,RefCCMItem<'a>)> =HashSet::new();
-			dotf.write_line("\tnode [style=filled, color=lightgrey ]");
+			try!(dotf.write_line("\tnode [style=filled, color=lightgrey ]"));
 
 			visit_call_graph(nmaps, // We miss do notation :(
 				|caller,callee| {	
@@ -88,28 +74,28 @@ pub fn write_call_graph<'a>(nmaps:&'a NodeMaps, outdirname:&str, filename:&str,o
 				let modstr:~str=modname.chars().map(|x|match x{'/'|'.'=>'_',_=>x}).collect();
 				if items.len()==0{ continue;}
 				if modstr.chars().nth(0)==Some('<') {continue;} // things like <std macros>
-				dotf.write_line("\tsubgraph cluster_"+modstr+"{");
-				dotf.write_line("\t\tlabel=\""+modname+"\"");
-				dotf.write_line("\t\tstyle=filled");
-				dotf.write_line("\t\tcolor=darkgrey");
+				try!(dotf.write_line("\tsubgraph cluster_"+modstr+"{"));
+				try!(dotf.write_line("\t\tlabel=\""+modname+"\""));
+				try!(dotf.write_line("\t\tstyle=filled"));
+				try!(dotf.write_line("\t\tcolor=darkgrey"));
 				for &(defid,xcmi) in items.iter() {
 					let url_name= xcmi.file_name+".html#"+(xcmi.line+1).to_str();
-					dotf.write_line("\t\t"+fn_to_dotfile_symbol((defid,xcmi)) + "["+
+					try!(dotf.write_line("\t\t"+fn_to_dotfile_symbol((defid,xcmi)) + "["+
 						if is_main((defid,xcmi)){"style=filled,fontcolor=white color=blue, "}else{" "/*"style=filled, color=lightgrey "*/}+
-						"label=\""+xcmi.item_name+"()\" URL=\""+ url_name  + "\"];");
+						"label=\""+xcmi.item_name+"()\" URL=\""+ url_name  + "\"];"));
 				}
-				dotf.write_line("\t}");
+				try!(dotf.write_line("\t}"));
 			}
 			// Write out all the calls..
-			dotf.write_line("edge [len=4.0];");
+			try!(dotf.write_line("edge [len=4.0];"));
 			for &(f1,f2) in all_calls.iter() {
 				let fstr1=fn_to_dotfile_symbol(f1);
 				let fstr2=fn_to_dotfile_symbol(f2);
 				if fstr1.len()>0 && fstr2.len()>0 {
 					
-					dotf.write_line("\t"+ fstr1 +" -> "+ fstr2 
+					try!(dotf.write_line("\t"+ fstr1 +" -> "+ fstr2
 //						if is_main(f1)|| is_main(f2) {" [len=10.0];"} else {" [len=4.0];"}
-					);
+					));
 				}
 			}
 
@@ -124,9 +110,8 @@ pub fn write_call_graph<'a>(nmaps:&'a NodeMaps, outdirname:&str, filename:&str,o
 			}
 
 //			fn rank_within(items:&Set<RefCCMItem>, &Vec<(RefCCMItem,RefCCMItem>
-			dotf.write_line("}");
+			dotf.write_line("}")
 		}
-		_ => println!("can't write callgraph {}", filename),
 	}
 }
 
