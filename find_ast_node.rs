@@ -151,7 +151,7 @@ impl FNodeInfo {
 
 	pub fn rf_as_fn_decl<'a>(&'a self)->
 			Option<(AstSPtr<ast::Item>,
-				(ast::P<ast::FnDecl>, ast::Purity, abi::Abi, ast::Generics, ast::P<ast::Block>)
+				(ast::P<ast::FnDecl>, ast::FnStyle, abi::Abi, ast::Generics, ast::P<ast::Block>)
 				)>
 	{
 		let x=self.rf_as_item().map(
