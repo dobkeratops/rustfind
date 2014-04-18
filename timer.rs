@@ -44,7 +44,7 @@ pub struct Profiler {
 
 static  mut g_depth:int=0;	// TODO - use an appropriate primitive, threadsafe, howto?
 
-/// helper to automatically profile a scope block. place a "let p=Profiler::new("my_profiler")" at the begining of a scope, time is reported at the end using drop. Care would be needed if you were profiling other drops..
+/// helper to automatically profile a scope block. place a "let _p=Profiler::new("my_profiler")" at the begining of a scope, time is reported at the end using drop. Care would be needed if you were profiling other drops..
 impl Profiler {
 	// todo - cfg(profile)..
 	pub fn new(n:&'static str)->Profiler{

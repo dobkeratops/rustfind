@@ -381,7 +381,7 @@ fn debug_test(dc:&RustFindCtx) {
 
 pub fn write_crate_as_html_and_rfx(dc:&RustFindCtx,lib_html_path:&str,opts: &RF_Options) {
     let mut xcm:CrossCrateMap=HashMap::new();
-	let tm=Profiler::new("write_crate_as_html_and_rfx");
+	let _tm=Profiler::new("write_crate_as_html_and_rfx");
 
     dc.cstore().iter_crate_data(|i,md| {
         println!("loading cross crate data {} {}", i, md.name);
@@ -410,7 +410,7 @@ pub fn write_crate_as_html_and_rfx(dc:&RustFindCtx,lib_html_path:&str,opts: &RF_
 
 
     if opts.write_html {
-		let mut tm=::timer::Profiler::new("write_crate_as_html_and_rfx");
+		let _tm=Profiler::new("write_crate_as_html_and_rfx");
         rust2html::write_crate_as_html_sub(dc,&nmaps,lib_html_path,opts);
     }
 	if !opts.write_callgraph {

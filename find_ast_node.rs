@@ -334,7 +334,7 @@ pub fn find_node_tree_loc_at_byte_pos(c:AstSPtr<ast::Crate>,_location:codemap::B
 
 pub fn build_node_info_map(c:AstSPtr<ast::Crate>)-> FNodeInfoMap {
     // todo-lambdas, big fcuntion but remove the extraneous symbols
-	let prof=::timer::Profiler::new("build_node_info_map");
+	let _prof=Profiler::new("build_node_info_map");
 
     let mut vt = FNodeInfoMapBuilder::new();
 

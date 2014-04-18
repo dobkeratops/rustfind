@@ -55,7 +55,7 @@ pub fn make_html_from_source(dc: &RustFindCtx, fm: &codemap::FileMap, nmaps: &No
                  fln: &FileLineNodes, lib_path: &str, 
                  out_file: &Path, options: &::RF_Options) -> ~str {
     // todo - Rust2HtmlCtx { fm,nim,jdm,jrm } .. cleanup common intermediates
-	let mut p=Profiler::new("make_html");
+	let _p=Profiler::new("make_html");
 //	::callgraph::dump_callgraph(xcm, nmaps);
 
     let mut doc= HtmlWriter::new();
