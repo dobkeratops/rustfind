@@ -1,7 +1,6 @@
 use std::io::println;
 use std::path::posix::Path;
 use std::path::posix;
-use std::io::fs;
 use rf_common::*;
 use syntax::ast;
 use syntax::ast::NodeId;

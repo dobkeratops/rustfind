@@ -16,7 +16,6 @@ use rfindctx::{RustFindCtx,get_source_loc};
 use codemaput::ZTextFilePos;
 use rf_ast_ut::{auto_deref_ty, find_named_struct_field};
 use util::flatten_to_str_ng; //todo - why is qualifying manually not working?!
-use timer::Timer;
 //use super::rf_use_ast;
 
 

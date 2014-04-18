@@ -21,7 +21,6 @@ use std::{os,local_data};
 use std::cell::RefCell;
 use collections::{HashMap,HashSet};
 use std::path::Path;
-use jumptodefmap::{MultiMap};
 use std::path::posix;
 //pub use super::NodeMaps;
 
@@ -29,9 +28,6 @@ use getopts::{optmulti, optopt, optflag, getopts};
 
 use syntax::{parse,ast,codemap};
 use syntax::codemap::Pos;
-use find_ast_node::{safe_node_id_to_type,get_node_info_str,find_node_tree_loc_at_byte_pos,ToJsonStr,ToJsonStrFc,AstNodeAccessors,get_node_source};
-use jumptodefmap::{lookup_def_at_text_file_pos_str, make_jump_to_def_map, def_info_from_node_id,
-    lookup_def_at_text_file_pos, dump_json};
 
 use rfindctx::{RustFindCtx,ctxtkey};
 pub use codemaput::{ZTextFilePos,ZTextFilePosLen,get_span_str,ToZTextFilePos,ZIndexFilePos,ToZIndexFilePos};

@@ -1,26 +1,13 @@
-use syntax::codemap;
 use syntax::ast;
 use syntax::ast::DefId;
-use syntax::codemap::Pos;
-use rustc::middle::ty;
-use std::io::fs;
 use std::path::posix;
-use std::hash::Hash;
 use collections::{HashMap,HashSet};
-use std::slice;
-use std::cmp;
-use std::io;
 use std::io::IoResult;
 use std::io::fs;
-use codemaput::{ZIndexFilePos,ToZIndexFilePos};
-use find_ast_node::{FNodeInfoMap,FNodeInfo,AstNode_};
-use rfindctx::{RustFindCtx};
-use crosscratemap::{CrossCrateMap,CrossCrateMapItem};
+use crosscratemap::CrossCrateMapItem;
+use find_ast_node::{FNodeInfo, astnode_item, astnode_expr};
 pub use super::NodeMaps;
-use rsfind::MyOption;
-use timer::Profiler;
-use find_ast_node::*;
-use rfindctx::*;
+use rfindctx::{str_of_ident, str_of_opt_ident};
 
 // build a call graph.
 // we also want to build a graph of users of types - including types.

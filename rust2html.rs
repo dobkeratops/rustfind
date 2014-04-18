@@ -3,8 +3,6 @@ use syntax::ast;
 use syntax::ast::DefId;
 use syntax::codemap::Pos;
 use rustc::middle::ty;
-use std::hash::Hash;
-use collections::HashMap;
 use std::slice;
 use std::cmp;
 use std::io;
@@ -12,8 +10,6 @@ use std::io::fs;
 use codemaput::{ZIndexFilePos,ToZIndexFilePos};
 use find_ast_node::{FNodeInfoMap,FNodeInfo};
 use rfindctx::{RustFindCtx};
-use crosscratemap::{CrossCrateMap};
-use jumptodefmap::{JumpToDefMap,JumpToRefMap,MultiMap};
 pub use super::NodeMaps;
 use rsfind::MyOption;
 use timer::Profiler;
@@ -213,11 +209,8 @@ pub fn write_head(doc:&mut HtmlWriter, out_file: &Path, options: &::RF_Options) 
 
 /// spawns git to find version info for the source tree here.
 pub fn get_git_branch_info()->~str {
-	use std::io;
 	use std::io::process;
-	use std::os;
 	use std::str;
-	use std::io::pipe;
 
 	match process::Process::output("git",&[~"branch",~"-v"]) {
 		Err(_)=>{},
