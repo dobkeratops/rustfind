@@ -14,7 +14,7 @@ impl Indent for ~str {
                 _ => 0
             }
         }
-        let mut a:~str=~"";
+        let mut a=StrBuf::new();
         let mut i=0;
         let mut indent=0;
         let len=self.len();
@@ -77,7 +77,7 @@ impl Indent for ~str {
             }
             a.push_char('\n');
         }
-        a
+        a.into_owned()
     }
 }
 
