@@ -52,9 +52,12 @@ fn 	mkAstSPtr2<T: 'static>(a:T)->AstSPtr<T> {
 // refactor ou code to use that.
 /// wrapper enum for the varios ast:: node types.
 
+// Single enum for rust nodes.
+// if we could extract a lone discriminant from an enum, or wrap their creation in a macro to enumerate this aswell, that would be nice. something with an x-macro in the compiler.. but we're unlikely to get changes like that in.
 #[deriving(Clone,Eq,TotalEq,Hash)]
-pub enum CG_Kind {	// typedef this, so we can swap in a rust identifier. its *not* the ast object itself.
-	CG_Trait, CG_Struct,CG_Enum,CG_Fn,CG_Mod, CG_Type, CG_Static, CG_None
+pub enum NodeKind {	// typedef this, so we can swap in a rust identifier. its *not* the ast object itself.
+	NK_Trait, NK_Struct, NK_Enum,NK_Fn,NK_Mod,NK_ForeignMod, NK_Type, NK_Static, NK_None, NK_FnBlock, /* todo - check if there really is a difference between fnblock and block?! or is one a lambda?*/
+	NK_Add,NK_Sub,NK_Mul,NK_Div,NK_Rem, NK_Assign,NK_Eq,NK_Le,NK_Lt,NK_Gt,NK_Ge,NK_Ne,NK_BinOp,NK_AssignOp,NK_BitAnd,NK_BitXor,NK_BitOr,NK_Shl,NK_Shr,NK_Not,NK_And,NK_Or,NK_Neg,NK_Box,NK_Uniq,NK_Deref,NK_AddrOf,NK_De,NK_TypeParam,NK_Ty,NK_StructField,NK_Path,NK_Call,NK_Variant,NK_MethodCall,NK_Lit,NK_Stmt,NK_Local,NK_Pat,NK_Block,NK_Method,NK_TyMethod,NK_TraitRef,NK_TraitMethod,NK_Tup,NK_Arm,NK_Index,NK_VStore,NK_Impl,NK_While,NK_Break,NK_ForLoop,NK_Match,NK_Loop,NK_Do,NK_Cast,NK_If,NK_Return,NK_Unsafe,NK_Extern,NK_Crate,NK_As,NK_In,NK_For, NK_Vec,NK_Proc, NK_AssignAdd,NK_AssignSub,NK_AssignMul,NK_AssignDiv,NK_AssignRem,NK_AssignAnd,NK_AssignOr,NK_AssignBitXor,NK_AssignBitAnd,NK_AssignBitOr,NK_AssignShl,NK_AssignShr,NK_Field,NK_InlineAsm,NK_Repeat,NK_Keyword,NK_Again,/*??*/NK_Paren,NK_Mac,NK_ViewItem,/*todo- check if we ever really should have this or rather drill down and always get the type of viewitem. */NK_ErrorShouldNeverHaveThis,NK_Decl,NK_Root,
 }
 
 #[deriving(Clone)]
@@ -93,7 +96,8 @@ pub enum AstNode_ {
 pub struct FNodeInfo {
 //	pub id:	ast::NodeId,					// id of this node.
 //    pub ident:Option<ast::Ident>,
-    pub kind:~str,			// TODO: This will just be an enum!
+	
+    pub kind:NodeKind,			// TODO: This will just be an enum!
     pub span:codemap::Span,
     pub node:AstNode_,			// todo- get rid of this and just make this a cache of spans for linking.
     pub parent_id:ast::NodeId,	// todo: vector of child nodes aswell?
@@ -134,7 +138,7 @@ impl FNodeInfo {
 		if !id.is_some() {fail!("tried to get ident on node without ident, code design is wrong");}
 		return id.unwrap();
 	}
-	pub fn rf_kind<'a> (&'a self)->&'a str { self.kind.as_slice() }
+	pub fn rf_kind<'a> (&'a self)->NodeKind { self.kind }
 	pub fn rf_span(&self)->codemap::Span { self.span }
 	pub fn rf_node(&self)->AstNode_ { self.node }
 	pub fn rf_get_parent_id(&self)->Option<ast::NodeId> { Some(self.parent_id) } // surely the root node doesn't have a parent. Is the root node in the same system ?
@@ -213,6 +217,27 @@ impl FNodeInfo {
 	}
 */
 }
+
+impl NodeKind{
+	pub fn as_str(self)->&'static str {
+		match self {
+			NK_Trait=>"trait",
+			NK_Struct=>"struct",
+			NK_Enum=>"enum",
+			NK_Fn=>"fn",
+			NK_Mod=>"mod",
+			NK_Type=>"type",
+			NK_Static=>"static",
+			NK_Decl=>"decl",
+			NK_None=>"",
+			_=>"NK_AS_STR_TODO",
+		}
+	}
+}
+// todo - read up on Show..
+//impl ToStr for NodeKind {
+//	fn to_str(&self)->~str{ self.as_str().to_owned()}
+//}
 
 //pub type FNodeInfoMap= HashMap<ast::NodeId,FNodeInfo>;
 
@@ -303,6 +328,7 @@ pub trait AstNodeAccessors {
 }
 pub trait KindToStr {
     fn kind_to_str(&self)->&'static str;
+    fn get_kind(&self)->NodeKind;
 }
 pub trait ToJsonStr {fn to_json_str(&self)->~str;}
 
@@ -383,13 +409,13 @@ pub fn node_spans_table_to_json_sub(dc:&RustFindCtx,ns:&FNodeInfoMap)->StrBuf {
             let ifpe=oifpe.unwrap();
             // local node:-
             //assert!(ifps.file_index==ifpe.file_index);
-            r.push_str(format!("\t\\{node_id:{:u},\tkind:\"{:s}\",\tlspan:\\{ lo:\\{file:{:u},line:{:u} ,ofs:{:u}\\},\thi:\\{file:{:u},line:{:u}, ofs:{:u}\\}\\}\\},\n",*k,v.kind,
+            r.push_str(format!("\t\\{node_id:{:u},\tkind:\"{:s}\",\tlspan:\\{ lo:\\{file:{:u},line:{:u} ,ofs:{:u}\\},\thi:\\{file:{:u},line:{:u}, ofs:{:u}\\}\\}\\},\n",*k,v.kind.as_str(),
                 ifps.file_index, ifps.line, ifps.col,ifpe.file_index, ifpe.line, ifpe.col));
         } else {
             // external node:-
             let codemap::BytePos(lo) = v.span.lo;
             let codemap::BytePos(hi) = v.span.hi;
-            r.push_str(format!("\t\\{node_id:{:u},\tkind:\"{:s}\"\trspan\\{lo:{:u},hi:{:u}\\}\\}\n",*k,v.kind, lo, hi));
+            r.push_str(format!("\t\\{node_id:{:u},\tkind:\"{:s}\"\trspan\\{lo:{:u},hi:{:u}\\}\\}\n",*k,v.kind.as_str(), lo, hi));
         }
     }
     r
@@ -436,6 +462,12 @@ impl KindToStr for ast::Decl {
         ast::DeclItem(x)=>x.kind_to_str(),
         }
     }
+	fn get_kind(&self)->NodeKind {
+        match self.node {
+        ast::DeclLocal(_)=>NK_Local,
+        ast::DeclItem(x)=>x.get_kind(),
+        }
+	}
 }
 impl KindToStr for ast::Item {
     fn kind_to_str(&self)->&'static str {
@@ -452,6 +484,20 @@ impl KindToStr for ast::Item {
         ast::ItemMac(_)=>"mac",
         }
     }
+	fn get_kind(&self)->NodeKind {
+        match self.node {
+        ast::ItemStatic(..)=>NK_Static,
+        ast::ItemFn(..)=>NK_Fn,
+        ast::ItemMod(_)=>NK_Mod,
+        ast::ItemForeignMod(_)=>NK_ForeignMod,
+        ast::ItemTy(..)=>NK_Ty,
+        ast::ItemEnum(..)=>NK_Enum,
+        ast::ItemStruct(..)=>NK_Struct,
+        ast::ItemTrait(..)=>NK_Trait,
+        ast::ItemImpl(..)=>NK_Impl,
+        ast::ItemMac(_)=>NK_Mac,
+        }
+	}
 }
 impl KindToStr for ast::Expr {
     fn kind_to_str(&self)->&'static str {
@@ -462,7 +508,7 @@ impl KindToStr for ast::Expr {
         ast::ExprMethodCall(_,_,_)=>"method_call",
         ast::ExprTup(_)=>"tup",
         ast::ExprBinary(binop, _,_)=>match binop {
-//          ast_util::binop_to_*(binop) todo - we donnt use this because of ambiguity
+
             ast::BiAdd=>"add",
             ast::BiSub=>"sub",
             ast::BiMul=>"mul",
@@ -538,6 +584,88 @@ impl KindToStr for ast::Expr {
         ast::ExprBox(_, _) => "box",
         }
     }
+
+    fn get_kind(&self)->NodeKind {
+        match self.node {
+        ast::ExprVstore(_,_)=>NK_VStore,
+        ast::ExprVec(_)=>NK_Vec,
+        ast::ExprCall(_,_)=>NK_Call,
+        ast::ExprMethodCall(_,_,_)=>NK_MethodCall,
+        ast::ExprTup(_)=>NK_Tup,
+        ast::ExprBinary(binop, _,_)=>match binop {
+
+            ast::BiAdd=>NK_Add,
+            ast::BiSub=>NK_Sub,
+            ast::BiMul=>NK_Mul,
+            ast::BiDiv=>NK_Div,
+            ast::BiRem=>NK_Rem,
+            ast::BiAnd=>NK_And,
+            ast::BiOr=>NK_Or,
+            ast::BiBitXor=>NK_BitXor,
+            ast::BiBitAnd=>NK_BitAnd,
+            ast::BiBitOr=>NK_BitOr,
+            ast::BiShl=>NK_Shl,
+            ast::BiShr=>NK_Shr,
+            ast::BiEq=>NK_Eq,
+            ast::BiLt=>NK_Lt,
+            ast::BiLe=>NK_Le,
+            ast::BiNe=>NK_Ne,
+            ast::BiGe=>NK_Ge,
+            ast::BiGt=>NK_Gt,
+
+        },
+        ast::ExprUnary(unop, _)=>match unop {
+            ast::UnBox=>NK_Box,
+            ast::UnUniq=>NK_Uniq,
+            ast::UnDeref=>NK_Deref,
+            ast::UnNot=>NK_Not,
+            ast::UnNeg=>NK_Neg
+        },
+        ast::ExprLit(_)=>NK_Lit,
+        ast::ExprCast(_, _)=>NK_Cast,
+        ast::ExprIf(_,_,_)=>NK_If,
+
+        ast::ExprWhile(_, _)=>NK_While,
+        ast::ExprForLoop(_, _,_, _)=>NK_ForLoop,
+        ast::ExprLoop(_, _)=>NK_Loop,
+        ast::ExprMatch(_, _)=>NK_Match,
+        ast::ExprFnBlock(_, _)=>NK_FnBlock,
+        ast::ExprProc(..) => NK_Proc,
+        ast::ExprBlock(_)=>NK_Block,
+        ast::ExprAssign(_,_)=>NK_Assign,
+        ast::ExprAssignOp(binop, _, _)=>match binop {
+            ast::BiAdd=>NK_AssignAdd,
+            ast::BiSub=>NK_AssignSub,
+            ast::BiMul=>NK_AssignMul,
+            ast::BiDiv=>NK_AssignDiv,
+            ast::BiRem=>NK_AssignRem,
+            ast::BiAnd=>NK_AssignAnd,
+            ast::BiOr=>NK_AssignOr,
+            ast::BiBitXor=>NK_AssignBitXor,
+            ast::BiBitAnd=>NK_AssignBitAnd,
+            ast::BiBitOr=>NK_AssignBitOr,
+            ast::BiShl=>NK_AssignShl,
+            ast::BiShr=>NK_AssignShr,
+			_=>NK_ErrorShouldNeverHaveThis,
+        },
+        ast::ExprField(_, _, _)=>NK_Field,
+        ast::ExprIndex(_,_)=>NK_Index,
+        ast::ExprPath(_)=>NK_Path,
+        ast::ExprAddrOf(_, _)=>NK_AddrOf,
+        ast::ExprBreak(_)=>NK_Break,
+        ast::ExprAgain(_)=>NK_Again,
+        ast::ExprRet(_)=>NK_Return,
+//        ast::ExprLogLevel => "log",
+        ast::ExprInlineAsm(_)=>NK_InlineAsm,
+        ast::ExprMac(_)=>NK_Mac,
+        ast::ExprStruct(_,_,_)=>NK_Struct,
+        ast::ExprRepeat(_,_)=>NK_Repeat,
+        ast::ExprParen(_)=>NK_Paren,
+        ast::ExprBox(_, _) => NK_Box,
+        }
+    }
+
+
 }
 
 impl AstNode_ {
@@ -578,6 +706,31 @@ impl KindToStr for AstNode_ {
             astnode_variant(_)=>"variant",
             astnode_root=>"root",
             astnode_none=>"none"
+        }
+    }
+    fn get_kind(&self)->NodeKind {
+        //TODO subsets of view_item?
+        match *self {
+            astnode_mod(_)=>NK_Mod,
+            astnode_view_item(_)=>NK_ViewItem,
+            astnode_item(x)=>x.get_kind(),
+            astnode_local(_)=>NK_Local,
+            astnode_block(_)=>NK_Block,
+            astnode_stmt(_)=>NK_Stmt,
+            astnode_arm(_)=>NK_Arm,
+            astnode_pat(_)=>NK_Pat,
+            astnode_decl(x)=>x.get_kind(),
+            astnode_expr(x)=>x.get_kind(),
+            astnode_ty(_)=>NK_Type,
+            astnode_ty_method(_)=>NK_TyMethod,
+            astnode_method(_)=>NK_Method,
+            astnode_trait_method(_)=>NK_TraitMethod,
+            astnode_struct_def(_)=>NK_Struct,
+            astnode_struct_field(_)=>NK_StructField,
+            astnode_trait_ref(_)=>NK_TraitRef,
+            astnode_variant(_)=>NK_Variant,
+            astnode_root=>NK_Root,
+            astnode_none=>NK_None
         }
     }
 }

@@ -173,13 +173,13 @@ pub fn cross_crate_map_write(dc:&RustFindCtx, _:&str,nim:&FNodeInfoMap, _:&HashM
                     if new_format {
                         try!(writeln!(&mut out_file, "node\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
                             curr_crate_name_only, k, ni.rf_get_parent_id().unwrap_or(0), tfp.name, (tfp.line + 1), tfp.col,
-                            (ni.rf_span().hi - ni.rf_span().lo).to_uint(), ni.rf_kind(), str_of_opt_ident(ni.rf_get_ident())));
+                            (ni.rf_span().hi - ni.rf_span().lo).to_uint(), ni.rf_kind().as_str(), str_of_opt_ident(ni.rf_get_ident())));
                     } else  {
                         // old format, relies on spans to reconstruct AST.
                         // cratename id filename line col len type [ident]
                         try!(writeln!(&mut out_file, "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
                             curr_crate_name_only, k, tfp.name, (tfp.line+1), tfp.col,
-                            (ni.rf_span().hi-ni.rf_span().lo).to_uint(), ni.rf_kind(), str_of_opt_ident(ni.rf_get_ident())));
+                            (ni.rf_span().hi-ni.rf_span().lo).to_uint(), ni.rf_kind().as_str(), str_of_opt_ident(ni.rf_get_ident())));
                     }
                 },
                 None=>{}

@@ -10,7 +10,7 @@ pub use rfindctx::*;
 use rustc::middle::ty;
 use rfindctx::{RustFindCtx,};
 use codemaput::{ZTextFilePos,ToZIndexFilePos,dump_span,get_span_str};
-use find_ast_node::{AstNodeAccessors,FNodeInfo,FNodeInfoMap,AstNode_,mkAstSPtrClone,AstSPtr,astnode_trait_ref,astnode_variant,astnode_item,KindToStr,NodeTreeLoc};
+use find_ast_node::{AstNodeAccessors,FNodeInfo,FNodeInfoMap,AstNode_,mkAstSPtrClone,AstSPtr,astnode_trait_ref,astnode_variant,astnode_item,KindToStr,NodeTreeLoc,NodeKind};
 use fa=find_ast_node;
 
 
@@ -29,11 +29,11 @@ impl self::FNodeInfoMapBuilder {
 //	use visit_rust_ast::FNodeInfoMapBuilder;
 
     pub fn trait_ref(&mut self, tr:&ast::TraitRef, p: ast::NodeId) {
-        push_span(&mut self.all_nodes, tr.ref_id, p,None, "trait_ref", tr.path.span, astnode_trait_ref(mkAstSPtrClone(tr)) );
+        push_span(&mut self.all_nodes, tr.ref_id, p,None, fa::NK_TraitRef, tr.path.span, astnode_trait_ref(mkAstSPtrClone(tr)) );
     }
 
     pub fn variant(&mut self, va:&ast::Variant, p: ast::NodeId) {
-        push_span(&mut self.all_nodes, va.node.id,p, Some(va.node.name),"variant", va.span, astnode_variant(mkAstSPtrClone(&va.node)))
+        push_span(&mut self.all_nodes, va.node.id,p, Some(va.node.name),fa::NK_Variant, va.span, astnode_variant(mkAstSPtrClone(&va.node)))
 //       visit_item(va,(s,va.node.id,v)) - TODO , are we actually suppoed to iterate here? why was't it done
     }
 }
@@ -46,7 +46,7 @@ pub fn rf_push_parent_child(spt:&mut FNodeInfoMap, parent_id:ast::NodeId, child_
 	}
 }
 
-pub fn push_span(spt:&mut FNodeInfoMap,node_id:ast::NodeId, parent:ast::NodeId, _:Option<ast::Ident>,k:&str, s:codemap::Span,nd:AstNode_) {
+pub fn push_span(spt:&mut FNodeInfoMap,node_id:ast::NodeId, parent:ast::NodeId, _:Option<ast::Ident>,k:NodeKind, s:codemap::Span,nd:AstNode_) {
 	// grr. we would really like to traverse children and gather array of ptrs to chilren as a child pointer, 
 	// instead we're 'push_back' reallocing all over the place, yuk.
 
@@ -54,7 +54,7 @@ pub fn push_span(spt:&mut FNodeInfoMap,node_id:ast::NodeId, parent:ast::NodeId, 
 		FNodeInfo{
 //			id: node_id,
 //			ident:nd.rf_get_ident(),
-			kind:k.to_owned(),
+			kind:k,
 			span:s,node:nd,
 			parent_id:parent,
 			children:Vec::new()
@@ -63,14 +63,14 @@ pub fn push_span(spt:&mut FNodeInfoMap,node_id:ast::NodeId, parent:ast::NodeId, 
 	rf_push_parent_child(spt, parent,node_id);
 }
 
-pub fn push_spanned<T:AstNodeAccessors>(spt:&mut FNodeInfoMap,k:&str,s:&codemap::Spanned<T>,ast_node:AstNode_,parent:ast::NodeId) {
+pub fn push_spanned<T:AstNodeAccessors>(spt:&mut FNodeInfoMap,k:NodeKind,s:&codemap::Spanned<T>,ast_node:AstNode_,parent:ast::NodeId) {
     match s.node.rf_get_id() {
         Some(node_id)=>{
 			spt.insert(node_id,
 				FNodeInfo{
 //					id:node_id, 
 //					ident:ast_node.rf_get_ident(),
-					kind:k.to_str(),
+					kind:k,
 					span:s.span,
 					node:ast_node,
 					parent_id:parent,
@@ -107,7 +107,7 @@ impl Visitor<ast::NodeId> for FNodeInfoMapBuilder {
     }
 
     fn visit_item(&mut self, a:&ast::Item, p: ast::NodeId) {
-        push_span(&mut self.all_nodes,a.id,p,item_get_ident(a),a.kind_to_str(),a.span,astnode_item(mkAstSPtrClone(a)));
+        push_span(&mut self.all_nodes,a.id,p,item_get_ident(a),a.get_kind(),a.span,astnode_item(mkAstSPtrClone(a)));
 
         // TODO: Push nodes for type-params... since we want to click on their defs...
         match a.node {
@@ -119,7 +119,7 @@ impl Visitor<ast::NodeId> for FNodeInfoMapBuilder {
                 }
 
                 for m in methods.iter() {
-                    push_span(&mut self.all_nodes, m.id, p, Some(a.ident), "method", m.span, fa::astnode_method(*m));
+                    push_span(&mut self.all_nodes, m.id, p, Some(a.ident), fa::NK_Method, m.span, fa::astnode_method(*m));
                 }
             }
             ast::ItemEnum(ref ed, _) => {
@@ -139,19 +139,19 @@ impl Visitor<ast::NodeId> for FNodeInfoMapBuilder {
     }
 
     fn visit_local(&mut self, a:&ast::Local, p: ast::NodeId) {
-        push_span(&mut self.all_nodes, a.id, p, None, "local", a.span, fa::astnode_local(@*a.clone())); // How to remove this?!
+        push_span(&mut self.all_nodes, a.id, p, None, fa::NK_Local, a.span, fa::astnode_local(@*a.clone())); // How to remove this?!
 
         visit::walk_local(self, a, a.id);
     }
 
     fn visit_block(&mut self, a: &ast::Block, p: ast::NodeId) {
-        push_span(&mut self.all_nodes, a.id, p, None, "block", a.span, fa::astnode_none);
+        push_span(&mut self.all_nodes, a.id, p, None, fa::NK_Block, a.span, fa::astnode_none);
 
         visit::walk_block(self, a, a.id);
     }
 
     fn visit_stmt(&mut self, a:&ast::Stmt, p: ast::NodeId) {
-        push_spanned(&mut self.all_nodes, "stmt", a, fa::astnode_stmt(mkAstSPtrClone(a)), p);
+        push_spanned(&mut self.all_nodes, fa::NK_Stmt, a, fa::astnode_stmt(mkAstSPtrClone(a)), p);
 
         visit::walk_stmt(self, a, p);
     }
@@ -160,13 +160,14 @@ impl Visitor<ast::NodeId> for FNodeInfoMapBuilder {
 //   fn visit_arm(&mut self, a:&ast::Arm, p: ast::NodeId) {}
 
     fn visit_pat(&mut self, a: &ast::Pat, p: ast::NodeId) {
-        push_span(&mut self.all_nodes, a.id, p, None, "pat", a.span, fa::astnode_pat(mkAstSPtrClone(a)));
+        push_span(&mut self.all_nodes, a.id, p, None, fa::NK_Pat, a.span, fa::astnode_pat(mkAstSPtrClone(a)));
 
         visit::walk_pat(self, a, a.id);
     }
 
     fn visit_decl(&mut self, a:&ast::Decl, p: ast::NodeId) {
-        push_spanned(&mut self.all_nodes, "decl", a, fa::astnode_decl(@*a), p);
+		// TODO - check if 'decl' should be emitted at all - shouldn't we drill down and get a specific decl .. (struct,fn..)
+        push_spanned(&mut self.all_nodes, fa::NK_Decl, a, fa::astnode_decl(@*a), p);
 
         visit::walk_decl(self, a, p);
     }
@@ -174,7 +175,7 @@ impl Visitor<ast::NodeId> for FNodeInfoMapBuilder {
 //   fn visit_struct_def(&mut self, s)
 
     fn visit_expr(&mut self, a:&ast::Expr, p: ast::NodeId) {
-        push_span(&mut self.all_nodes, a.id, p, expr_get_ident(a), a.kind_to_str(), a.span, fa::astnode_expr(mkAstSPtrClone(a)));
+        push_span(&mut self.all_nodes, a.id, p, expr_get_ident(a), a.get_kind(), a.span, fa::astnode_expr(mkAstSPtrClone(a)));
 
         visit::walk_expr(self, a, a.id);
     }
@@ -183,7 +184,7 @@ impl Visitor<ast::NodeId> for FNodeInfoMapBuilder {
 //   fn visit_expr_post()
 
     fn visit_ty(&mut self, a:&ast::Ty, p: ast::NodeId) {
-        push_span(&mut self.all_nodes, a.id, p, None, "ty", a.span, fa::astnode_ty(mkAstSPtrClone(a)));
+        push_span(&mut self.all_nodes, a.id, p, None, fa::NK_Type, a.span, fa::astnode_ty(mkAstSPtrClone(a)));
 
         visit::walk_ty(self, a, a.id);
     }
@@ -192,13 +193,13 @@ impl Visitor<ast::NodeId> for FNodeInfoMapBuilder {
 //   fn visit_fn()
 
     fn visit_struct_field(&mut self, a: &ast::StructField, p: ast::NodeId) {
-        push_spanned(&mut self.all_nodes, "struct_field", a, fa::astnode_struct_field(mkAstSPtrClone(a)), p);
+        push_spanned(&mut self.all_nodes, fa::NK_StructField, a, fa::astnode_struct_field(mkAstSPtrClone(a)), p);
 
         visit::walk_struct_field(self, a, p);
     }
 
     fn visit_ty_method(&mut self, a:&ast::TypeMethod, p: ast::NodeId) {
-        push_span(&mut self.all_nodes, a.id, p, Some(a.ident), "type_method", a.span, fa::astnode_ty_method(mkAstSPtrClone(a)));
+        push_span(&mut self.all_nodes, a.id, p, Some(a.ident), fa::NK_TyMethod, a.span, fa::astnode_ty_method(mkAstSPtrClone(a)));
 
         visit::walk_ty_method(self, a, a.id);
     }

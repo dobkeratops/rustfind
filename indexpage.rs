@@ -61,7 +61,16 @@ pub fn write_index_html(source_dir: &Path,extentions:&[~str], options:&::RF_Opti
 	doc.begin_tag_check("maintext");
 
 	doc.writeln("Index of " + source_dir.as_str().unwrap_or(""));
+
+
 	doc.begin_tag("c40").writeln(rust2html::get_git_branch_info()).end_tag();
+
+	if (options.write_callgraph) {
+		doc.begin_tag_link("callgraph.html");
+		doc.write("callgraph");
+		doc.end_tag();
+	}
+
 
 	for (dir, files) in files_per_dir.iter() {
 		doc.writeln("");

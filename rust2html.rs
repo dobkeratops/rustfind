@@ -348,6 +348,39 @@ impl NodesPerLinePerFile {
 }
 pub fn node_color_index(ni:&FNodeInfo)->int {
     // TODO - map this a bit more intelligently..
+	match ni.rf_kind() {
+        NK_Fn=>1,
+        NK_Add|NK_Sub|NK_Mul|NK_Div|NK_Assign|NK_Eq|NK_Le|NK_Gt|NK_Ge|NK_Ne|NK_BinOp|NK_AssignOp
+        |NK_BitAnd|NK_BitXor|NK_BitOr|NK_Shl|NK_Shr|NK_Not|NK_Neg|NK_Box|NK_Uniq|NK_Deref|NK_AddrOf
+            =>5,
+        NK_De=>3,
+        NK_TypeParam=>7,
+        NK_Ty=>8,
+        NK_StructField|NK_Field=>24,
+        NK_Path=>26,
+        NK_Call=>27,
+        NK_Variant=>28,
+        NK_MethodCall=>10,
+        NK_Lit=>12,
+        NK_Stmt=>13,
+        NK_Mod=>38,
+        NK_Local=>16,
+        NK_Pat=>20,
+        NK_Block|NK_FnBlock=>22,
+        NK_Method|NK_TyMethod=>18,
+        NK_Tup=>14,
+        NK_Arm=>11,
+        NK_Index=>13,
+        NK_VStore=>16,
+        NK_Mac=>10,
+        NK_Struct=>31,
+        NK_Trait=>32,
+        NK_Impl=>33,
+        NK_Enum=>34,
+        NK_Keyword|NK_While|NK_Match|NK_Loop|NK_Do|NK_Cast|NK_If|NK_Return|NK_Unsafe|NK_Extern|NK_Crate|NK_As|NK_In|NK_For=>21,
+        _ =>1
+	}
+/*
     match ni.rf_kind() {
         "fn"=>1,
         "add"|"sub"|"mul"|"div"|"assign"|"eq"|"le"|"gt"|"ge"|"ne"|"binop"|"assign_op"
@@ -378,9 +411,9 @@ pub fn node_color_index(ni:&FNodeInfo)->int {
         "impl"=>33,
         "enum"=>34,
         "keyword"|"while"|"match"|"loop"|"do"|"cast"|"if"|"return"|"unsafe"|"extern"|"crate"|"as"|"in"|"for"=>21,
-
         _ =>1
     }
+*/
 }
 pub fn color_index_to_tag(i:int)->~str {
     "c"+i.to_str()
@@ -938,7 +971,11 @@ fn write_symbol_references(doc:&mut HtmlWriter,dc:&RustFindCtx, fm:&codemap::Fil
         let opt_def_info = nmaps.node_info_map.find(&def_node);
         if !opt_def_info.is_some() {continue;}
         let def_info = opt_def_info.unwrap();
-        if !(def_info.rf_kind()==~"fn" || def_info.rf_kind()==~"struct" || def_info.rf_kind()==~"trait" || def_info.rf_kind()==~"enum" || def_info.rf_kind()==~"ty") { continue; }
+//        if !(def_info.rf_kind()==~"fn" || def_info.rf_kind()==~"struct" || def_info.rf_kind()==~"trait" || def_info.rf_kind()==~"enum" || def_info.rf_kind()==~"ty") { continue; }
+		match def_info.rf_kind() {
+			NK_Fn|NK_Struct|NK_Trait|NK_Enum|NK_Ty=>{}
+			_=> continue,
+		}
 
         let refs = nmaps.jump_ref_map.find(def_node);
         let max_verbose_links=20;   // todo - sort..
@@ -972,10 +1009,10 @@ fn write_symbol_references(doc:&mut HtmlWriter,dc:&RustFindCtx, fm:&codemap::Fil
             let l=refs_iter.len();
             fn pri_of(x:&FNodeInfo) -> uint { 
 				match x.rf_kind() {
-					"impl"=>0,
-					"fn"=>1,
-					"trait"=>2,
-					"struct"=>3,
+					NK_Impl=>0,
+					NK_Ty=>1,
+					NK_Trait=>2,
+					NK_Struct=>3,
 					_=>0x8000
                 }
             }
@@ -1096,7 +1133,7 @@ impl ::rust2html::htmlwriter::HtmlWriter{ // todo, why doesn't that allow path r
                 self.begin_tag_anchor("line"+(node_file_pos.line+1).to_str()+"_col"+node_file_pos.col.to_str() + "_refs" );
                 self.begin_tag("c43");
                 self.writeln(dc.codemap().files.borrow().get(node_file_pos.file_index as uint).name + ":" + (node_file_pos.line + 1).to_str() + ":" + node_file_pos.col.to_str()
-                            +"-"+(node_end_file_pos.line+1).to_str()+":"+node_file_pos.col.to_str() +" -" +info.rf_kind() + "- definition:");
+                            +"-"+(node_end_file_pos.line+1).to_str()+":"+node_file_pos.col.to_str() +" -" +info.rf_kind().as_str() + "- definition:");
                 self.end_tag();
 
                 self.begin_tag_link( "#"+(node_file_pos.line+1).to_str());

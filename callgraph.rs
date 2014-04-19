@@ -12,7 +12,7 @@ use std::cmp;
 use std::io;
 use std::io::fs;
 use codemaput::{ZIndexFilePos,ToZIndexFilePos};
-use find_ast_node::{FNodeInfoMap,FNodeInfo,AstNode_};
+use find_ast_node::{FNodeInfoMap,FNodeInfo,AstNode_,NodeKind};
 use rfindctx::{RustFindCtx};
 use crosscratemap::{CrossCrateMap,CrossCrateMapItem};
 pub use super::NodeMaps;
@@ -56,7 +56,7 @@ impl CG_Options {
 /// Generate callgraph file.
 /// Todo - seperate into callgraph iterator and file writer passing a closure..
 #[deriving(Clone,Eq,TotalEq,Hash)]
-type RefCCMItem<'a> =(DefId,&'a CrossCrateMapItem,CG_Kind);
+type RefCCMItem<'a> =(DefId,&'a CrossCrateMapItem,NodeKind);
 type SetOfItems<'a> =HashSet<RefCCMItem<'a>>;
 
 
@@ -100,16 +100,16 @@ fn write_call_graph_sub<'a>(nmaps:&'a NodeMaps, outdirname:&str, filename:&str,o
 		let kind=match info.rf_node() {
 			
 			astnode_item(item)=>match item.node{
-				ast::ItemEnum(_,_)=>CG_Enum,
-				ast::ItemStruct(_,_)=>CG_Struct,
-				ast::ItemTrait(_,_,_)=>CG_Trait,
-				_=>CG_None,
+				ast::ItemEnum(_,_)=>NK_Enum,
+				ast::ItemStruct(_,_)=>NK_Struct,
+				ast::ItemTrait(_,_,_)=>NK_Trait,
+				_=>NK_None,
 			},
-			_=>CG_None,
+			_=>NK_None,
 		};
 
 		match (ccmitem,kind) {
-			(_,CG_None)|(None,_)=>{},
+			(_,NK_None)|(None,_)=>{},
 			(Some(ccmitem),kind)=>{items_per_module.insert_or_update_with(
 				ccmitem.file_name.as_slice(),
 				HashSet::new(),
@@ -141,16 +141,16 @@ fn write_call_graph_sub<'a>(nmaps:&'a NodeMaps, outdirname:&str, filename:&str,o
 							"fontcolor=white, color=\"#00000040\", fontsize=32, "}
 						else{
 							match kind {
-								CG_Trait=>"fontcolor=\"#ed9603\", fontsize=16, ",
-								CG_Struct=>"fontcolor=\"#e53700\", fontsize=16, ",
-								CG_Type=>"fontcolor=\"#f52700\", fontsize=16, ",
-								CG_Enum=>"fontcolor=\"#5e9766\", fontsize=16, ",
-								CG_Fn=>"fontcolor=\"#8c6067\", fontsize=14, ",
-								CG_Mod=>"fontcolor=\"#4d76ae\", fontsize=16, ",
+								NK_Trait=>"fontcolor=\"#ed9603\", fontsize=16, ",
+								NK_Struct=>"fontcolor=\"#e53700\", fontsize=16, ",
+								NK_Type=>"fontcolor=\"#f52700\", fontsize=16, ",
+								NK_Enum=>"fontcolor=\"#5e9766\", fontsize=16, ",
+								NK_Fn=>"fontcolor=\"#8c6067\", fontsize=14, ",
+								NK_Mod=>"fontcolor=\"#4d76ae\", fontsize=16, ",
 								_=>" "
 							}
 						}+
-						"label=\""+match kind{CG_Mod=>"mod", CG_Fn=>"fn",CG_Enum=>"enum",CG_Trait=>"trait",CG_Struct=>"struct",_=>""}
+						"label=\""+match kind{NK_Mod=>"mod", NK_Fn=>"fn",NK_Enum=>"enum",NK_Trait=>"trait",NK_Struct=>"struct",_=>""}
 						+" "
 						+xcmi.item_name+"\""
 						+" URL=\""+ url_name  + "\"];"
@@ -169,11 +169,11 @@ fn write_call_graph_sub<'a>(nmaps:&'a NodeMaps, outdirname:&str, filename:&str,o
 			(Some(fstr1),Some(fstr2))=>{
 				let is_either=|(_,_,ref k0):RefCCMItem,(_,_,ref k1):RefCCMItem,k|->bool{*k0==k ||*k1==k};
 				let edge_color=
-					if is_either(f1,f2,CG_Struct){"\"#e5370020\""} else
-					if is_either(f1,f2,CG_Trait){"\"#ed960320\""} else
-					if is_either(f1,f2,CG_Enum){"\"#5e976620\""} else
-					if is_either(f1,f2,CG_Mod){"\"#4d76ae20\""} else
-					if is_either(f1,f2,CG_Fn){"\"#8c606720\""} else
+					if is_either(f1,f2,NK_Struct){"\"#e5370020\""} else
+					if is_either(f1,f2,NK_Trait){"\"#ed960320\""} else
+					if is_either(f1,f2,NK_Enum){"\"#5e976620\""} else
+					if is_either(f1,f2,NK_Mod){"\"#4d76ae20\""} else
+					if is_either(f1,f2,NK_Fn){"\"#8c606720\""} else
 
 					{"\"#00000020\""};
 				dotf.write_line("\t"+ fstr1 +" -> "+ fstr2 + "[color="+edge_color+ "]" );
@@ -226,7 +226,7 @@ fn to_dotfile_symbol((def_id,xcmi,kind):RefCCMItem)-> Option<~str> {
 //	cleaned_up_name
 }
 fn is_main((def_id,xcmi,kind):RefCCMItem)->bool{
-	xcmi.item_name.as_slice()=="main" && kind==CG_Fn
+	xcmi.item_name.as_slice()=="main" && kind==NK_Fn
 }
 
 
@@ -272,19 +272,19 @@ fn gather_use_graph_rec<'a>(edges:&mut SetOfItems<'a>,nmaps:&'a NodeMaps, edge_f
 				astnode_expr(expr)=>{
 					match expr.node {
 						ast::ExprCall( ref call_expr,ref args)=>{
-							(nmaps.jump_def_map.find(&call_expr.id),CG_Fn)
+							(nmaps.jump_def_map.find(&call_expr.id),NK_Fn)
 						},
 						ast::ExprMethodCall(ref ident,ref typeargs,ref args)=>{
-							(nmaps.jump_def_map.find(&child_id),CG_Fn)
+							(nmaps.jump_def_map.find(&child_id),NK_Fn)
 						},
-						_=>{(None,CG_None)}
+						_=>{(None,NK_None)}
 					}
 				},
 				astnode_item(item)=>{
 					gather_use_graph_item(nmaps, edge_fn, &(*item));
-					(None,CG_None)
+					(None,NK_None)
 				},
-				_=>{(None,CG_None)},
+				_=>{(None,NK_None)},
 			};
 			// todo: for clarity of flow, make this a sub called above - insert(calls,nmaps,target).
 			match target{
@@ -304,7 +304,7 @@ fn gather_node_id_def<'s>(calls:&mut SetOfItems<'s>, nmaps:&'s NodeMaps, node_id
 		Some(def_id)=>{
 			match nmaps.xcmap.find(def_id) { None=>{},
 				Some(xcm_item)=>{
-					calls.insert((*def_id, xcm_item, CG_Struct));
+					calls.insert((*def_id, xcm_item, NK_Struct));
 				},
 			}
 		}
@@ -325,7 +325,7 @@ fn gather_use_graph_item<'a>(nmaps:&'a NodeMaps<'a>, edge_fn: &|RefCCMItem<'a>, 
 
 	let mut edge_ends:SetOfItems=HashSet::new();
 
-	let src_kind:CG_Kind= match item.node {
+	let src_kind:NodeKind= match item.node {
 		ast::ItemEnum(ref enum_def,ref generics)=>{
 			for variant in enum_def.variants.iter() {
 				match variant.node.kind {
@@ -342,14 +342,14 @@ fn gather_use_graph_item<'a>(nmaps:&'a NodeMaps<'a>, edge_fn: &|RefCCMItem<'a>, 
 //					_=>{}
 				}
 			}
-			CG_Enum
+			NK_Enum
 		}
 		ast::ItemImpl(ref generics,ref opt_trait_ref,ty,ref vec_method)=>{
 //			println!("Impl Trait.. for {} for {}",str_of_ident(item.ident), ::syntax::print::pprust::ty_to_str(ty),  );
 			// impl X for Y means an edge Y->X, (or the other way round? whatever, an edge.)
 			match nmaps.jump_def_map.find(&ty.id) {None=>{},Some(ty_defid)=>
 				match nmaps.xcmap.find(ty_defid) {None=>{},Some(ccmi)=>
-					{edge_ends.insert( (*ty_defid,ccmi, CG_Struct) );}
+					{edge_ends.insert( (*ty_defid,ccmi, NK_Struct) );}
 				}
 			};
 			match *opt_trait_ref {
@@ -362,7 +362,7 @@ fn gather_use_graph_item<'a>(nmaps:&'a NodeMaps<'a>, edge_fn: &|RefCCMItem<'a>, 
 			for method in vec_method.iter() {
 				gather_fn_decl(&mut edge_ends, nmaps,edge_fn,  method.decl, Some(&(*method.body)));
 			}
-			CG_Struct
+			NK_Struct
 		}
 		ast::ItemTrait(ref generics,ref vec_trait_ref,ref vec_trait_method)=>{
 			for trait_ref in vec_trait_ref.iter() {
@@ -379,24 +379,24 @@ fn gather_use_graph_item<'a>(nmaps:&'a NodeMaps<'a>, edge_fn: &|RefCCMItem<'a>, 
 				}
 			}
 			// handle trait function declarations..
-			CG_Trait
+			NK_Trait
 		}
 		ast::ItemFn(p_fn_decl, ref fn_style, ref abi, ref generics, p_block)=> {
 			gather_fn_decl(&mut edge_ends, nmaps,edge_fn,  p_fn_decl, Some(&*p_block));
-			CG_Fn
+			NK_Fn
 		}
 		ast::ItemStruct(ref struct_def,ref generics)=>{
 			for struct_field in struct_def.fields.iter() {
 				gather_type(&mut edge_ends, nmaps, /*node, (child_id,child_node),*/&(*struct_field.node.ty));
 			}
-			CG_Struct
+			NK_Struct
 		}
 		// nested module - todo: build a module-graph aswell - and do the collapse-logic here
 		ast::ItemMod(ref mod_)=> {
 			gather_use_graph_module(nmaps, edge_fn, mod_);
-			CG_None
+			NK_None
 		}
-		_=>{CG_None}
+		_=>{NK_None}
 	};
 
 	for &(ref other_defid,other_ccmitem,other_kind) in edge_ends.iter() {
@@ -427,7 +427,7 @@ fn gather_trait_ref<'a>(edge_ends:&mut SetOfItems<'a>, nmaps:&'a NodeMaps<'a>, t
 			match nmaps.xcmap.find(defid) {None=>{},
 				Some(ref ccmitem) =>{
 //					println!(" trait..{} .. ok", ::syntax::print::pprust::path_to_str(&tr.path) );
-					edge_ends.insert( (*defid, *ccmitem,CG_Trait) );
+					edge_ends.insert( (*defid, *ccmitem,NK_Trait) );
 				}
 			}
 		}
@@ -463,7 +463,7 @@ fn gather_type<'s>(
 					match nmaps.xcmap.find(def_id) {
 						None=>{},
 						Some(xcm_item)=>{
-							let kind = CG_Struct;
+							let kind = NK_Struct;
 //			let node_info=nmaps.node_info_map.find(def_id);
 //							println!(" ty_path {}\n", xcm_item.item_name);
 							calls.insert((*def_id, xcm_item, kind)   );
@@ -488,10 +488,7 @@ fn gather_type<'s>(
 //		ast::TyProc(ref expr)=>{} /* gather_expr .. */
 		_=>{},
 
-
-
 	}
-	
 }
 
 

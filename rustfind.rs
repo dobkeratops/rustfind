@@ -257,7 +257,7 @@ fn main() {
             println!("Writing .rfx .. done");
             done=true;
         }
-		// callgraph options, todo seperate..
+		// callgraph options, todo se
         if matches.opt_present("C") {
 			all_options.callgraph_opt.local_only=true;
 		}
