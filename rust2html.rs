@@ -464,9 +464,9 @@ fn write_line_with_links(dst:&mut SourceCodeWriter<HtmlWriter>,dc:&RustFindCtx,f
 //  dump!(node_infos);
 // todo - sorting node spans, not this "painters-algorithm" approach..
 
-    let mut link:~[i64] = slice::from_elem(line.len(),0 as ast::NodeId as i64);
-    let mut color:~[int] = slice::from_elem(line.len(),0 as int);
-    let mut depth:~[uint]= slice::from_elem(line.len(),0x7fffffff as uint);
+    let mut link:~[i64] = Vec::from_elem(line.len(),0 as ast::NodeId as i64).move_iter().collect();
+    let mut color:~[int] = Vec::from_elem(line.len(),0 as int).move_iter().collect();
+    let mut depth:~[uint]= Vec::from_elem(line.len(),0x7fffffff as uint).move_iter().collect();
 
     for node in nodes.iter() {
 
@@ -773,14 +773,11 @@ fn write_line_attr_links(dst:&mut SourceCodeWriter<HtmlWriter>,text_line:&str,co
 
 /// gather all the nodes within the file specified by 'FileMap'
 fn find_defs_in_file(fm:&codemap::FileMap, nim:&FNodeInfoMap)->~[ast::NodeId] {
-    // todo - functional way..
-    let mut acc=~[];
-    for (n,info) in nim.iter() {
-        if info.rf_span().lo >= fm.start_pos && (info.rf_span().lo < (fm.start_pos+codemap::BytePos(fm.src.len() as u32))) {
-            acc.push(*n);
-        }
-    }
-    acc
+    let span_begin = fm.start_pos;
+    let span_end = fm.start_pos + codemap::BytePos(fm.src.len() as u32);
+    nim.iter().filter(|&(_,ref info)| {
+            info.rf_span().lo >= span_begin && info.rf_span().lo < span_end
+    }).map(|(&n,_)|n).collect()
 }
 
 

@@ -154,8 +154,9 @@ fn usage(binary: &str) {
 
 fn main() {
 
-    let mut args = os::args();
+    let mut args = os::args().move_iter().collect::<Vec<~str>>();
     let binary = args.shift().unwrap();
+    let mut args = args.move_iter().collect::<~[~str]>();
 
     let opts = optgroups();
 	let matches = getopts(args, opts).unwrap();

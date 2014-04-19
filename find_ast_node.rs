@@ -268,7 +268,7 @@ pub fn rf_get_root_node<'a> (nim:&'a FNodeInfoMap)->Option<(ast::NodeId,&'a FNod
 */
 
 
-pub type NodeTreeLoc = ~[AstNode_];
+pub type NodeTreeLoc = Vec<AstNode_>;
 pub fn dump_node_tree_loc(ndt:&NodeTreeLoc) {
 //  for ndt.iter().advance |x|
     for x in ndt.iter()
@@ -1012,7 +1012,7 @@ pub struct Finder {
 impl Finder {
     fn new (location: u32) -> Finder {
         let env = FindAstNodeSt{
-            result:~[astnode_root], location:location, stop:false
+            result: Vec::from_elem(1,astnode_root), location:location, stop:false
 
         };
         Finder {

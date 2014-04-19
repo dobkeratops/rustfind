@@ -3,7 +3,7 @@ use std::iter::range_inclusive;
 
 pub struct HtmlWriter {
     pub doc:StrBuf,
-    pub tag_stack:~[~str],
+    pub tag_stack: Vec<~str>,
     pub xlat:HashMap<char, ~str>,
 }
 
@@ -11,7 +11,6 @@ pub struct HtmlWriter {
 fn mk_xlat_table()-> HashMap<char,~str>
 {
     let mut xlat= HashMap::new();
-//  let mut i=0u8;
     for i in range_inclusive(0u8, 255) {
 
         xlat.insert(i as char,
@@ -29,7 +28,13 @@ fn mk_xlat_table()-> HashMap<char,~str>
 /// helper object for building html docs, puts tags in a stack for convinient close
 
 impl<'a> HtmlWriter {
-    pub fn new()->HtmlWriter { HtmlWriter { doc:StrBuf::new(), tag_stack:~[], xlat:mk_xlat_table()}}
+    pub fn new()->HtmlWriter {
+      HtmlWriter {
+        doc:StrBuf::new(),
+        tag_stack: Vec::new(),
+        xlat:mk_xlat_table()
+      }
+    }
 
     pub fn write_quoted_str(&'a mut self, a:&str)->&'a mut HtmlWriter {
         self.doc.push_str("\"");
