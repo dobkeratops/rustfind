@@ -293,27 +293,32 @@ pub fn make_jump_to_def_map(dc:&RustFindCtx)->( FNodeInfoMap, ~HashMap<ast::Node
 /// K:[V]  insert(K, V) for many V;  find(K)->[V]
 /// todo - can just compose it as hashmap<K,Vec<V>>
 pub struct MultiMap<K,V> {
-    next_index:uint,
-    indices:HashMap<K,uint>,
-    items:~[~[V]],
-    empty:~[V]
+    next_index: uint,
+    indices: HashMap<K,uint>,
+    items: Vec<Vec<V>>,
+    empty: Vec<V>,
 }
 impl<'a,K:Hash+TotalEq,V> MultiMap<K,V> {
     pub fn new()->MultiMap<K,V> {
-        MultiMap{ next_index:0, indices:HashMap::new(), items:~[], empty:~[] }
+        MultiMap{
+          next_index: 0,
+          indices: HashMap::new(),
+          items: Vec::new(),
+          empty: Vec::new(),
+        }
     }
-    pub fn find(&'a self, k:K)->&'a~[V] {
+    pub fn find(&'a self, k:K)->&'a Vec<V> {
         // TODO - return iterator, not collection
         match self.indices.find(&k) {
             None=>&self.empty,
-            Some(&ix)=>&self.items[ix]
+            Some(&ix)=>self.items.get(ix)
         }
     }
     pub fn insert(&'a mut self, k:K,v:V) {
         let ix=match self.indices.find(&k) {
-            None=>{ self.indices.insert(k,self.next_index); self.next_index+=1; self.items.push(~[]); self.next_index-1},
+            None=>{ self.indices.insert(k,self.next_index); self.next_index+=1; self.items.push(Vec::new()); self.next_index-1},
             Some(&ix)=> ix
         };
-        self.items[ix].push(v);
+        self.items.get_mut(ix).push(v);
     }
 }
