@@ -176,7 +176,7 @@ fn main() {
     let opts = optgroups();
 	let matches = getopts(args, opts).unwrap();
     let libs1 = matches.opt_strs("L").iter().map(|s| Path::new(s.as_slice())).collect::<Vec<Path>>();
-    let libs= if libs1.len() > 0 {
+    let libs:Vec<Path> = if libs1.len() > 0 {
         libs1
     } else {
         match os::getenv(&"RUST_LIBS") {
@@ -185,7 +185,7 @@ fn main() {
 				println("ERROR.. No library path specified with -L , and RUST_LIBS not set, \n so we dont have a library path to use");
 				println("possible fix, set RUST_LIBS = $RUST_PATH/x86_64-unknown-linux-gnu/stage2/lib/rustlib/x86_64-unknown-linux-gnu/lib  ?");
 				fail!();
-				vec!()
+				Vec::<Path>::new()
 			}
         }
     };

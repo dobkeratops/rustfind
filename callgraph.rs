@@ -77,7 +77,9 @@ fn write_call_graph_sub<'a>(nmaps:&'a NodeMaps, outdirname:&str, filename:&str,o
 	dotf.write_line("digraph "+ filename +" {");
 	let mut items_per_module:HashMap<&str,HashSet<RefCCMItem>> =HashMap::new();
 	let mut all_calls:HashSet<(RefCCMItem<'a>,RefCCMItem<'a>)> =HashSet::new();
-	dotf.write_line("\tnode [style=filled, color=lightgrey, fontsize=12 ]");
+	dotf.write_line("\tnode [style=filled, color=\"#f0f0f0\", fontsize=12 ];");
+//	dotf.write_line("\tedge [color=\"#000000f0\", fontsize=12 ]");
+	dotf.write_line("\tedge [color=\"#00000020\"];");
 
 	// Gather items with call-graph links,
 	gather_use_graph(nmaps, // We miss do notation :( but maybe we could encapsulate the traversal in an iterator?
@@ -135,12 +137,14 @@ fn write_call_graph_sub<'a>(nmaps:&'a NodeMaps, outdirname:&str, filename:&str,o
 					let url_name= xcmi.file_name+".html#"+(xcmi.line+1).to_str();
 					dotf.write_line("\t\t"+symbol + "["+
 						if is_main((defid,xcmi,kind)){
-							"fontcolor=white, color=black, fontsize=32, "}
+							"fontcolor=white, color=\"#00000040\", fontsize=32, "}
 						else{
 							match kind {
-								CG_Trait=>"fontcolor=yellow, fontsize=16, ",
-								CG_Struct=>"fontcolor=red, fontsize=16, ",
-								CG_Enum=>"fontcolor=darkgreen, fontsize=16, ",
+								CG_Trait=>"fontcolor=\"#ed9603\", fontsize=16, ",
+								CG_Struct=>"fontcolor=\"#e53700\", fontsize=16, ",
+								CG_Enum=>"fontcolor=\"#5e9766\", fontsize=16, ",
+								CG_Fn=>"fontcolor=\"#8c6067\", fontsize=12, ",
+								CG_Mod=>"fontcolor=\"#4d76ae\", fontsize=16, ",
 								_=>" "
 							}
 						}+
@@ -177,10 +181,11 @@ fn module_subgraph_begin(dotf:&mut fs::File,  depth:uint, mangled_name:&str,modu
 	dotf.write_line(indentstr+"graph[");
 	let indentstr2=indent(depth+2);
 	dotf.write_line(indentstr2+"style=filled,");
-	dotf.write_line(indentstr2+"color=grey,");
+	dotf.write_line(indentstr2+"color=\"#00000008\",");
 	dotf.write_line(indentstr2+"label="+module_name);
 	dotf.write_line(indentstr2+"];");
-	dotf.write_line(indentstr2+"node [style=filled, color=white];"+module_name);
+	dotf.write_line(indentstr+"node [style=filled, color=\"#00000010\"];");
+	dotf.write_line(indentstr+"edge [color=\"#00000010\"];");
 	
 //				dotf.write_line("\t\tlabel=\""+modname+"\";");
 //				dotf.write_line("\t\tcolor=darkgrey;");

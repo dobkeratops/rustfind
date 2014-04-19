@@ -133,7 +133,7 @@ pub unsafe fn fileRead<T:Zero+Clone>(fp:*FILE,numElems:Size_t)->Vec<T> {
 pub unsafe fn fileReadBytes(fp:*FILE,numBytes:Size_t)->Vec<u8> {
     // todo - simply express as the above..
     let buffer=Vec::from_elem(numBytes as uint,0 as u8);
-    fread(as_mut_void_ptr(&buffer.get(0)),numBytes,1,fp);
+    fread(as_mut_void_ptr(buffer.get(0)),numBytes,1,fp);
     buffer
 }
 
@@ -151,10 +151,12 @@ pub fn fileLoad(filename:&str)->Vec<u8> {
         // TODO - should do with patter match null, fp?
         let fp= fileOpen(filename,"rb");
         if fp==0 as *FILE {
-            printStr(&("could not read "+filename)); Vec::new()
+            printStr(&("could not read "+filename)); 
+			Vec::new()
         }
         else
-        {   let buffer=fileReadBytes(fp,fileSize(fp));
+        { 
+			let buffer=fileReadBytes(fp,fileSize(fp));
             fclose(fp);
             buffer
         }
