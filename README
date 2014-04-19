@@ -2,6 +2,7 @@ Uses rust libsyntax to find symbol definitions
 and generates  HTML view of source with links
 finds struct-defs, functions, methods, fields
 writes ast node def info into '.rfx' files in plaintext.
+Also spits out a graphviz dotfile with the static callgraph, modules as clusters.
 
 "make" to compile and run test program
 "make rustsrc" to generate HTML source for the main rust source tree at $(RUST_PATH)/src
@@ -14,8 +15,6 @@ writes ast node def info into '.rfx' files in plaintext.
 ./rustfind -j cratename.rs -- dump spans & node definition links as JSON
 
 ./rustfind -w cratename.rs -- creates HTML view of sourcecode
-
-![Alt text](https://github.com/dobkeratops/rustfind/screenshot/callgraph2.png "output callgraph example")
 
 roadmap
 [1] a commandline tool rustfind sourcefile.rs:LINE:COLUMN: --> definition.rs:LINE:col
@@ -35,6 +34,9 @@ roadmap
    
 
 [5] use components for IDE integration?
+
+example of callgraph output
+![Screenshot](screenshot/callgraph2.png)
 
 Notes on sourcecode:-
 --------------------
