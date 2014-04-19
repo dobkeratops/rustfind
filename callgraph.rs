@@ -143,7 +143,7 @@ fn write_call_graph_sub<'a>(nmaps:&'a NodeMaps, outdirname:&str, filename:&str,o
 								CG_Trait=>"fontcolor=\"#ed9603\", fontsize=16, ",
 								CG_Struct=>"fontcolor=\"#e53700\", fontsize=16, ",
 								CG_Enum=>"fontcolor=\"#5e9766\", fontsize=16, ",
-								CG_Fn=>"fontcolor=\"#8c6067\", fontsize=12, ",
+								CG_Fn=>"fontcolor=\"#8c6067\", fontsize=14, ",
 								CG_Mod=>"fontcolor=\"#4d76ae\", fontsize=16, ",
 								_=>" "
 							}
@@ -162,8 +162,18 @@ fn write_call_graph_sub<'a>(nmaps:&'a NodeMaps, outdirname:&str, filename:&str,o
 	dotf.write_line("\tedge [len=4.0];");
 	for &(f1,f2) in all_calls.iter() {
 		match (to_dotfile_symbol(f1), to_dotfile_symbol(f2)) {
+			
 			(Some(fstr1),Some(fstr2))=>{
-				dotf.write_line("\t"+ fstr1 +" -> "+ fstr2 );
+				let is_either=|(_,_,ref k0):RefCCMItem,(_,_,ref k1):RefCCMItem,k|->bool{*k0==k ||*k1==k};
+				let edge_color=
+					if is_either(f1,f2,CG_Struct){"\"#e5370020\""} else
+					if is_either(f1,f2,CG_Trait){"\"#ed960320\""} else
+					if is_either(f1,f2,CG_Enum){"\"#5e976620\""} else
+					if is_either(f1,f2,CG_Mod){"\"#4d76ae20\""} else
+					if is_either(f1,f2,CG_Fn){"\"#8c606710\""} else
+
+					{"\"#00000020\""};
+				dotf.write_line("\t"+ fstr1 +" -> "+ fstr2 + "[color="+edge_color+ "]" );
 			}
 			_=>{}
 		}
