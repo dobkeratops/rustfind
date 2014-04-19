@@ -66,7 +66,7 @@ pub fn read_cross_crate_map(crate_num:int, crate_name:&str,lib_path:&str)->~Cros
 			println("must run rustfind in library directories if you want links to work (needs html & .rfx files)\n");
 		}
     }
-    let rfx=str::from_utf8(raw_bytes);
+    let rfx=str::from_utf8(raw_bytes.as_slice());
     println("loaded cratemap "+rfx.get_ref().len().to_str()+" bytes"+" as crate "+crate_num.to_str());
 //  for &x in raw_bytes.iter() { rfx.push_char(x as char); }
 

@@ -144,7 +144,7 @@ fn write_call_graph_sub<'a>(nmaps:&'a NodeMaps, outdirname:&str, filename:&str,o
 								_=>" "
 							}
 						}+
-						"label=\""+match kind{CG_Fn=>"fn",CG_Enum=>"enum",CG_Trait=>"trait",CG_Struct=>"struct",_=>""}
+						"label=\""+match kind{CG_Mod=>"mod", CG_Fn=>"fn",CG_Enum=>"enum",CG_Trait=>"trait",CG_Struct=>"struct",_=>""}
 						+" "
 						+xcmi.item_name+"\""
 						+" URL=\""+ url_name  + "\"];"

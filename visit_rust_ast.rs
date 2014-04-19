@@ -54,7 +54,7 @@ pub fn push_span(spt:&mut FNodeInfoMap,node_id:ast::NodeId, parent:ast::NodeId, 
 		FNodeInfo{
 //			id: node_id,
 //			ident:nd.rf_get_ident(),
-			kind:k.to_str(),
+			kind:k.to_owned(),
 			span:s,node:nd,
 			parent_id:parent,
 			children:Vec::new()
@@ -224,7 +224,7 @@ pub struct Finder {
 impl Finder {
     pub fn new (location: u32) -> Finder {
         let env = FindAstNodeSt{
-            result:~[fa::astnode_root], location:location, stop:false
+            result:Vec::from_elem(1,fa::astnode_root), location:location, stop:false
 
         };
         Finder {

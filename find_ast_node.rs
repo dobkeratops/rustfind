@@ -5,6 +5,7 @@ pub use syntax::parse::token;
 pub use syntax::visit::{Visitor};
 pub use syntax::codemap;
 pub use syntax::codemap::BytePos;
+use rf_ast_ut::*;
 pub use rfindctx::*;
 //use rustc::middle::mem_categorization::ast_node;
 use rustc::middle::ty;
@@ -92,7 +93,7 @@ pub enum AstNode_ {
 pub struct FNodeInfo {
 //	pub id:	ast::NodeId,					// id of this node.
 //    pub ident:Option<ast::Ident>,
-    pub kind:~str,
+    pub kind:~str,			// TODO: This will just be an enum!
     pub span:codemap::Span,
     pub node:AstNode_,			// todo- get rid of this and just make this a cache of spans for linking.
     pub parent_id:ast::NodeId,	// todo: vector of child nodes aswell?
@@ -171,7 +172,7 @@ impl FNodeInfo {
 
 	pub fn rf_as_fn_decl<'a>(&'a self)->
 			Option<(AstSPtr<ast::Item>,
-				(ast::P<ast::FnDecl>, ast::Purity, abi::Abi, ast::Generics, ast::P<ast::Block>)
+				(ast::P<ast::FnDecl>, ast::FnStyle, abi::Abi, ast::Generics, ast::P<ast::Block>)
 				)>
 	{
 		let x=self.rf_as_item().map(
@@ -288,7 +289,7 @@ pub fn rf_get_root_node<'a> (nim:&'a FNodeInfoMap)->Option<(ast::NodeId,&'a FNod
 */
 
 
-pub type NodeTreeLoc = ~[AstNode_];
+pub type NodeTreeLoc = Vec<AstNode_>;
 pub fn dump_node_tree_loc(ndt:&NodeTreeLoc) {
 //  for ndt.iter().advance |x|
     for x in ndt.iter()
@@ -364,13 +365,13 @@ pub fn build_node_info_map(c:AstSPtr<ast::Crate>)-> FNodeInfoMap {
 
 pub trait ToJsonStrFc {fn to_json_str(&self,c:&RustFindCtx)->~str;}
 
-pub fn node_spans_table_to_json_sub(dc:&RustFindCtx,ns:&FNodeInfoMap)->~str {
+pub fn node_spans_table_to_json_sub(dc:&RustFindCtx,ns:&FNodeInfoMap)->StrBuf {
     // TODO - is there a cleaner functional way,
     // map (|x| fmt...).flatten_to_str() or something like that..
 
     // emit in a form more useable by external tools.
     // not a serialization of the data used here.
-    let mut r=~"";
+    let mut r=StrBuf::with_capacity(1024);
 //  for ns.iter().advance |(k,v)| {
     for (k,v) in ns.iter() {
         //let (_,line,_)=byte_pos_to_file_line_col(c,*v.span.lo);
@@ -396,19 +397,22 @@ pub fn node_spans_table_to_json_sub(dc:&RustFindCtx,ns:&FNodeInfoMap)->~str {
 
 impl ToJsonStrFc for FNodeInfoMap {
     fn to_json_str(&self,dc:&RustFindCtx)->~str {
-        ~"[\n"+node_spans_table_to_json_sub(dc,self)+"]\n"
+        let mut ret=StrBuf::from_str("[\n");
+		ret.push_str(node_spans_table_to_json_sub(dc,self).as_slice());
+		ret.push_str("]\n");
+		ret.as_slice().to_owned()
     }
 }
 
 impl ToJsonStr for HashMap<ast::NodeId,ast::DefId> {
     fn to_json_str(&self)->~str {
-        let mut r=~"[\n";
+        let mut r=StrBuf::from_str("[\n");
 //      for self.iter().advance|(&key,&value)| {
         for (&key,&value) in self.iter() {
             r.push_str(format!("\t\\{node_id:{:?},\tdef_id:\\{crate_:{:?},node:{:?}\\}\\},\n", key, value.krate,value.node));
         }
         r.push_str("]\n");
-        r
+        r.as_slice().to_owned()
     }
 }
 
@@ -939,46 +943,6 @@ pub fn safe_node_id_to_type(cx: &ty::ctxt, id: ast::NodeId) -> Option<ty::t> {
     }
 }
 
-pub fn get_def_id(curr_crate:ast::CrateNum,src_def:ast::Def)->Option<ast::DefId> {
-    let mk=|x|{Some(ast::DefId{krate:curr_crate, node:x})}; // todo,mmaybe this is best 'None'..
-    // todo-'definition' can be at multiple locations. we should return [def_id] really..
-    match src_def {
-        ast::DefFn(d,_)=>Some(d),
-        ast::DefStaticMethod(d,_,_)=>Some(d),
-        ast::DefSelfTy(id)=>mk(id),
-        ast::DefMod(d)=>Some(d),
-        ast::DefForeignMod(d)=>Some(d),
-        ast::DefStatic(d,_)=>Some(d),
-        ast::DefArg(id,_)=>mk(id),
-        ast::DefLocal(id,_)=>mk(id),
-        ast::DefVariant(_, d2, _)=>Some(d2),
-        ast::DefTy(d)=>Some(d),
-        ast::DefTrait(d)=>Some(d),
-        ast::DefPrimTy(_)=>None,
-        ast::DefTyParam(d,_)=>Some(d),
-        ast::DefBinding(d,_)=>mk(d),
-        ast::DefUse(d)=>Some(d),
-        ast::DefUpvar(_,d,_,_)=>get_def_id(curr_crate,*d),
-        ast::DefStruct(d)=>Some(d),
-        ast::DefTyParamBinder(id)=>mk(id),
-        ast::DefRegion(id)=>mk(id),
-        ast::DefLabel(id)=>mk(id),
-        ast::DefMethod(d,_)=>Some(d)
-    }
-}
-
-pub fn def_node_id_from_node_id(dc:&RustFindCtx, id:ast::NodeId)->ast::NodeId {
-    let crate_num=0;    // TODO - whats crate Id really???
-    match dc.tycx_ref().def_map.borrow().find(&id) { // finds a def..
-        Some(a)=>{
-            match get_def_id(crate_num,*a) {
-                Some(b)=>b.node,
-                None=>id
-            }
-        },
-        None=>(id)  // no definition? say its its own definition
-    }
-}
 
 
 pub fn def_of_symbol_to_str(_:&RustFindCtx, _:&FNodeInfoMap, _:&HashMap<ast::NodeId, ast::DefId>, _:&str)->~str {

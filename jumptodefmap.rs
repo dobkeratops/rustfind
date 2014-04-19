@@ -11,10 +11,10 @@ use std::hash::Hash;
 
 use find_ast_node::{FNodeInfoMap, FNodeInfo, AstNode_, NodeTreeLoc, find_node_tree_loc_at_byte_pos,
     build_node_info_map, get_node_source, astnode_expr,
-    get_def_id,  ToJsonStr, ToJsonStrFc, AstNodeAccessors};
+      ToJsonStr, ToJsonStrFc, AstNodeAccessors};
 use rfindctx::{RustFindCtx,get_source_loc};
 use codemaput::{ZTextFilePos,byte_pos_from_text_file_pos_str};
-use rf_ast_ut::{auto_deref_ty, find_named_struct_field};
+use rf_ast_ut::*;
 use util::flatten_to_str_ng; //todo - why is qualifying manually not working?!
 use timer::Timer;
 //use super::rf_use_ast;
@@ -192,13 +192,13 @@ pub fn dump_json(dc:&RustFindCtx) {
     let nim=build_node_info_map(dc.crate_);
     let node_def_node = build_node_def_node_table(dc);
     let jdm=build_jump_to_def_map(dc, &nim,node_def_node);
-    io::println(nim.to_json_str(dc));
+    io::println(nim.to_json_str(dc).as_slice());
     io::println(",");
     io::println("\tnode_defs [\n");
-    io::println(jdm.to_json_str());
+    io::println(jdm.to_json_str().as_slice());
     io::println("\t],\n");
     io::println("\tdef_ids:");
-    io::println(node_def_node.to_json_str());
+    io::println(node_def_node.to_json_str().as_slice());
     io::println("}");
 }
 
@@ -296,26 +296,26 @@ pub fn make_jump_to_def_map(dc:&RustFindCtx)->( FNodeInfoMap, ~HashMap<ast::Node
 pub struct MultiMap<K,V> {
     next_index:uint,
     indices:HashMap<K,uint>,
-    items:~[~[V]],
-    empty:~[V]
+    items:Vec<Vec<V>>,
+    empty:Vec<V>
 }
 impl<'a,K:Hash+TotalEq,V> MultiMap<K,V> {
     pub fn new()->MultiMap<K,V> {
-        MultiMap{ next_index:0, indices:HashMap::new(), items:~[], empty:~[] }
+        MultiMap{ next_index:0, indices:HashMap::new(), items:Vec::new(), empty:Vec::new() }
     }
-    pub fn find(&'a self, k:K)->&'a~[V] {
+    pub fn find(&'a self, k:K)->&'a Vec<V> {
         // TODO - return iterator, not collection
         match self.indices.find(&k) {
             None=>&self.empty,
-            Some(&ix)=>&self.items[ix]
+            Some(&ix)=>self.items.get(ix)
         }
     }
     pub fn insert(&'a mut self, k:K,v:V) {
         let ix=match self.indices.find(&k) {
-            None=>{ self.indices.insert(k,self.next_index); self.next_index+=1; self.items.push(~[]); self.next_index-1},
+            None=>{ self.indices.insert(k,self.next_index); self.next_index+=1; self.items.push(Vec::new()); self.next_index-1},
             Some(&ix)=> ix
         };
-        self.items[ix].push(v);
+        self.items.get_mut(ix).push(v);
     }
 }
 

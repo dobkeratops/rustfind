@@ -165,8 +165,13 @@ fn usage(binary: &str) {
 
 fn main() {
 
-    let mut args = os::args();
+//    let mut args = os::args();
+//    let binary = args.shift().unwrap();
+
+    let mut args = os::args().move_iter().collect::<Vec<~str>>();
     let binary = args.shift().unwrap();
+    let mut args = args.move_iter().collect::<~[~str]>();
+
 
     let opts = optgroups();
 	let matches = getopts(args, opts).unwrap();
@@ -176,7 +181,11 @@ fn main() {
     } else {
         match os::getenv(&"RUST_LIBS") {
             Some(x) => vec!(Path::new(x)),
-            None => vec!()
+            None => {
+				println("ERROR.. No library path specified with -L , and RUST_LIBS not set, \n so we dont have a library path to use");
+				fail!();
+				vec!()
+			}
         }
     };
 
@@ -318,13 +327,13 @@ fn debug_test(dc:&RustFindCtx) {
     //dump!(ctxt.tycx);
     logi!("==== Get tables of node-spans,def_maps,JumpToDefTable..===")
     let (node_info_map,node_def_node,jdm)=make_jump_to_def_map(dc);
-    println(node_info_map.to_json_str(dc));
+    println(node_info_map.to_json_str(dc).as_slice());
 
     logi!("==== Node Definition mappings...===")
-    println(node_def_node.to_json_str());
+    println(node_def_node.to_json_str().as_slice());
 
     logi!("==== JumpToDef Table ===");
-    println(jdm.to_json_str());
+    println(jdm.to_json_str().as_slice());
 
 
     logi!("==== dump def table.===");

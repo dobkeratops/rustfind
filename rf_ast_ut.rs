@@ -1,6 +1,35 @@
 use syntax::{ast,ast_map};
 use rustc::middle::ty;
 
+pub fn get_def_id(curr_crate:ast::CrateNum,src_def:ast::Def)->Option<ast::DefId> {
+    let mk=|x|{Some(ast::DefId{krate:curr_crate, node:x})}; // todo,mmaybe this is best 'None'..
+    // todo-'definition' can be at multiple locations. we should return [def_id] really..
+    match src_def {
+        ast::DefFn(d,_)=>Some(d),
+        ast::DefStaticMethod(d,_,_)=>Some(d),
+        ast::DefSelfTy(id)=>mk(id),
+        ast::DefMod(d)=>Some(d),
+        ast::DefForeignMod(d)=>Some(d),
+        ast::DefStatic(d,_)=>Some(d),
+        ast::DefArg(id,_)=>mk(id),
+        ast::DefLocal(id,_)=>mk(id),
+        ast::DefVariant(_, d2, _)=>Some(d2),
+        ast::DefTy(d)=>Some(d),
+        ast::DefTrait(d)=>Some(d),
+        ast::DefPrimTy(_)=>None,
+        ast::DefTyParam(d,_)=>Some(d),
+        ast::DefBinding(d,_)=>mk(d),
+        ast::DefUse(d)=>Some(d),
+        ast::DefUpvar(_,d,_,_)=>get_def_id(curr_crate,*d),
+        ast::DefStruct(d)=>Some(d),
+        ast::DefTyParamBinder(id)=>mk(id),
+        ast::DefRegion(id)=>mk(id),
+        ast::DefLabel(id)=>mk(id),
+        ast::DefMethod(d,_)=>Some(d)
+    }
+}
+
+
 
 pub fn auto_deref_ty<'a> (t: &'a ty::t_box_) -> &'a ty::t_box_ {
     match t.sty {

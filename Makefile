@@ -45,7 +45,7 @@ tags:
 
 callgraph : html_sub
 	neato -Tcmap html/callgraph.dot -o html/callgraph_cmap.html
-	fdp -Tpng html/callgraph.dot -o html/callgraph.png
+	neato -Tpng html/callgraph.dot -o html/callgraph.png
 	cat resources/callgraph_header.html html/callgraph_cmap.html resources/callgraph_footer.html > html/callgraph.html
 
 # Make the HTML view of the main rust sourcetree

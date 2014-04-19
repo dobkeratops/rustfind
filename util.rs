@@ -1,5 +1,5 @@
 use std::vec::Vec;
-
+use std::strbuf::StrBuf;
 
 pub fn text_line_pos_to_offset(text: &[u8], (line, ofs_in_line): (u32, u32))->Option<u32> {
     // line as reported by grep & text editors,counted from '1' not '0'
@@ -51,7 +51,7 @@ pub fn text_offset_to_line_pos(text:&[u8], src_ofs: u32)-> Option<(u32, u32)> {
     return None;
 }
 pub fn flatten_to_str<T,U:ToStr>(xs:&[T],f: |&T| -> U, sep:&str)->~str {
-    let mut acc=~"";
+    let mut acc=StrBuf::new();
     let mut i=0; // TODO - functional way.
     while i<xs.len() {
         if i>0 {acc.push_str(sep);}
@@ -59,18 +59,18 @@ pub fn flatten_to_str<T,U:ToStr>(xs:&[T],f: |&T| -> U, sep:&str)->~str {
 
         i+=1;
     }
-    acc
+    acc.as_slice().to_owned()
 }
 
-pub fn flatten_to_str_ng<T, U:ToStr>(xs: &Vec<T>, f: |&T| -> U, sep: &str) -> ~str {
-    use std::str::with_capacity;
+pub fn flatten_to_str_ng<T, U:ToStr>(xs: &Vec<T>, f: |&T| -> U, sep: &str) -> StrBuf {
+//    use std::str::with_capacity;
 
-    if xs.is_empty() { return ~""; }
+    if xs.is_empty() { return StrBuf::from_str(""); }
 
     // this calculation is not right, but not sure what the best approximation is
     // code taken originally from StrVector code for collect()
     let len = sep.len() * (xs.len() * 2 - 1);
-    let mut result = with_capacity(len);
+    let mut result = StrBuf::with_capacity(len);
     let mut first = true;
 
     for s in xs.iter() {

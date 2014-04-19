@@ -7,9 +7,10 @@ pub use std::io::{stdout, stdin};
 pub use libc::{fwrite, fread, fseek, fopen, ftell, fclose, FILE, c_void, c_char, SEEK_END,
     SEEK_SET};
 pub use std::mem::size_of;  // for size_of
-pub use std::slice::from_elem;
 pub use std::num::Zero;
 use std::io::{BufferedReader, IoResult};
+use std::vec::Vec;
+use std::vec;
 
 pub type Size_t=u64;    // todo - we're not sure this should be u64
                         // as the libc stuff seems to want.
@@ -58,9 +59,9 @@ impl<T:ToStr> Dbprint for T {
     }
 }
 
-pub fn promptInput(prompt:&str)->~str {
+pub fn promptInput(prompt:&str)->StrBuf {
     println!("{}", prompt);
-    BufferedReader::new(stdin()).read_line().unwrap() // TODO add error handling
+    StrBuf::from_str(BufferedReader::new(stdin()).read_line().unwrap()) // TODO add error handling
 }
 
 pub fn as_void_ptr<T>(a:&T)->*c_void { unsafe {cast::transmute(a) } }
@@ -122,17 +123,17 @@ pub unsafe fn fileWriteStruct<T>(fp:*FILE, s:&T) {
 }
 
 
-pub unsafe fn fileRead<T:Zero+Clone>(fp:*FILE,numElems:Size_t)->~[T] {
-    let buffer=from_elem(numElems as uint, Zero::zero());
-    fread(as_mut_void_ptr(&buffer[0]),numElems,size_of::<T>() as Size_t,fp);
+pub unsafe fn fileRead<T:Zero+Clone>(fp:*FILE,numElems:Size_t)->Vec<T> {
+    let buffer=Vec::from_elem(numElems as uint, Zero::zero());
+    fread(as_mut_void_ptr(&buffer.get(0)),numElems,size_of::<T>() as Size_t,fp);
     buffer
 }
 
 
-pub unsafe fn fileReadBytes(fp:*FILE,numBytes:Size_t)->~[u8] {
+pub unsafe fn fileReadBytes(fp:*FILE,numBytes:Size_t)->Vec<u8> {
     // todo - simply express as the above..
-    let buffer=from_elem(numBytes as uint,0 as u8);
-    fread(as_mut_void_ptr(&buffer[0]),numBytes,1,fp);
+    let buffer=Vec::from_elem(numBytes as uint,0 as u8);
+    fread(as_mut_void_ptr(&buffer.get(0)),numBytes,1,fp);
     buffer
 }
 
@@ -145,12 +146,12 @@ pub unsafe fn fileSize(fp:*FILE)->Size_t {
 }
 
 
-pub fn fileLoad(filename:&str)->~[u8] {
+pub fn fileLoad(filename:&str)->Vec<u8> {
     unsafe {
         // TODO - should do with patter match null, fp?
         let fp= fileOpen(filename,"rb");
         if fp==0 as *FILE {
-            printStr(&("could not read "+filename)); ~[]
+            printStr(&("could not read "+filename)); Vec::new()
         }
         else
         {   let buffer=fileReadBytes(fp,fileSize(fp));
