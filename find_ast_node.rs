@@ -54,7 +54,7 @@ fn 	mkAstSPtr2<T: 'static>(a:T)->AstSPtr<T> {
 
 #[deriving(Clone,Eq,TotalEq,Hash)]
 pub enum CG_Kind {	// typedef this, so we can swap in a rust identifier. its *not* the ast object itself.
-	CG_Trait,CG_Struct,CG_Enum,CG_Fn,CG_Mod, CG_None
+	CG_Trait, CG_Struct,CG_Enum,CG_Fn,CG_Mod, CG_Type, CG_Static, CG_None
 }
 
 #[deriving(Clone)]

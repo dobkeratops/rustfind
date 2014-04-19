@@ -145,7 +145,8 @@ fn optgroups () -> ~[getopts::OptGroup] {
         optflag("f", "", "Return definition reference of symbol at given position"),
         optopt("x", "external_crates", "Path to html of external crates, or '-x .' to emit relative ", "$RUST_PATH/src"),
         optflag("d", "", "TODO url for rustdoc pages to link to, default=unused"),
-        optopt("o", "", "Directory to output the html / rfx files to", "OUTDIR")
+        optopt("o", "", "Directory to output the html / rfx files to", "OUTDIR"),
+        optflag("C", "cg-local-only", "callgraph rendering limited to local crate only",)
     ]
 }
 
@@ -200,7 +201,7 @@ fn main() {
         let dc = @get_ast_and_resolve(&Path::new(filename), libs.move_iter().collect());
         local_data::set(ctxtkey, dc);
 
-        let mut html_options = RF_Options::new();
+        let mut all_options = RF_Options::new();
         if matches.opt_present("D") {
             debug_test(dc);
             done=true;
@@ -233,11 +234,11 @@ fn main() {
             }
         }
         if matches.opt_present("d") {
-			html_options.rustdoc_url = Some(Path::new(matches.opt_str("d").unwrap_or(~"")));
-			println!("TODO:linking to rustdoc pages at {}",html_options.rustdoc_url.clone().unwrap().as_str());
+			all_options.rustdoc_url = Some(Path::new(matches.opt_str("d").unwrap_or(~"")));
+			println!("TODO:linking to rustdoc pages at {}",all_options.rustdoc_url.clone().unwrap().as_str());
         }
         if matches.opt_present("n") {
-			html_options.write_references=false;
+			all_options.write_references=false;
 		}
         if matches.opt_present("i") {
             rfserver::run_server(dc);
@@ -247,21 +248,25 @@ fn main() {
             let out_dir = matches.opt_str("o").unwrap();
             let mut out_path = Path::new("./");
             out_path.push(out_dir + "/");
-            html_options.output_dir = out_path;
+            all_options.output_dir = out_path;
         }
         if matches.opt_present("r") {
             println!("Writing .rfx ast nodes/cross-crate-map:-");
-			html_options.write_html=false;
-            write_crate_as_html_and_rfx(dc,lib_html_path, &html_options);
+			all_options.write_html=false;
+            write_crate_as_html_and_rfx(dc,lib_html_path, &all_options);
             println!("Writing .rfx .. done");
             done=true;
         }
+		// callgraph options, todo seperate..
+        if matches.opt_present("C") {
+			all_options.callgraph_opt.local_only=true;
+		}
 
         // Dump as html..
         if matches.opt_present("w") || !(done) {
             println!("Creating HTML pages from source & .rfx:-");
-			html_options.write_html=true;
-            write_crate_as_html_and_rfx(dc,lib_html_path, &html_options);
+			all_options.write_html=true;
+            write_crate_as_html_and_rfx(dc,lib_html_path, &all_options);
             println!("Creating HTML pages from source.. done");
         }
 	} else {

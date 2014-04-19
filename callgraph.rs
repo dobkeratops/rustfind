@@ -50,7 +50,7 @@ pub struct CG_Options {
 }
 impl CG_Options {
 	pub fn new()->CG_Options {
-		CG_Options{local_only:true}
+		CG_Options{local_only:false}
 	}	
 }
 /// Generate callgraph file.
@@ -87,7 +87,7 @@ fn write_call_graph_sub<'a>(nmaps:&'a NodeMaps, outdirname:&str, filename:&str,o
 			for x in [caller,callee].iter() {
 				items_per_module.insert_or_update_with(x.val1().file_name.as_slice(), HashSet::new(), |k,v|{v.insert(*x);});
 			}
-			if !(opts.local_only && callee.val0().krate!=0) {
+			if !(opts.local_only && (callee.val0().krate!=0 || caller.val0().krate!=0)) {
 				all_calls.insert( (caller, callee) );
 			}
 		}
@@ -130,7 +130,8 @@ fn write_call_graph_sub<'a>(nmaps:&'a NodeMaps, outdirname:&str, filename:&str,o
 		// todo: use mangled module name
 		module_subgraph_begin(dotf,2, modstr, modstr.slice_to(modname.rfind('.').unwrap_or(modname.len())));
 		for &(defid,xcmi,kind) in items.iter() {
-
+			if opts.local_only && defid.krate!=0 {continue;}
+			if xcmi.item_name.len()==0 {continue;}
 			match to_dotfile_symbol((defid,xcmi,kind)) {
 				None=>{},
 				Some(symbol)=> {
@@ -142,6 +143,7 @@ fn write_call_graph_sub<'a>(nmaps:&'a NodeMaps, outdirname:&str, filename:&str,o
 							match kind {
 								CG_Trait=>"fontcolor=\"#ed9603\", fontsize=16, ",
 								CG_Struct=>"fontcolor=\"#e53700\", fontsize=16, ",
+								CG_Type=>"fontcolor=\"#f52700\", fontsize=16, ",
 								CG_Enum=>"fontcolor=\"#5e9766\", fontsize=16, ",
 								CG_Fn=>"fontcolor=\"#8c6067\", fontsize=14, ",
 								CG_Mod=>"fontcolor=\"#4d76ae\", fontsize=16, ",
@@ -159,6 +161,7 @@ fn write_call_graph_sub<'a>(nmaps:&'a NodeMaps, outdirname:&str, filename:&str,o
 		module_subgraph_end(dotf, 2);
 	}
 	// Write out all the calls..
+	// Todo- write out the library links, just de-emphasize them much further
 	dotf.write_line("\tedge [len=4.0];");
 	for &(f1,f2) in all_calls.iter() {
 		match (to_dotfile_symbol(f1), to_dotfile_symbol(f2)) {
@@ -170,7 +173,7 @@ fn write_call_graph_sub<'a>(nmaps:&'a NodeMaps, outdirname:&str, filename:&str,o
 					if is_either(f1,f2,CG_Trait){"\"#ed960320\""} else
 					if is_either(f1,f2,CG_Enum){"\"#5e976620\""} else
 					if is_either(f1,f2,CG_Mod){"\"#4d76ae20\""} else
-					if is_either(f1,f2,CG_Fn){"\"#8c606710\""} else
+					if is_either(f1,f2,CG_Fn){"\"#8c606720\""} else
 
 					{"\"#00000020\""};
 				dotf.write_line("\t"+ fstr1 +" -> "+ fstr2 + "[color="+edge_color+ "]" );
