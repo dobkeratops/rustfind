@@ -15,6 +15,7 @@ writes ast node def info into '.rfx' files in plaintext.
 
 ./rustfind -w cratename.rs -- creates HTML view of sourcecode
 
+![Alt text](screenshot/callgraph2.png "generated callgraph ex")
 
 roadmap
 [1] a commandline tool rustfind sourcefile.rs:LINE:COLUMN: --> definition.rs:LINE:col
