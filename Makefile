@@ -6,7 +6,7 @@ else
 	RF_LIBS = -L $(RUST_PATH)/x86_64-unknown-linux-gnu/stage2/lib/rustlib/x86_64-unknown-linux-gnu/lib
 endif
 
-RF_OPTS = $(RF_LIBS) -o html/
+RF_OPTS = $(RF_LIBS) -o html/ -C
 SRC=$(wildcard *.rs)
 RUST_FIND=$(shell pwd)/rustfind
 RUSTSRC=$(RUST_PATH)/src
@@ -16,7 +16,7 @@ RUSTFLAGS = --opt-level=3 -A non-camel-case-types
 html: html_sub callgraph tags
 
 html_sub: rustfind
-	./rustfind rustfind.rs $(RF_LIBS) -x $(RUSTSRC) -o html/
+	./rustfind rustfind.rs $(RF_OPTS) -x $(RUSTSRC) 
 
 test_dump: rustfind
 	./rustfind  -d $(RF_OPTS) test_input.rs
