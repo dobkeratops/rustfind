@@ -2,6 +2,9 @@
 #![feature(globs)]
 #![feature(macro_rules)]
 #![feature(log_syntax)]
+#![allow(non_camel_case_types)]
+#![allow(unused_variable)]
+#![allow(unused_imports)]
 
 extern crate syntax;
 extern crate rustc;

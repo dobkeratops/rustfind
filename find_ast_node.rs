@@ -60,6 +60,8 @@ pub enum NodeKind {	// typedef this, so we can swap in a rust identifier. its *n
 	NK_Add,NK_Sub,NK_Mul,NK_Div,NK_Rem, NK_Assign,NK_Eq,NK_Le,NK_Lt,NK_Gt,NK_Ge,NK_Ne,NK_BinOp,NK_AssignOp,NK_BitAnd,NK_BitXor,NK_BitOr,NK_Shl,NK_Shr,NK_Not,NK_And,NK_Or,NK_Neg,NK_Box,NK_Uniq,NK_Deref,NK_AddrOf,NK_De,NK_TypeParam,NK_Ty,NK_StructField,NK_Path,NK_Call,NK_Variant,NK_MethodCall,NK_Lit,NK_Stmt,NK_Local,NK_Pat,NK_Block,NK_Method,NK_TyMethod,NK_TraitRef,NK_TraitMethod,NK_Tup,NK_Arm,NK_Index,NK_VStore,NK_Impl,NK_While,NK_Break,NK_ForLoop,NK_Match,NK_Loop,NK_Do,NK_Cast,NK_If,NK_Return,NK_Unsafe,NK_Extern,NK_Crate,NK_As,NK_In,NK_For, NK_Vec,NK_Proc, NK_AssignAdd,NK_AssignSub,NK_AssignMul,NK_AssignDiv,NK_AssignRem,NK_AssignAnd,NK_AssignOr,NK_AssignBitXor,NK_AssignBitAnd,NK_AssignBitOr,NK_AssignShl,NK_AssignShr,NK_Field,NK_InlineAsm,NK_Repeat,NK_Keyword,NK_Again,/*??*/NK_Paren,NK_Mac,NK_ViewItem,/*todo- check if we ever really should have this or rather drill down and always get the type of viewitem. */NK_ErrorShouldNeverHaveThis,NK_Decl,NK_Root,
 }
 
+/// Unified AST node, wraps any ast node accessible from a NodeId
+/// TODO - add a lifetime, we suspect this will become a borrowedptr
 #[deriving(Clone)]
 pub enum AstNode_ { 
 	// todo: CamelCase

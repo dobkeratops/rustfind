@@ -380,40 +380,6 @@ pub fn node_color_index(ni:&FNodeInfo)->int {
         NK_Keyword|NK_While|NK_Match|NK_Loop|NK_Do|NK_Cast|NK_If|NK_Return|NK_Unsafe|NK_Extern|NK_Crate|NK_As|NK_In|NK_For=>21,
         _ =>1
 	}
-/*
-    match ni.rf_kind() {
-        "fn"=>1,
-        "add"|"sub"|"mul"|"div"|"assign"|"eq"|"le"|"gt"|"ge"|"ne"|"binop"|"assign_op"
-        |"bitand"|"bitxor"|"bitor"|"shl"|"shr"|"not"|"neg"|"box"|"uniq"|"deref"|"addr_of"
-            =>5,
-        "de"=>3,
-        "type_param"=>7,
-        "ty"=>8,
-        "struct_field"|"field"=>24,
-        "path"=>26,
-        "call"=>27,
-        "variant"=>28,
-        "method_call"=>10,
-        "lit"=>12,
-        "stmt"=>13,
-        "mod"=>38,
-        "local"=>16,
-        "pat"=>20,
-        "block"|"blk"|"fn_block"=>22,
-        "method"|"type_method"=>18,
-        "tup"=>14,
-        "arm"=>11,
-        "index"=>13,
-        "vstore"=>16,
-        "mac"=>10,
-        "struct"=>31,
-        "trait"=>32,
-        "impl"=>33,
-        "enum"=>34,
-        "keyword"|"while"|"match"|"loop"|"do"|"cast"|"if"|"return"|"unsafe"|"extern"|"crate"|"as"|"in"|"for"=>21,
-        _ =>1
-    }
-*/
 }
 pub fn color_index_to_tag(i:int)->~str {
     "c"+i.to_str()
@@ -500,9 +466,6 @@ fn write_line_with_links(dst:&mut SourceCodeWriter<HtmlWriter>,dc:&RustFindCtx,f
     // todo ... BREAK THIS FUNCTION UP!!!!
     // and there is a load of messy cut paste too.
 
-//  for x in node_infos.iter() { println!(fmt!("%?", x));}
-//  dump!(node_infos);
-// todo - sorting node spans, not this "painters-algorithm" approach..
 
     let mut link:Vec<i64> = Vec::from_elem(line.len(),0 as ast::NodeId as i64);
     let mut color:Vec<int> = Vec::from_elem(line.len(),0 as int);
@@ -529,10 +492,6 @@ fn write_line_with_links(dst:&mut SourceCodeWriter<HtmlWriter>,dc:&RustFindCtx,f
                     Some(x) => if link_debug{(x.node as i64)|(x.krate as i64<<48)} else {x.node as i64}
                 };
 
-//              let null_def=ast::def_id{crate_:0,node:0};
-//              let x=nmaps.jdm.find(n).unwrap_or_default(&null_def);
-//              let link_id=(x.node as i64)|(x.crate as i64<<48);
-//              let link_id=*n as i64 &15;
 
                 let os=node_info.rf_span().lo.to_index_file_pos(dc.tycx_ref());
                 let oe=node_info.rf_span().hi.to_index_file_pos(dc.tycx_ref());
@@ -591,7 +550,6 @@ fn write_line_with_links(dst:&mut SourceCodeWriter<HtmlWriter>,dc:&RustFindCtx,f
             let c0=line[x] as char;
 
             match c0 {
-//              ' '|'\t'|'+'|'-'|'|'|':'|'*'|'&'|'\''|'/'|'@'|'~'|'^'|'%'|'$'|'!'|'>'|'<'|'.'|'#'=> {link[x]=0;}
                 '{'|'}'|'['|']'|';'|',' => {*color.get_mut(x)=3; *link.get_mut(x)=0; },
                 '('|')'=> {*color.get_mut(x)=4;*link.get_mut(x)=0;},
                 _=>{}
@@ -682,37 +640,6 @@ fn write_line_with_links(dst:&mut SourceCodeWriter<HtmlWriter>,dc:&RustFindCtx,f
 }
 
 fn resolve_link(link:i64, dc:&RustFindCtx,fm:&codemap::FileMap,lib_path:&str, nmaps:&NodeMaps)->Option<~str> {
-/*
-    if link_debug==false {
-        if link!=no_link {
-            if link>0 // value is link node index {
-                match nmaps.nim.find(&link) {
-                    None=>~"",  // link outside the crate?
-                    Some(link_node_info)=>{
-                        let oifp = link_node_info.rf_span().lo.to_index_file_pos(dc.tycx);
-                        match oifp {
-                            Some(ifp)=>{
-                                let link_str:~str="#"+(ifp.line+1).to_str();
-                                make_html_name_rel(dc.sess.codemap.files[ifp.file_index].name,fm.name)+link_str
-                            },
-                            None=>{
-                                // out of crate def node?
-//                                  def_node = ;
-                                ~"#n"+link.to_str()
-                            }
-                        }
-                    }
-                }
-            } else if link<0{// link to refs block,value is -(this node index)
-                let ifp= (nmaps.nim,-link).to_index_file_pos(dc.tycx).unwrap();
-
-                "#"+(ifp.line+1).to_str()+"_"+ifp.col.to_str()+"_refs"
-            }
-        } else {
-            ~""
-        }
-    } else
-    */
     if link !=no_link {
 		// If this node is a definition, we write a link to references block(todo-page)-or TODO rustdoc page.
 		// link to refs block with link = neg(node_id)
@@ -973,9 +900,9 @@ fn write_symbol_references(doc:&mut HtmlWriter,dc:&RustFindCtx, fm:&codemap::Fil
         let def_info = opt_def_info.unwrap();
 //        if !(def_info.rf_kind()==~"fn" || def_info.rf_kind()==~"struct" || def_info.rf_kind()==~"trait" || def_info.rf_kind()==~"enum" || def_info.rf_kind()==~"ty") { continue; }
 		match def_info.rf_kind() {
-			NK_Fn|NK_Struct|NK_Trait|NK_Enum|NK_Ty=>{}
+			NK_Fn|NK_Struct|NK_Trait|NK_Enum|NK_Ty=>{}// use these cases, else continue.
 			_=> continue,
-		}
+		}	// TODO: Include StructField ,Variant here, and include get refs of their sub elements..
 
         let refs = nmaps.jump_ref_map.find(def_node);
         let max_verbose_links=20;   // todo - sort..

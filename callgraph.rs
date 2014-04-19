@@ -58,7 +58,7 @@ impl CG_Options {
 #[deriving(Clone,Eq,TotalEq,Hash)]
 type RefCCMItem<'a> =(DefId,&'a CrossCrateMapItem,NodeKind);
 type SetOfItems<'a> =HashSet<RefCCMItem<'a>>;
-
+//type EdgeFn<'a> = &'a |RefCCMItem<'a>, RefCCMItem<'a>|;
 
 // TODO: Use mangled symbols for the nodes.
 pub fn write_call_graph<'a>(nmaps:&'a NodeMaps, outdirname:&str, filename:&str,opts:&CG_Options) {
@@ -150,8 +150,7 @@ fn write_call_graph_sub<'a>(nmaps:&'a NodeMaps, outdirname:&str, filename:&str,o
 								_=>" "
 							}
 						}+
-						"label=\""+match kind{NK_Mod=>"mod", NK_Fn=>"fn",NK_Enum=>"enum",NK_Trait=>"trait",NK_Struct=>"struct",_=>""}
-						+" "
+						"label=\""+kind.as_str()+" "
 						+xcmi.item_name+"\""
 						+" URL=\""+ url_name  + "\"];"
 					);
@@ -183,6 +182,7 @@ fn write_call_graph_sub<'a>(nmaps:&'a NodeMaps, outdirname:&str, filename:&str,o
 	}
 	dotf.write_line("}");
 }
+
 fn indent(depth:uint)->&'static str{
 	let tabs=&'static "\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t";
 	if depth<tabs.len() {tabs.slice_to(depth)} else {tabs}
