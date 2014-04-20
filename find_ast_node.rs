@@ -56,8 +56,8 @@ fn 	mkAstSPtr2<T: 'static>(a:T)->AstSPtr<T> {
 // if we could extract a lone discriminant from an enum, or wrap their creation in a macro to enumerate this aswell, that would be nice. something with an x-macro in the compiler.. but we're unlikely to get changes like that in.
 #[deriving(Clone,Eq,TotalEq,Hash)]
 pub enum NodeKind {	// typedef this, so we can swap in a rust identifier. its *not* the ast object itself.
-	NK_Trait, NK_Struct, NK_Enum,NK_Fn,NK_Mod,NK_ForeignMod, NK_Type, NK_Static, NK_None, NK_FnBlock, /* todo - check if there really is a difference between fnblock and block?! or is one a lambda?*/
-	NK_Add,NK_Sub,NK_Mul,NK_Div,NK_Rem, NK_Assign,NK_Eq,NK_Le,NK_Lt,NK_Gt,NK_Ge,NK_Ne,NK_BinOp,NK_AssignOp,NK_BitAnd,NK_BitXor,NK_BitOr,NK_Shl,NK_Shr,NK_Not,NK_And,NK_Or,NK_Neg,NK_Box,NK_Uniq,NK_Deref,NK_AddrOf,NK_De,NK_TypeParam,NK_Ty,NK_StructField,NK_Path,NK_Call,NK_Variant,NK_MethodCall,NK_Lit,NK_Stmt,NK_Local,NK_Pat,NK_Block,NK_Method,NK_TyMethod,NK_TraitRef,NK_TraitMethod,NK_Tup,NK_Arm,NK_Index,NK_VStore,NK_Impl,NK_While,NK_Break,NK_ForLoop,NK_Match,NK_Loop,NK_Do,NK_Cast,NK_If,NK_Return,NK_Unsafe,NK_Extern,NK_Crate,NK_As,NK_In,NK_For, NK_Vec,NK_Proc, NK_AssignAdd,NK_AssignSub,NK_AssignMul,NK_AssignDiv,NK_AssignRem,NK_AssignAnd,NK_AssignOr,NK_AssignBitXor,NK_AssignBitAnd,NK_AssignBitOr,NK_AssignShl,NK_AssignShr,NK_Field,NK_InlineAsm,NK_Repeat,NK_Keyword,NK_Again,/*??*/NK_Paren,NK_Mac,NK_ViewItem,/*todo- check if we ever really should have this or rather drill down and always get the type of viewitem. */NK_ErrorShouldNeverHaveThis,NK_Decl,NK_Root,
+	NK_Trait, NK_Struct, NK_Enum,NK_Fn,NK_Mod,NK_ForeignMod, NK_Type, NK_Static,  NK_FnBlock, /* todo - check if there really is a difference between fnblock and block?! or is one a lambda?*/
+	NK_Add,NK_Sub,NK_Mul,NK_Div,NK_Rem, NK_Assign,NK_Eq,NK_Le,NK_Lt,NK_Gt,NK_Ge,NK_Ne,NK_BinOp,NK_AssignOp,NK_BitAnd,NK_BitXor,NK_BitOr,NK_Shl,NK_Shr,NK_Not,NK_And,NK_Or,NK_Neg,NK_Box,NK_Uniq,NK_Deref,NK_AddrOf,NK_De,NK_TypeParam,NK_Ty,NK_StructField,NK_Path,NK_Call,NK_Variant,NK_MethodCall,NK_Lit,NK_Stmt,NK_Local,NK_Pat,NK_Block,NK_Method,NK_TyMethod,NK_TraitRef,NK_TraitMethod,NK_Tup,NK_Arm,NK_Index,NK_VStore,NK_Impl,NK_While,NK_Break,NK_ForLoop,NK_Match,NK_Loop,NK_Do,NK_Cast,NK_If,NK_Return,NK_Unsafe,NK_Extern,NK_Crate,NK_As,NK_In,NK_For, NK_Vec,NK_Proc, NK_AssignAdd,NK_AssignSub,NK_AssignMul,NK_AssignDiv,NK_AssignRem,NK_AssignAnd,NK_AssignOr,NK_AssignBitXor,NK_AssignBitAnd,NK_AssignBitOr,NK_AssignShl,NK_AssignShr,NK_Field,NK_InlineAsm,NK_Repeat,NK_Keyword,NK_Again,/*??*/NK_Paren,NK_Mac,NK_ViewItem,/*todo- check if we ever really should have this or rather drill down and always get the type of viewitem. */NK_ErrorShouldNeverHaveThis,NK_Decl,NK_Root,NK_Unknown,NK_None,
 }
 
 /// Unified AST node, wraps any ast node accessible from a NodeId
@@ -102,13 +102,9 @@ pub struct FNodeInfo {
     pub kind:NodeKind,			// TODO: This will just be an enum!
     pub span:codemap::Span,
     pub node:AstNode_,			// todo- get rid of this and just make this a cache of spans for linking.
-    pub parent_id:ast::NodeId,	// todo: vector of child nodes aswell?
+    pub parent_id:ast::NodeId,
 	pub children:Vec<ast::NodeId>,
 }
-
-//pub struct FNodeInfoMapBuilder {
-//	pub all_nodes: FNodeInfoMap
-//}
 
 
 
@@ -125,14 +121,6 @@ type SPtr<T> =@T;	// temporary to be replaced later.
 /// use rf_ prefix for methods for ease of search replace when we know what the
 /// best way is !
 impl FNodeInfo {
-/*
-	pub fn visit_children(&self, all_nodes:&FNodeInfoMap, f:|all_nodes:&FNodeInfoMap,node:&FNodeInfo|) {
-		for id in all_nodes.children_of(self.id).iter() {
-			all_nodes.find(id).map(	|x|{ f(all_nodes, x)} );
-		}
-	}
-*/
-
 	pub fn rf_get_ident(&self)->Option<ast::Ident> { self.node.rf_get_ident()}
 	pub fn rf_get_id(&self)->ast::NodeId {
 		// hmm, this starts to look wrong.
@@ -221,27 +209,61 @@ impl FNodeInfo {
 }
 
 impl NodeKind{
+	// todo - make a macro to emit enum NK_... and this 'as_str'
 	pub fn as_str(self)->&'static str {
 		match self {
+			NK_Path=>"path",
 			NK_Trait=>"trait",
 			NK_Struct=>"struct",
+			NK_StructField=>"struct_field",
+			NK_Field=>"field",
 			NK_Enum=>"enum",
+			NK_Variant=>"variant",
 			NK_Fn=>"fn",
+			NK_Method=>"method",
+			NK_TyMethod=>"ty_method",
+			NK_TraitMethod=>"trait_method",
+			NK_TraitRef=>"trait_ref",
 			NK_Mod=>"mod",
-			NK_Type=>"type",
+			NK_ForeignMod=>"foreign_mod",
 			NK_Static=>"static",
+			NK_Type=>"type",
 			NK_Decl=>"decl",
 			NK_None=>"",
+			NK_Impl=>"impl",
+			NK_Tup=>"tup",
+			NK_TypeParam=>"type_param",
+			NK_Lit=>"lit",
 			_=>"NK_AS_STR_TODO",
 		}
 	}
-}
-// todo - read up on Show..
-//impl ToStr for NodeKind {
-//	fn to_str(&self)->~str{ self.as_str().to_owned()}
-//}
+	// todo - macro / enum generates this for all..
+	pub fn from_str(s:&str)->NodeKind {
+		match s {
+			"path"=>NK_Path,
+			"trait"=>NK_Trait,
+			"struct"=>NK_Struct,
+			"struct_field"=>NK_StructField,
+			"field"=>NK_Field,
+			"enum"=>NK_Enum,
+			"variant"=>NK_Variant,
+			"fn"=>NK_Fn,
+			"method"=>NK_Method,
+			"ty_method"=>NK_TyMethod,
+			"trait_method"=>NK_TraitMethod,
+			"trait_ref"=>NK_TraitRef,
+			"mod"=>NK_Mod,
+			"foreign_mod"=>NK_ForeignMod,
+			"type_param"=>NK_TypeParam,
+			"type"=>NK_Type,
+			"tup"=>NK_Tup,
+			"static"=>NK_Static,
+			"lit"=>NK_Lit,
 
-//pub type FNodeInfoMap= HashMap<ast::NodeId,FNodeInfo>;
+			_=>NK_Unknown,
+		}
+	}
+}
 
 /// Wrapper for holder of nodes, TODO - refactoring away from our local copy of the ast, wrap a cursor around theirs.
 pub struct FNodeInfoMap {
@@ -272,7 +294,7 @@ impl FNodeInfoMap {
 
 }
 
-
+// TODO - find a way to eliminate this hell!
 static mut g_root_node:Option<ast::NodeId> =None;
 pub fn rf_set_root_node<'a> (nim:&'a FNodeInfoMap, root_node: ast::NodeId) {
 	unsafe {
@@ -447,7 +469,7 @@ impl ToJsonStr for HashMap<ast::NodeId,ast::DefId> {
 // TODO - is there an official wrapper like this for all nodes in libsyntax::ast?
 // is there a way of acheiving this without one?
 // TODO: TRY USING ast_map::ast_node INSTEAD
-#[deriving(Clone)]
+//#[deriving(Clone)]
 
 // TODO - include heirachical location in wrappertype? node.parent.. node.node
 // Currently we use a [AstNode] to represent a location in the node-tree with all parent nodes.
@@ -459,10 +481,7 @@ impl ToJsonStr for HashMap<ast::NodeId,ast::DefId> {
 
 impl KindToStr for ast::Decl {
     fn kind_to_str(&self)->&'static str {
-        match self.node {
-        ast::DeclLocal(_)=>"decl_local",
-        ast::DeclItem(x)=>x.kind_to_str(),
-        }
+		self.get_kind().as_str()
     }
 	fn get_kind(&self)->NodeKind {
         match self.node {
@@ -473,18 +492,7 @@ impl KindToStr for ast::Decl {
 }
 impl KindToStr for ast::Item {
     fn kind_to_str(&self)->&'static str {
-        match self.node {
-        ast::ItemStatic(..)=>"static",
-        ast::ItemFn(..)=>"fn",
-        ast::ItemMod(_)=>"mod",
-        ast::ItemForeignMod(_)=>"foreign_mod",
-        ast::ItemTy(..)=>"ty",
-        ast::ItemEnum(..)=>"enum",
-        ast::ItemStruct(..)=>"struct",
-        ast::ItemTrait(..)=>"trait",
-        ast::ItemImpl(..)=>"impl",
-        ast::ItemMac(_)=>"mac",
-        }
+		self.get_kind().as_str()
     }
 	fn get_kind(&self)->NodeKind {
         match self.node {
@@ -503,89 +511,8 @@ impl KindToStr for ast::Item {
 }
 impl KindToStr for ast::Expr {
     fn kind_to_str(&self)->&'static str {
-        match self.node {
-        ast::ExprVstore(_,_)=>"vstore",
-        ast::ExprVec(_)=>"vec",
-        ast::ExprCall(_,_)=>"call",
-        ast::ExprMethodCall(_,_,_)=>"method_call",
-        ast::ExprTup(_)=>"tup",
-        ast::ExprBinary(binop, _,_)=>match binop {
-
-            ast::BiAdd=>"add",
-            ast::BiSub=>"sub",
-            ast::BiMul=>"mul",
-            ast::BiDiv=>"div",
-            ast::BiRem=>"rem",
-            ast::BiAnd=>"and",
-            ast::BiOr=>"or",
-            ast::BiBitXor=>"bitxor",
-            ast::BiBitAnd=>"bitand",
-            ast::BiBitOr=>"bitor",
-            ast::BiShl=>"shl",
-            ast::BiShr=>"shr",
-            ast::BiEq=>"eq",
-            ast::BiLt=>"lt",
-            ast::BiLe=>"le",
-            ast::BiNe=>"ne",
-            ast::BiGe=>"ge",
-            ast::BiGt=>"gt",
-
-        },
-        ast::ExprUnary(unop, _)=>match unop {
-            ast::UnBox=>"box",
-            ast::UnUniq=>"uniq",
-            ast::UnDeref=>"deref",
-            ast::UnNot=>"not",
-            ast::UnNeg=>"neg"
-        },
-        ast::ExprLit(_)=>"lit",
-        ast::ExprCast(_, _)=>"cast",
-        ast::ExprIf(_,_,_)=>"if",
-
-        ast::ExprWhile(_, _)=>"while",
-        ast::ExprForLoop(_, _,_, _)=>"for_loop",
-        ast::ExprLoop(_, _)=>"loop",
-        ast::ExprMatch(_, _)=>"match",
-        ast::ExprFnBlock(_, _)=>"fn_blk",
-        ast::ExprProc(..) => "proc",
-        ast::ExprBlock(_)=>"blk",
-        ast::ExprAssign(_,_)=>"assign",
-        ast::ExprAssignOp(binop, _, _)=>match binop {
-            ast::BiAdd=>"assign_add",
-            ast::BiSub=>"assign_sub",
-            ast::BiMul=>"assign_mul",
-            ast::BiDiv=>"assign_div",
-            ast::BiRem=>"assign_rem",
-            ast::BiAnd=>"assign_and",
-            ast::BiOr=>"assign_or",
-            ast::BiBitXor=>"assign_bitxor",
-            ast::BiBitAnd=>"assign_bitand",
-            ast::BiBitOr=>"assign_bitor",
-            ast::BiShl=>"assign_shl",
-            ast::BiShr=>"assign_shr",
-            ast::BiEq=>"assign_eq",
-            ast::BiLt=>"assign_lt",
-            ast::BiLe=>"assign_le",
-            ast::BiNe=>"assign_ne",
-            ast::BiGe=>"assign_ge",
-            ast::BiGt=>"assign_gt"
-        },
-        ast::ExprField(_, _, _)=>"field",
-        ast::ExprIndex(_,_)=>"index",
-        ast::ExprPath(_)=>"path",
-        ast::ExprAddrOf(_, _)=>"addr_of",
-        ast::ExprBreak(_)=>"break",
-        ast::ExprAgain(_)=>"again",
-        ast::ExprRet(_)=>"ret",
-//        ast::ExprLogLevel => "log",
-        ast::ExprInlineAsm(_)=>"inline_asm",
-        ast::ExprMac(_)=>"mac",
-        ast::ExprStruct(_,_,_)=>"expr_struct",
-        ast::ExprRepeat(_,_)=>"repeat",
-        ast::ExprParen(_)=>"paren",
-        ast::ExprBox(_, _) => "box",
-        }
-    }
+		self.get_kind().as_str()
+	}
 
     fn get_kind(&self)->NodeKind {
         match self.node {
@@ -657,7 +584,6 @@ impl KindToStr for ast::Expr {
         ast::ExprBreak(_)=>NK_Break,
         ast::ExprAgain(_)=>NK_Again,
         ast::ExprRet(_)=>NK_Return,
-//        ast::ExprLogLevel => "log",
         ast::ExprInlineAsm(_)=>NK_InlineAsm,
         ast::ExprMac(_)=>NK_Mac,
         ast::ExprStruct(_,_,_)=>NK_Struct,
@@ -686,29 +612,7 @@ impl AstNode_ {
 }
 impl KindToStr for AstNode_ {
     fn kind_to_str(&self)->&'static str {
-        //TODO subsets of view_item?
-        match *self {
-            astnode_mod(_)=>"mod",
-            astnode_view_item(_)=>"view_item",
-            astnode_item(x)=>x.kind_to_str(),
-            astnode_local(_)=>"local",
-            astnode_block(_)=>"block",
-            astnode_stmt(_)=>"stmt",
-            astnode_arm(_)=>"arm",
-            astnode_pat(_)=>"pat",
-            astnode_decl(x)=>x.kind_to_str(),
-            astnode_expr(x)=>x.kind_to_str(),
-            astnode_ty(_)=>"ty",
-            astnode_ty_method(_)=>"ty_method",
-            astnode_method(_)=>"method",
-            astnode_trait_method(_)=>"trait_method",
-            astnode_struct_def(_)=>"struct_def",
-            astnode_struct_field(_)=>"struct_field",
-            astnode_trait_ref(_)=>"trait_ref",
-            astnode_variant(_)=>"variant",
-            astnode_root=>"root",
-            astnode_none=>"none"
-        }
+		self.get_kind().as_str()
     }
     fn get_kind(&self)->NodeKind {
         //TODO subsets of view_item?

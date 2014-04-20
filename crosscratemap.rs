@@ -11,7 +11,7 @@ use jumptodefmap::{JumpToDefMap};
 use codemaput::ToZTextFilePos;
 use ioutil;
 use rfindctx::{RustFindCtx, str_of_opt_ident};
-use find_ast_node::AstNodeAccessors;
+use find_ast_node::{AstNodeAccessors,NodeKind};
 
 /*new file*/
 
@@ -28,6 +28,7 @@ pub struct CrossCrateMapItem {
     pub line:ZeroBasedIndex,
     pub col:uint,
     pub len:uint,
+	pub kind:NodeKind,
 }
 /*
 impl<S> std::hash::Hash<S> for CrossCrateMapItem {
@@ -92,7 +93,8 @@ pub fn read_cross_crate_map(crate_num:int, crate_name:&str,lib_path:&str)->~Cros
                             file_name:  toks[4].to_owned(),
                             line:   from_str(toks[5]).unwrap_or(0)-1,
                             col:    from_str(toks[6]).unwrap_or(0),
-                            len:    from_str(toks[7]).unwrap_or(0)
+                            len:    from_str(toks[7]).unwrap_or(0),
+							kind:	NodeKind::from_str(toks[8])
                         }
                     );
                 }
@@ -106,7 +108,9 @@ pub fn read_cross_crate_map(crate_num:int, crate_name:&str,lib_path:&str)->~Cros
                             file_name:  toks[2].to_owned(),
                             line:   from_str(toks[3]).unwrap_or(0)-1,
                             col:    from_str(toks[4]).unwrap_or(0),
-                            len:    from_str(toks[5]).unwrap_or(0)
+                            len:    from_str(toks[5]).unwrap_or(0),
+							kind:	NodeKind::from_str(toks[6])
+							
                         }
                     );
                 }
@@ -138,7 +142,8 @@ pub fn cross_crate_map_combine_current_crate(xcm:&mut CrossCrateMap,dc:&RustFind
 						file_name:	tfp.name.clone(),
 						line:	tfp.line as uint,
 						col:	tfp.col as uint,
-						len:	(node_info.rf_span().hi - node_info.rf_span().lo).to_uint()
+						len:	(node_info.rf_span().hi - node_info.rf_span().lo).to_uint(),
+						kind:	node_info.rf_kind()
 					}
 				);
 			}

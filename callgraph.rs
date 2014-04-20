@@ -56,7 +56,7 @@ impl CG_Options {
 /// Generate callgraph file.
 /// Todo - seperate into callgraph iterator and file writer passing a closure..
 #[deriving(Clone,Eq,TotalEq,Hash)]
-type RefCCMItem<'a> =(DefId,&'a CrossCrateMapItem,NodeKind);
+type RefCCMItem<'a> =(DefId,&'a CrossCrateMapItem);
 type SetOfItems<'a> =HashSet<RefCCMItem<'a>>;
 //type EdgeFn<'a> = &'a |RefCCMItem<'a>, RefCCMItem<'a>|;
 
@@ -96,7 +96,7 @@ fn write_call_graph_sub<'a>(nmaps:&'a NodeMaps, outdirname:&str, filename:&str,o
 	// Gather definitions.
 	// can't we write submodules directly?
 	for (&node_id,info) in nmaps.node_info_map.iter() {
-		let ccmitem = nmaps.rf_find_local_node(node_id);
+		let opt_ccmitem = nmaps.rf_find_local_node(node_id);
 		let kind=match info.rf_node() {
 			
 			astnode_item(item)=>match item.node{
@@ -108,12 +108,12 @@ fn write_call_graph_sub<'a>(nmaps:&'a NodeMaps, outdirname:&str, filename:&str,o
 			_=>NK_None,
 		};
 
-		match (ccmitem,kind) {
-			(_,NK_None)|(None,_)=>{},
-			(Some(ccmitem),kind)=>{items_per_module.insert_or_update_with(
+		match opt_ccmitem {
+			None=>{},
+			Some(ccmitem)=>{items_per_module.insert_or_update_with(
 				ccmitem.file_name.as_slice(),
 				HashSet::new(),
-				|k,v|{v.insert((ast::DefId{krate:0,node:node_id},ccmitem,kind));}
+				|k,v|{v.insert((ast::DefId{krate:0,node:node_id},ccmitem));}
 				);
 			},
 		}
@@ -129,20 +129,21 @@ fn write_call_graph_sub<'a>(nmaps:&'a NodeMaps, outdirname:&str, filename:&str,o
 		if modstr.chars().nth(0)==Some('<') {continue;} // things like <std macros>
 		// todo: use mangled module name
 		module_subgraph_begin(dotf,2, modstr, modstr.slice_to(modname.rfind('.').unwrap_or(modname.len())));
-		for &(defid,xcmi,kind) in items.iter() {
+		for &(defid,xcmi) in items.iter() {
 			if opts.local_only && defid.krate!=0 {continue;}
 			if xcmi.item_name.len()==0 {continue;}
-			match to_dotfile_symbol((defid,xcmi,kind)) {
+			match to_dotfile_symbol(&(defid,xcmi)) {
 				None=>{},
 				Some(symbol)=> {
 					let url_name= xcmi.file_name+".html#"+(xcmi.line+1).to_str();
 					dotf.write_line("\t\t"+symbol + "["+
-						if is_main((defid,xcmi,kind)){
+						if is_main((defid,xcmi)){
 							"fontcolor=white, color=\"#00000040\", fontsize=32, "}
 						else{
-							match kind {
+							match xcmi.kind {
 								NK_Trait=>"fontcolor=\"#ed9603\", fontsize=16, ",
 								NK_Struct=>"fontcolor=\"#e53700\", fontsize=16, ",
+								NK_Impl=>"fontcolor=\"#e04730\", fontsize=16, ",
 								NK_Type=>"fontcolor=\"#f52700\", fontsize=16, ",
 								NK_Enum=>"fontcolor=\"#5e9766\", fontsize=16, ",
 								NK_Fn=>"fontcolor=\"#8c6067\", fontsize=14, ",
@@ -150,7 +151,7 @@ fn write_call_graph_sub<'a>(nmaps:&'a NodeMaps, outdirname:&str, filename:&str,o
 								_=>" "
 							}
 						}+
-						"label=\""+kind.as_str()+" "
+						"label=\""+xcmi.kind.as_str()+" "
 						+xcmi.item_name+"\""
 						+" URL=\""+ url_name  + "\"];"
 					);
@@ -162,17 +163,18 @@ fn write_call_graph_sub<'a>(nmaps:&'a NodeMaps, outdirname:&str, filename:&str,o
 	// Write out all the calls..
 	// Todo- write out the library links, just de-emphasize them much further
 	dotf.write_line("\tedge [len=4.0];");
-	for &(f1,f2) in all_calls.iter() {
+	for &(ref f1,ref f2) in all_calls.iter() {
 		match (to_dotfile_symbol(f1), to_dotfile_symbol(f2)) {
 			
 			(Some(fstr1),Some(fstr2))=>{
-				let is_either=|(_,_,ref k0):RefCCMItem,(_,_,ref k1):RefCCMItem,k|->bool{*k0==k ||*k1==k};
+				let is_either=|a:&RefCCMItem,b:&RefCCMItem,k|->bool{a.ref1().kind==k || b.ref1().kind==k};
 				let edge_color=
 					if is_either(f1,f2,NK_Struct){"\"#e5370020\""} else
 					if is_either(f1,f2,NK_Trait){"\"#ed960320\""} else
 					if is_either(f1,f2,NK_Enum){"\"#5e976620\""} else
 					if is_either(f1,f2,NK_Mod){"\"#4d76ae20\""} else
 					if is_either(f1,f2,NK_Fn){"\"#8c606720\""} else
+					if is_either(f1,f2,NK_Impl){"\"#e0373020\""} else
 
 					{"\"#00000020\""};
 				dotf.write_line("\t"+ fstr1 +" -> "+ fstr2 + "[color="+edge_color+ "]" );
@@ -199,15 +201,12 @@ fn module_subgraph_begin(dotf:&mut fs::File,  depth:uint, mangled_name:&str,modu
 	dotf.write_line(indentstr2+"];");
 	dotf.write_line(indentstr+"node [style=filled, color=\"#00000010\"];");
 	dotf.write_line(indentstr+"edge [color=\"#00000010\"];");
-	
-//				dotf.write_line("\t\tlabel=\""+modname+"\";");
-//				dotf.write_line("\t\tcolor=darkgrey;");
 }
 
 fn  module_subgraph_end(dotf:&mut fs::File, depth:uint) {
 	dotf.write_line(indent(depth)+"}");
 }
-fn to_dotfile_symbol((def_id,xcmi,kind):RefCCMItem)-> Option<~str> {
+fn to_dotfile_symbol(&(ref def_id,ref xcmi):&RefCCMItem)-> Option<~str> {
 	// TODO: this should be the symbols' qualified module pathname
 	// its only coincidentally correlated with the filename+symbol most of the time.
 //	let pathname:~str=xcmi.file_name.chars().map(|x|match x{'/'|'<'|'>'|'.'=>'_',_=>x}).collect(); 
@@ -225,8 +224,8 @@ fn to_dotfile_symbol((def_id,xcmi,kind):RefCCMItem)-> Option<~str> {
 	}
 //	cleaned_up_name
 }
-fn is_main((def_id,xcmi,kind):RefCCMItem)->bool{
-	xcmi.item_name.as_slice()=="main" && kind==NK_Fn
+fn is_main((def_id,xcmi):RefCCMItem)->bool{
+	xcmi.item_name.as_slice()=="main" && xcmi.kind==NK_Fn
 }
 
 
@@ -291,7 +290,7 @@ fn gather_use_graph_rec<'a>(edges:&mut SetOfItems<'a>,nmaps:&'a NodeMaps, edge_f
 				(None,_)=>{},
 				(Some(x),kind)=>{
 					match nmaps.rf_find_source(x) {
-						Some(xcm_item)=>{edges.insert((*x,xcm_item,kind));},
+						Some(xcm_item)=>{edges.insert((*x,xcm_item));},
 						None=>{/*println!("call with no source \n", )*/} 
 					}
 				}
@@ -304,7 +303,7 @@ fn gather_node_id_def<'s>(calls:&mut SetOfItems<'s>, nmaps:&'s NodeMaps, node_id
 		Some(def_id)=>{
 			match nmaps.xcmap.find(def_id) { None=>{},
 				Some(xcm_item)=>{
-					calls.insert((*def_id, xcm_item, NK_Struct));
+					calls.insert((*def_id, xcm_item));
 				},
 			}
 		}
@@ -320,12 +319,13 @@ fn gather_use_graph_item<'a>(nmaps:&'a NodeMaps<'a>, edge_fn: &|RefCCMItem<'a>, 
 	// we dont traverse 'block' for the minute because its' done above.
 	// using the ast directly is easier, but only when we have *everything* implemented.
 
-	let caller_defid=ast::DefId{krate:0,node: item.id};
-	let opt_caller=nmaps.rf_find_source(&caller_defid);
+	let item_defid=ast::DefId{krate:0,node: item.id};
+	let opt_item=nmaps.rf_find_source(&item_defid);
 
+	// we will create edges between this item & its contents, the ends cached here:-
 	let mut edge_ends:SetOfItems=HashSet::new();
 
-	let src_kind:NodeKind= match item.node {
+	match item.node {
 		ast::ItemEnum(ref enum_def,ref generics)=>{
 			for variant in enum_def.variants.iter() {
 				match variant.node.kind {
@@ -342,14 +342,13 @@ fn gather_use_graph_item<'a>(nmaps:&'a NodeMaps<'a>, edge_fn: &|RefCCMItem<'a>, 
 //					_=>{}
 				}
 			}
-			NK_Enum
 		}
 		ast::ItemImpl(ref generics,ref opt_trait_ref,ty,ref vec_method)=>{
 //			println!("Impl Trait.. for {} for {}",str_of_ident(item.ident), ::syntax::print::pprust::ty_to_str(ty),  );
 			// impl X for Y means an edge Y->X, (or the other way round? whatever, an edge.)
 			match nmaps.jump_def_map.find(&ty.id) {None=>{},Some(ty_defid)=>
 				match nmaps.xcmap.find(ty_defid) {None=>{},Some(ccmi)=>
-					{edge_ends.insert( (*ty_defid,ccmi, NK_Struct) );}
+					{edge_ends.insert( (*ty_defid,ccmi) );}
 				}
 			};
 			match *opt_trait_ref {
@@ -362,7 +361,6 @@ fn gather_use_graph_item<'a>(nmaps:&'a NodeMaps<'a>, edge_fn: &|RefCCMItem<'a>, 
 			for method in vec_method.iter() {
 				gather_fn_decl(&mut edge_ends, nmaps,edge_fn,  method.decl, Some(&(*method.body)));
 			}
-			NK_Struct
 		}
 		ast::ItemTrait(ref generics,ref vec_trait_ref,ref vec_trait_method)=>{
 			for trait_ref in vec_trait_ref.iter() {
@@ -378,33 +376,28 @@ fn gather_use_graph_item<'a>(nmaps:&'a NodeMaps<'a>, edge_fn: &|RefCCMItem<'a>, 
 					}
 				}
 			}
-			// handle trait function declarations..
-			NK_Trait
 		}
 		ast::ItemFn(p_fn_decl, ref fn_style, ref abi, ref generics, p_block)=> {
 			gather_fn_decl(&mut edge_ends, nmaps,edge_fn,  p_fn_decl, Some(&*p_block));
-			NK_Fn
 		}
 		ast::ItemStruct(ref struct_def,ref generics)=>{
 			for struct_field in struct_def.fields.iter() {
 				gather_type(&mut edge_ends, nmaps, /*node, (child_id,child_node),*/&(*struct_field.node.ty));
 			}
-			NK_Struct
 		}
 		// nested module - todo: build a module-graph aswell - and do the collapse-logic here
 		ast::ItemMod(ref mod_)=> {
 			gather_use_graph_module(nmaps, edge_fn, mod_);
-			NK_None
 		}
-		_=>{NK_None}
+		_=>{}
 	};
 
-	for &(ref other_defid,other_ccmitem,other_kind) in edge_ends.iter() {
+	for &(ref other_defid,other_ccmitem) in edge_ends.iter() {
 		if debug_callgraph{
-			println!("\tcalls  {}() {}:{}",other_ccmitem.item_name, other_ccmitem.file_name, other_ccmitem.line+1);
+			println!("\tuses  {}() {}:{}",other_ccmitem.item_name, other_ccmitem.file_name, other_ccmitem.line+1);
 		}
-		if opt_caller.is_some() {
-			(*edge_fn)((caller_defid, opt_caller.unwrap(),src_kind), (*other_defid,other_ccmitem,other_kind));
+		if opt_item.is_some() {
+			(*edge_fn)((item_defid, opt_item.unwrap()), (*other_defid,other_ccmitem));
 
 		}
 	}
@@ -427,7 +420,7 @@ fn gather_trait_ref<'a>(edge_ends:&mut SetOfItems<'a>, nmaps:&'a NodeMaps<'a>, t
 			match nmaps.xcmap.find(defid) {None=>{},
 				Some(ref ccmitem) =>{
 //					println!(" trait..{} .. ok", ::syntax::print::pprust::path_to_str(&tr.path) );
-					edge_ends.insert( (*defid, *ccmitem,NK_Trait) );
+					edge_ends.insert( (*defid, *ccmitem) );
 				}
 			}
 		}
@@ -463,10 +456,9 @@ fn gather_type<'s>(
 					match nmaps.xcmap.find(def_id) {
 						None=>{},
 						Some(xcm_item)=>{
-							let kind = NK_Struct;
 //			let node_info=nmaps.node_info_map.find(def_id);
 //							println!(" ty_path {}\n", xcm_item.item_name);
-							calls.insert((*def_id, xcm_item, kind)   );
+							calls.insert((*def_id, xcm_item)   );
 			
 							match *opt_typarambound {None=>{},
 								Some(ref owned_slice_ty_param_bound)=>{
@@ -483,9 +475,6 @@ fn gather_type<'s>(
 				}
 			}
 		}
-//		ast::Typeof(ref expr)=>{} /* gather_expr .. */
-//		ast::TyBareFn(ref expr)=>{} /* gather_expr .. */
-//		ast::TyProc(ref expr)=>{} /* gather_expr .. */
 		_=>{},
 
 	}
