@@ -275,6 +275,11 @@ fn main() {
 			all_options.callgraph_opt.local_only=true;
 		}
 
+		// callgraph options - If didn't search any, look for 'main'..
+		if all_options.callgraph_opt.search.len()==0 {
+			all_options.callgraph_opt.search.push("main".to_owned());
+		}
+
         // Dump as html..
         if matches.opt_present("w") || !(done) {
             println!("Creating HTML pages from source & .rfx:-");

@@ -55,7 +55,7 @@ impl CG_Options {
 		CG_Options{
 			local_only:false,
 			search:vec!(~"main"),
-			max_nodes:100
+			max_nodes:1000
 		}
 	}	
 }
@@ -150,6 +150,7 @@ fn write_call_graph_sub<'a>(nmaps:&'a NodeMaps<'a,'a>, outdirname:&str, filename
 	// Filter the graph by searches and max node count..
 	let find_nodes = find_named_nodes(nmaps, &all_items, opts);
 	let graph_dist = graph_distance(nmaps, &all_items, &find_nodes,&all_calls);
+	let show_nodes = filter_nodes_by_dist(&all_items, &graph_dist, opts.max_nodes);
 
 	// Write out a cluster for all the functions in a particular sourcefile.
 	// TODO - should be able to recursively cluster directories for this..
@@ -161,12 +162,15 @@ fn write_call_graph_sub<'a>(nmaps:&'a NodeMaps<'a,'a>, outdirname:&str, filename
 		if modstr.chars().nth(0)==Some('<') {continue;} // things like <std macros>
 		// todo: use mangled module name
 		module_subgraph_begin(dotf,2, modstr, modstr.slice_to(modname.rfind('.').unwrap_or(modname.len())));
-		for &(defid,xcmi) in items.iter() {
+		for item in items.iter() {
+			let &(defid,xcmi)=item;
 			if opts.local_only && defid.krate!=0 {continue;}
 			if xcmi.item_name.len()==0 {continue;}
+			if show_nodes.contains(item)==false {continue;}
 			match to_dotfile_symbol(&(defid,xcmi)) {
 				None=>{},
 				Some(symbol)=> {
+					// write a node 
 					let url_name= xcmi.file_name+".html#"+(xcmi.line+1).to_str();
 					dotf.write_line("\t\t"+symbol + "["+
 						if is_main((defid,xcmi)){
@@ -197,6 +201,9 @@ fn write_call_graph_sub<'a>(nmaps:&'a NodeMaps<'a,'a>, outdirname:&str, filename
 	// Todo- write out the library links, just de-emphasize them much further
 	dotf.write_line("\tedge [len=4.0];");
 	for &(ref f1,ref f2) in all_calls.iter() {
+		// only show an edge if both nodes are within threshold
+		if	show_nodes.contains(f1)==false ||
+			show_nodes.contains(f2)==false {continue;};
 		match (to_dotfile_symbol(f1), to_dotfile_symbol(f2)) {
 			
 			(Some(fstr1),Some(fstr2))=>{
@@ -565,6 +572,29 @@ fn graph_distance<'a>(nmaps:&NodeMaps, all_nodes:&GraphNodes<'a>, start_nodes:&G
 	dist
 }
 
+fn filter_nodes_by_dist<'a>(all_nodes:&GraphNodes<'a>, dist:&HashMap<DefId,uint>, max_nodes:uint)->GraphNodes<'a> 
+{
+	// todo: sub-prioritize by the number of connections.
+	// score = distance<<8 + 255-max(num_connections,0)
+	let mut acc:GraphNodes=HashSet::new();
+	let	mut threshold_dist=0;
+	while true {
+		let mut num_within_threshold=0;
+		for x in all_nodes.iter() {
+			if *dist.find(&x.def_id()).unwrap_or(&0x7fff) < threshold_dist { num_within_threshold+=1 }
+		}
+		if num_within_threshold<max_nodes {
+			threshold_dist+=1;
+		} else {break;}
+	}
+	for x in all_nodes.iter() {
+		if *dist.find(&x.def_id()).unwrap_or(&0x7fff) <threshold_dist {
+			acc.insert(*x);
+			dump!(dist.find(&x.def_id()).unwrap_or(&0x7fff));
+		}
+	}
+	acc
+}
 
 
 
