@@ -55,7 +55,7 @@ impl CG_Options {
 		CG_Options{
 			local_only:false,
 			search:vec!(~"main"),
-			max_nodes:1000
+			max_nodes:200
 		}
 	}	
 }
@@ -580,10 +580,20 @@ fn filter_nodes_by_dist<'a>(all_nodes:&GraphNodes<'a>, dist:&HashMap<DefId,uint>
 	let	mut threshold_dist=0;
 	while true {
 		let mut num_within_threshold=0;
+		let mut max_dist=0;
 		for x in all_nodes.iter() {
-			if *dist.find(&x.def_id()).unwrap_or(&0x7fff) < threshold_dist { num_within_threshold+=1 }
+			let d=match (dist.find(&x.def_id())) {	
+				Some(&x) => {	
+					max_dist=::std::cmp::max(x,max_dist);
+					x
+				},
+				None=>0x7fff, // out of range, but dont update max dist in this graph
+			};
+			if d < threshold_dist { num_within_threshold+=1 }
+			
+
 		}
-		if num_within_threshold<max_nodes {
+		if num_within_threshold<max_nodes && threshold_dist<max_dist {
 			threshold_dist+=1;
 		} else {break;}
 	}
