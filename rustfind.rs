@@ -86,14 +86,14 @@ impl RF_Options {
         }
     }
 }
-pub struct NodeMaps<'a>  {
-    pub node_info_map:&'a FNodeInfoMap,
-    pub jump_def_map:&'a JumpToDefMap,
-    pub jump_ref_map:&'a JumpToRefMap,
-	pub xcmap:&'a CrossCrateMap,
-	pub krate: &'a ast::Crate,
+pub struct NodeMaps<'nm, 'ast>  {
+    pub node_info_map:&'nm FNodeInfoMap<'ast>,
+    pub jump_def_map:&'nm JumpToDefMap,
+    pub jump_ref_map:&'nm JumpToRefMap,
+	pub xcmap:&'nm CrossCrateMap,
+	pub krate: &'ast ast::Crate,
 }
-impl<'a> NodeMaps<'a> {
+impl<'a,'astl> NodeMaps<'a,'astl> {
 	pub fn rf_find_source(&'a self,defid:&ast::DefId)->Option<&'a CrossCrateMapItem>{
 		self.xcmap.find(defid)
 	}
@@ -109,16 +109,15 @@ pub macro_rules! logi{
     ($($a:expr),*)=>(println(""$(+$a.to_str())*) )
 }
 macro_rules! dump{ ($($a:expr),*)=>
-    (   {   let mut txt=~"";
+    (   {   let mut txt=StrBuf::new(); txt.push_str(file!()+":"+line!().to_str()+":");
             $( { txt=txt.append(
-                 format!("{:s}={:?}",stringify!($a),$a)+",")
+                 format!("\t{:s}={:?}",stringify!($a),$a)+";")
                 }
             );*;
-            logi!(txt);
+            ::std::io::println(txt.as_slice());
         }
     )
 }
-
 pub macro_rules! if_some {
     ($b:ident in $a:expr then $c:expr)=>(
         match $a {
@@ -149,7 +148,9 @@ fn optgroups () -> ~[getopts::OptGroup] {
         optopt("x", "external_crates", "Path to html of external crates, or '-x .' to emit relative ", "$RUST_PATH/src"),
         optflag("d", "", "TODO url for rustdoc pages to link to, default=unused"),
         optopt("o", "", "Directory to output the html / rfx files to", "OUTDIR"),
-        optflag("C", "cg-local-only", "callgraph rendering limited to local crate only",)
+        optflag("C", "cg-local-only", "callgraph rendering limited to local crate only"),
+        optflag("F", "cg-find", "find node in callgraph"),
+        optflag("m", "cg-max-nodes", "max callgraph nodes to display")
     ]
 }
 
@@ -180,6 +181,7 @@ fn main() {
     let opts = optgroups();
 	let matches = getopts(args, opts).unwrap();
     let libs1 = matches.opt_strs("L").iter().map(|s| Path::new(s.as_slice())).collect::<Vec<Path>>();
+
     let libs:Vec<Path> = if libs1.len() > 0 {
         libs1
     } else {
@@ -253,6 +255,14 @@ fn main() {
             out_path.push(out_dir + "/");
             all_options.output_dir = out_path;
         }
+        if matches.opt_present("F") {
+            let find_node = matches.opt_str("F").unwrap();
+			all_options.callgraph_opt.search.push(find_node);
+        }
+        if matches.opt_present("m") {
+            let max_nodes:uint = from_str(matches.opt_str("F").unwrap_or(~"100")).unwrap_or(100);
+			all_options.callgraph_opt.max_nodes=max_nodes;
+		}
         if matches.opt_present("r") {
             println!("Writing .rfx ast nodes/cross-crate-map:-");
 			all_options.write_html=false;

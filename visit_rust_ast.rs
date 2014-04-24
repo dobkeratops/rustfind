@@ -13,19 +13,18 @@ use codemaput::{ZTextFilePos,ToZIndexFilePos,dump_span,get_span_str};
 use find_ast_node::{AstNodeAccessors,FNodeInfo,FNodeInfoMap,AstNode_,mkAstSPtrClone,AstSPtr,astnode_trait_ref,astnode_variant,astnode_item,KindToStr,NodeTreeLoc,NodeKind};
 use fa=find_ast_node;
 
-
-pub struct FNodeInfoMapBuilder {
-	pub all_nodes: FNodeInfoMap
+pub struct FNodeInfoMapBuilder<'astl> {
+	pub all_nodes: FNodeInfoMap<'astl>
 }
 
-pub fn FNodeInfoMapBuilder_new() -> FNodeInfoMapBuilder {
-	FNodeInfoMapBuilder {
+pub fn FNodeInfoMapBuilder_new<'astl>() -> FNodeInfoMapBuilder<'astl> {
+	FNodeInfoMapBuilder::<'astl> {
 		all_nodes: FNodeInfoMap::new()
 	}
 }
 
 
-impl self::FNodeInfoMapBuilder {
+impl<'astl> self::FNodeInfoMapBuilder<'astl> {
 //	use visit_rust_ast::FNodeInfoMapBuilder;
 
     pub fn trait_ref(&mut self, tr:&ast::TraitRef, p: ast::NodeId) {
@@ -38,7 +37,7 @@ impl self::FNodeInfoMapBuilder {
     }
 }
 
-pub fn rf_push_parent_child(spt:&mut FNodeInfoMap, parent_id:ast::NodeId, child_id: ast::NodeId) {
+pub fn rf_push_parent_child<'astl>(spt:&mut FNodeInfoMap<'astl>, parent_id:ast::NodeId, child_id: ast::NodeId) {
 	let parent_node = spt.find_mut(&parent_id);
 	match (parent_node) {
 		Some(p)=> p.children.push(child_id),
@@ -46,7 +45,7 @@ pub fn rf_push_parent_child(spt:&mut FNodeInfoMap, parent_id:ast::NodeId, child_
 	}
 }
 
-pub fn push_span(spt:&mut FNodeInfoMap,node_id:ast::NodeId, parent:ast::NodeId, _:Option<ast::Ident>,k:NodeKind, s:codemap::Span,nd:AstNode_) {
+pub fn push_span<'astl>(spt:&mut FNodeInfoMap<'astl>,node_id:ast::NodeId, parent:ast::NodeId, _:Option<ast::Ident>,k:NodeKind, s:codemap::Span,nd:AstNode_<'astl>) {
 	// grr. we would really like to traverse children and gather array of ptrs to chilren as a child pointer, 
 	// instead we're 'push_back' reallocing all over the place, yuk.
 
@@ -83,7 +82,7 @@ pub fn push_spanned<T:AstNodeAccessors>(spt:&mut FNodeInfoMap,k:NodeKind,s:&code
     }
 }
 
-impl Visitor<ast::NodeId> for FNodeInfoMapBuilder {
+impl<'astl> Visitor<ast::NodeId> for FNodeInfoMapBuilder<'astl> {
     // use default impl
 //   fn visit_view_item(&mut self, a:&ast::ViewItem, p: ast::NodeId) {
 //       walk_view_item(self, a, s);
@@ -211,19 +210,19 @@ fn expr_get_ident(_ :&ast::Expr)->Option<ast::Ident> {
 }
 
 #[deriving(Clone)]
-pub struct FindAstNodeSt {
-    pub result: NodeTreeLoc,        // todo - full tree path, all the parent nodes.
+pub struct FindAstNodeSt<'astl> {
+    pub result: NodeTreeLoc<'astl>,        // todo - full tree path, all the parent nodes.
     pub location: u32,
     pub stop: bool,
 //  node_spans: HashMap<ast::node_id,codemap::span>
 }
 
-pub struct Finder {
-    pub env: FindAstNodeSt
+pub struct Finder<'astl> {
+    pub env: FindAstNodeSt<'astl>
 }
 
-impl Finder {
-    pub fn new (location: u32) -> Finder {
+impl<'astl> Finder<'astl> {
+    pub fn new (location: u32) -> Finder<'astl> {
         let env = FindAstNodeSt{
             result:Vec::from_elem(1,fa::astnode_root), location:location, stop:false
 
@@ -239,7 +238,7 @@ pub fn span_contains(x: u32, s: codemap::Span)->bool {
     BytePos(x)>=s.lo && BytePos(x)<s.hi
 }
 
-impl Visitor<()> for Finder {
+impl<'astl> Visitor<()> for Finder<'astl> {
     fn visit_view_item(&mut self, a:&ast::ViewItem, _: ()) {
         if span_contains(self.env.location, a.span) {
             self.env.result.push(fa::astnode_view_item(mkAstSPtrClone(a)));;

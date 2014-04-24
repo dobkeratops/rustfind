@@ -62,8 +62,10 @@ pub enum NodeKind {	// typedef this, so we can swap in a rust identifier. its *n
 
 /// Unified AST node, wraps any ast node accessible from a NodeId
 /// TODO - add a lifetime, we suspect this will become a borrowedptr
-#[deriving(Clone)]
-pub enum AstNode_ { 
+/// THIS IS REALLY AN AST NODE POINTER, DONT PANIC
+/// - its currently a @ptr, but will possily changed to a borrowed reference?
+#[deriving(Clone,TotalEq,Hash,Eq)]
+pub enum AstNode_<'a> { 
 	// todo: CamelCase
     astnode_mod(AstSPtr<ast::Mod>),
     astnode_view_item(AstSPtr<ast::ViewItem>),
@@ -95,13 +97,13 @@ pub enum AstNode_ {
 
 /// This will be refactored into something like clang 'Cursor', more like an iterator.
 #[deriving(Clone)]
-pub struct FNodeInfo {
+pub struct FNodeInfo<'a> {
 //	pub id:	ast::NodeId,					// id of this node.
 //    pub ident:Option<ast::Ident>,
 	
     pub kind:NodeKind,			// TODO: This will just be an enum!
     pub span:codemap::Span,
-    pub node:AstNode_,			// todo- get rid of this and just make this a cache of spans for linking.
+    pub node:AstNode_<'a>,			// todo- get rid of this and just make this a cache of spans for linking.
     pub parent_id:ast::NodeId,
 	pub children:Vec<ast::NodeId>,
 }
@@ -120,7 +122,7 @@ type SPtr<T> =@T;	// temporary to be replaced later.
 /// we suspect either these are already available, or they will be added in time.
 /// use rf_ prefix for methods for ease of search replace when we know what the
 /// best way is !
-impl FNodeInfo {
+impl<'a> FNodeInfo<'a> {
 	pub fn rf_get_ident(&self)->Option<ast::Ident> { self.node.rf_get_ident()}
 	pub fn rf_get_id(&self)->ast::NodeId {
 		// hmm, this starts to look wrong.
@@ -130,7 +132,7 @@ impl FNodeInfo {
 	}
 	pub fn rf_kind<'a> (&'a self)->NodeKind { self.kind }
 	pub fn rf_span(&self)->codemap::Span { self.span }
-	pub fn rf_node(&self)->AstNode_ { self.node }
+	pub fn rf_node(&self)->AstNode_<'a> { self.node }
 	pub fn rf_get_parent_id(&self)->Option<ast::NodeId> { Some(self.parent_id) } // surely the root node doesn't have a parent. Is the root node in the same system ?
 	pub fn rf_visit_children(&self, nim:&FNodeInfoMap,  f:|node_id:ast::NodeId, node_info:&FNodeInfo|) {
 		for nid in self.children.iter() {
@@ -156,7 +158,7 @@ impl FNodeInfo {
 			_=>None,
 		}
 	}
-	pub fn rf_as_ast_node<'a>(&'a self)->&'a AstNode_ {
+	pub fn rf_as_ast_node<'a>(&'a self)->&'a AstNode_<'a> {
 		&self.node
 	}
 
@@ -266,29 +268,29 @@ impl NodeKind{
 }
 
 /// Wrapper for holder of nodes, TODO - refactoring away from our local copy of the ast, wrap a cursor around theirs.
-pub struct FNodeInfoMap {
-	pub fni_hashmap:HashMap<ast::NodeId,FNodeInfo>
+pub struct FNodeInfoMap<'ast_lifetime> {
+	pub fni_hashmap:HashMap<ast::NodeId,FNodeInfo<'ast_lifetime>>
 }
 
 
-impl FNodeInfoMap {
-	pub fn new()->FNodeInfoMap{
+impl<'ast> FNodeInfoMap<'ast> {
+	pub fn new()->FNodeInfoMap<'ast>{
 		FNodeInfoMap{ fni_hashmap: HashMap::new() }
 	}
-	pub fn find<'a>(&'a self,id:&ast::NodeId)->Option<&'a FNodeInfo> {
+	pub fn find<'a>(&'a self,id:&ast::NodeId)->Option<&'a FNodeInfo<'ast>> {
 		self.fni_hashmap.find(id)
 	}
-	pub fn find_mut<'a> (&'a mut self,id:&ast::NodeId)->Option<&'a mut FNodeInfo> {
+	pub fn find_mut<'a> (&'a mut self,id:&ast::NodeId)->Option<&'a mut FNodeInfo<'ast>> {
 		self.fni_hashmap.find_mut(id)
 	}
-	pub fn insert(&mut self, id:ast::NodeId, v:FNodeInfo) {
+	pub fn insert(&mut self, id:ast::NodeId, v:FNodeInfo<'ast>) {
 		self.fni_hashmap.insert(id,v);
 	}
-	pub fn find_or_insert<'a>(&'a mut self, id:ast::NodeId, v:FNodeInfo)->&'a mut FNodeInfo {
+	pub fn find_or_insert<'a>(&'a mut self, id:ast::NodeId, v:FNodeInfo)->&'a mut FNodeInfo<'ast> {
 		self.fni_hashmap.find_or_insert(id,v)
 	}
 	pub fn len(&self)->uint { self.fni_hashmap.len() }
-	pub fn iter<'a>(&'a self)->::collections::hashmap::Entries<'a,ast::NodeId, FNodeInfo>  {
+	pub fn iter<'a>(&'a self)->::collections::hashmap::Entries<'a,ast::NodeId, FNodeInfo<'ast> >  {
 		self.fni_hashmap.iter()
 	}
 
@@ -338,8 +340,8 @@ pub fn rf_get_root_node<'a> (nim:&'a FNodeInfoMap)->Option<(ast::NodeId,&'a FNod
 */
 
 
-pub type NodeTreeLoc = Vec<AstNode_>;
-pub fn dump_node_tree_loc(ndt:&NodeTreeLoc) {
+pub type NodeTreeLoc<'a> = Vec<AstNode_<'a>>;
+pub fn dump_node_tree_loc<'a>(ndt:&NodeTreeLoc<'a>) {
 //  for ndt.iter().advance |x|
     for x in ndt.iter()
      {println!("{}.", x.kind_to_str());}
@@ -445,7 +447,7 @@ pub fn node_spans_table_to_json_sub(dc:&RustFindCtx,ns:&FNodeInfoMap)->StrBuf {
     r
 }
 
-impl ToJsonStrFc for FNodeInfoMap {
+impl<'astl> ToJsonStrFc for FNodeInfoMap<'astl> {
     fn to_json_str(&self,dc:&RustFindCtx)->~str {
         let mut ret=StrBuf::from_str("[\n");
 		ret.push_str(node_spans_table_to_json_sub(dc,self).as_slice());
@@ -596,7 +598,7 @@ impl KindToStr for ast::Expr {
 
 }
 
-impl AstNode_ {
+impl<'a> AstNode_<'a> {
     // Accessor for the node_id to use for getting definition
     // TODO - clarify by wrapping access to def_map here?
     pub fn rf_ty_node_id(&self)->Option<ast::NodeId> {
@@ -610,7 +612,7 @@ impl AstNode_ {
         }
     }
 }
-impl KindToStr for AstNode_ {
+impl<'astl> KindToStr for AstNode_<'astl> {
     fn kind_to_str(&self)->&'static str {
 		self.get_kind().as_str()
     }
@@ -822,7 +824,7 @@ impl AstNodeAccessors for ast::Mod  {
     fn rf_get_ident(&self)->Option<ast::Ident>{ None }
 }
 
-impl AstNodeAccessors for AstNode_ {
+impl<'astl> AstNodeAccessors for AstNode_<'astl> {
     fn rf_get_id(&self)->Option<ast::NodeId> {
         // todo - should be option<node_id> really..
         match *self {
@@ -878,14 +880,14 @@ impl AstNodeAccessors for AstNode_ {
 
 
 
-pub fn get_ast_node_of_node_id(info:&FNodeInfoMap,id:ast::NodeId)->Option<AstNode_> {
+pub fn get_ast_node_of_node_id<'astl>(info:&FNodeInfoMap<'astl>,id:ast::NodeId)->Option<AstNode_<'astl>> {
     match info.find(&id) {
         None=>None,
         Some(node_info)=>Some(node_info.node)
     }
 }
 
-pub fn get_node_info_str(dc:&RustFindCtx,node:&NodeTreeLoc)->~str
+pub fn get_node_info_str<'astl>(dc:&RustFindCtx,node:&NodeTreeLoc<'astl>)->~str
 {
     fn path_to_str(path:&ast::Path)->~str {
         let mut acc=~"";
@@ -1004,13 +1006,13 @@ pub fn safe_node_id_to_type(cx: &ty::ctxt, id: ast::NodeId) -> Option<ty::t> {
 
 
 
-pub fn def_of_symbol_to_str(_:&RustFindCtx, _:&FNodeInfoMap, _:&HashMap<ast::NodeId, ast::DefId>, _:&str)->~str {
+pub fn def_of_symbol_to_str<'astl>(_:&RustFindCtx, _:&FNodeInfoMap<'astl>, _:&HashMap<ast::NodeId, ast::DefId>, _:&str)->~str {
     ~"TODO"
 }
 
 
 // TODO- this should return a slice?
-pub fn get_node_source(tc:&ty::ctxt, nim:&FNodeInfoMap, did:ast::DefId)->~str {
+pub fn get_node_source<'astl>(tc:&ty::ctxt, nim:&FNodeInfoMap<'astl>, did:ast::DefId)->~str {
     if did.krate==0{
         match nim.find(&did.node) {
             None=>~"",
@@ -1023,7 +1025,7 @@ pub fn get_node_source(tc:&ty::ctxt, nim:&FNodeInfoMap, did:ast::DefId)->~str {
     }
 }
 
-pub fn dump_node_source_for_single_file_only(text:&[u8], ns:&FNodeInfoMap, id:ast::NodeId) {
+pub fn dump_node_source_for_single_file_only<'astl>(text:&[u8], ns:&FNodeInfoMap<'astl>, id:ast::NodeId) {
     match ns.find(&id) {
         None=>logi!("()"),
         Some(info)=>{
@@ -1033,7 +1035,7 @@ pub fn dump_node_source_for_single_file_only(text:&[u8], ns:&FNodeInfoMap, id:as
 }
 
 // Step thru everything here...
-fn verify_parent_links(infomap:&FNodeInfoMap) {
+fn verify_parent_links<'astl>(infomap:&FNodeInfoMap<'astl>) {
 	for (id,info) in infomap.iter() {
 //		let parent_info = infomap.find(&info.parent)
 	}

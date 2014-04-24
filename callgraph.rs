@@ -47,21 +47,44 @@ pub fn dump_functions(nmaps:&NodeMaps) {
 pub struct CG_Options {	
 	// TODO - when we have a solid IDE, we can stop Clike namespacing
 	pub local_only:bool,
+	pub search: Vec<~str>,	// nodes to look for..
+	pub max_nodes:uint
 }
 impl CG_Options {
 	pub fn new()->CG_Options {
-		CG_Options{local_only:false}
+		CG_Options{
+			local_only:false,
+			search:vec!(~"main"),
+			max_nodes:100
+		}
 	}	
 }
+
 /// Generate callgraph file.
 /// Todo - seperate into callgraph iterator and file writer passing a closure..
 #[deriving(Clone,Eq,TotalEq,Hash)]
-type RefCCMItem<'a> =(DefId,&'a CrossCrateMapItem);
-type SetOfItems<'a> =HashSet<RefCCMItem<'a>>;
-//type EdgeFn<'a> = &'a |RefCCMItem<'a>, RefCCMItem<'a>|;
+type GraphNode<'a> =(
+				DefId,
+				&'a CrossCrateMapItem	// 
+					// if its a local-node, we've got the whole thing. if its from the 'crosscratemap'.. limited info
+			);
 
+trait GraphNodeAcessors {
+	fn def_id(&self)->DefId;
+	fn ident_str<'a>(&'a self)->&'a str;
+}
+
+impl<'a> GraphNodeAcessors for  GraphNode<'a> {
+	fn def_id(&self)->DefId { self.val0()}
+	fn ident_str<'a>(&'a self)->&'a str { self.val1().item_name.as_slice() }
+}
+
+type GraphNodes<'a> =HashSet<GraphNode<'a>>;
+type GraphEdge<'a> =(GraphNode<'a>,GraphNode<'a>);
+type GraphEdges<'a> =HashSet<GraphEdge<'a>>;
+static g_debug_dist:bool=false;
 // TODO: Use mangled symbols for the nodes.
-pub fn write_call_graph<'a>(nmaps:&'a NodeMaps, outdirname:&str, filename:&str,opts:&CG_Options) {
+pub fn write_call_graph<'a>(nmaps:&'a NodeMaps<'a,'a>, outdirname:&str, filename:&str,opts:&CG_Options) {
 
 	gather_use_graph( nmaps, &|x,y|{});
 
@@ -72,11 +95,13 @@ pub fn write_call_graph<'a>(nmaps:&'a NodeMaps, outdirname:&str, filename:&str,o
 	}
 }
 
-fn write_call_graph_sub<'a>(nmaps:&'a NodeMaps, outdirname:&str, filename:&str,opts:&CG_Options, dotf:&mut fs::File) {
+
+fn write_call_graph_sub<'a>(nmaps:&'a NodeMaps<'a,'a>, outdirname:&str, filename:&str,opts:&CG_Options, dotf:&mut fs::File) {
 	println!("writing callgraph file ..\n");
 	dotf.write_line("digraph "+ filename +" {");
-	let mut items_per_module:HashMap<&str,HashSet<RefCCMItem>> =HashMap::new();
-	let mut all_calls:HashSet<(RefCCMItem<'a>,RefCCMItem<'a>)> =HashSet::new();
+	let mut all_items:GraphNodes = HashSet::new();
+	let mut items_per_module:HashMap<&str,GraphNodes > =HashMap::new();
+	let mut all_calls:GraphEdges =HashSet::new();
 	dotf.write_line("\tnode [style=filled, color=\"#f0f0f0\", fontsize=12 ];");
 //	dotf.write_line("\tedge [color=\"#000000f0\", fontsize=12 ]");
 	dotf.write_line("\tedge [color=\"#00000020\"];");
@@ -86,6 +111,8 @@ fn write_call_graph_sub<'a>(nmaps:&'a NodeMaps, outdirname:&str, filename:&str,o
 		&|caller,callee| {
 			for x in [caller,callee].iter() {
 				items_per_module.insert_or_update_with(x.val1().file_name.as_slice(), HashSet::new(), |k,v|{v.insert(*x);});
+				all_items.insert(caller);
+				all_items.insert(callee);
 			}
 			if !(opts.local_only && (callee.val0().krate!=0 || caller.val0().krate!=0)) {
 				all_calls.insert( (caller, callee) );
@@ -97,15 +124,16 @@ fn write_call_graph_sub<'a>(nmaps:&'a NodeMaps, outdirname:&str, filename:&str,o
 	// can't we write submodules directly?
 	for (&node_id,info) in nmaps.node_info_map.iter() {
 		let opt_ccmitem = nmaps.rf_find_local_node(node_id);
-		let kind=match info.rf_node() {
+		let optp_ast_node=match info.rf_node() {
 			
 			astnode_item(item)=>match item.node{
-				ast::ItemEnum(_,_)=>NK_Enum,
-				ast::ItemStruct(_,_)=>NK_Struct,
-				ast::ItemTrait(_,_,_)=>NK_Trait,
-				_=>NK_None,
+				ast::ItemEnum(_,_)=>Some(info.rf_node()),
+				ast::ItemStruct(_,_)=>Some(info.rf_node()),
+				ast::ItemTrait(_,_,_)=>Some(info.rf_node()),
+
+				_=>None,
 			},
-			_=>NK_None,
+			_=>None,
 		};
 
 		match opt_ccmitem {
@@ -118,6 +146,10 @@ fn write_call_graph_sub<'a>(nmaps:&'a NodeMaps, outdirname:&str, filename:&str,o
 			},
 		}
 	}
+
+	// Filter the graph by searches and max node count..
+	let find_nodes = find_named_nodes(nmaps, &all_items, opts);
+	let graph_dist = graph_distance(nmaps, &all_items, &find_nodes,&all_calls);
 
 	// Write out a cluster for all the functions in a particular sourcefile.
 	// TODO - should be able to recursively cluster directories for this..
@@ -151,7 +183,7 @@ fn write_call_graph_sub<'a>(nmaps:&'a NodeMaps, outdirname:&str, filename:&str,o
 								_=>" "
 							}
 						}+
-						"label=\""+xcmi.kind.as_str()+" "
+						"label=\""+xcmi.kind.as_str()+ " "
 						+xcmi.item_name+"\""
 						+" URL=\""+ url_name  + "\"];"
 					);
@@ -160,6 +192,7 @@ fn write_call_graph_sub<'a>(nmaps:&'a NodeMaps, outdirname:&str, filename:&str,o
 		}
 		module_subgraph_end(dotf, 2);
 	}
+
 	// Write out all the calls..
 	// Todo- write out the library links, just de-emphasize them much further
 	dotf.write_line("\tedge [len=4.0];");
@@ -167,7 +200,7 @@ fn write_call_graph_sub<'a>(nmaps:&'a NodeMaps, outdirname:&str, filename:&str,o
 		match (to_dotfile_symbol(f1), to_dotfile_symbol(f2)) {
 			
 			(Some(fstr1),Some(fstr2))=>{
-				let is_either=|a:&RefCCMItem,b:&RefCCMItem,k|->bool{a.ref1().kind==k || b.ref1().kind==k};
+				let is_either=|a:&GraphNode,b:&GraphNode,k|->bool{a.ref1().kind==k || b.ref1().kind==k};
 				let edge_color=
 					if is_either(f1,f2,NK_Struct){"\"#e5370020\""} else
 					if is_either(f1,f2,NK_Trait){"\"#ed960320\""} else
@@ -206,7 +239,7 @@ fn module_subgraph_begin(dotf:&mut fs::File,  depth:uint, mangled_name:&str,modu
 fn  module_subgraph_end(dotf:&mut fs::File, depth:uint) {
 	dotf.write_line(indent(depth)+"}");
 }
-fn to_dotfile_symbol(&(ref def_id,ref xcmi):&RefCCMItem)-> Option<~str> {
+fn to_dotfile_symbol(&(ref def_id,ref xcmi):&GraphNode)-> Option<~str> {
 	// TODO: this should be the symbols' qualified module pathname
 	// its only coincidentally correlated with the filename+symbol most of the time.
 //	let pathname:~str=xcmi.file_name.chars().map(|x|match x{'/'|'<'|'>'|'.'=>'_',_=>x}).collect(); 
@@ -224,7 +257,7 @@ fn to_dotfile_symbol(&(ref def_id,ref xcmi):&RefCCMItem)-> Option<~str> {
 	}
 //	cleaned_up_name
 }
-fn is_main((def_id,xcmi):RefCCMItem)->bool{
+fn is_main((def_id,xcmi):GraphNode)->bool{
 	xcmi.item_name.as_slice()=="main" && xcmi.kind==NK_Fn
 }
 
@@ -238,14 +271,13 @@ fn is_main((def_id,xcmi):RefCCMItem)->bool{
 
 static debug_callgraph:bool=false;
 
-//type EdgeFn<'a> = 'a|RefCCMItem<'a>, RefCCMItem<'a>|;
 
-pub fn gather_use_graph<'a>(nmaps:&'a NodeMaps, edge_fn: &|RefCCMItem<'a>, RefCCMItem<'a>|)
+pub fn gather_use_graph<'a>(nmaps:&'a NodeMaps<'a,'a>, edge_fn: &|GraphNode<'a>, GraphNode<'a>|)
 {
 	gather_use_graph_module(nmaps, edge_fn, &nmaps.krate.module);
 }
 
-pub fn gather_use_graph_module<'a>(nmaps:&'a NodeMaps, edge_fn: &|RefCCMItem<'a>, RefCCMItem<'a>|, module:&ast::Mod) {
+pub fn gather_use_graph_module<'a>(nmaps:&'a NodeMaps<'a,'a>, edge_fn: &|GraphNode<'a>, GraphNode<'a>|, module:&ast::Mod) {
 
 	for &item in module.items.iter() {
 //		let item_shared_ref = *item; // we know its valid/ lets unsafe transmute it :(
@@ -255,7 +287,7 @@ pub fn gather_use_graph_module<'a>(nmaps:&'a NodeMaps, edge_fn: &|RefCCMItem<'a>
 
 }
 
-fn gather_use_graph_rec<'a>(edges:&mut SetOfItems<'a>,nmaps:&'a NodeMaps, edge_fn:&|RefCCMItem<'a>, RefCCMItem<'a>|, node_id:ast::NodeId)
+fn gather_use_graph_rec<'a>(edges:&mut GraphNodes<'a>,nmaps:&'a NodeMaps<'a,'a>, edge_fn:&|GraphNode<'a>, GraphNode<'a>|, node_id:ast::NodeId)
 {
 	let node=nmaps.node_info_map.find(&node_id);
 	if !node.is_some() {return;}
@@ -298,7 +330,7 @@ fn gather_use_graph_rec<'a>(edges:&mut SetOfItems<'a>,nmaps:&'a NodeMaps, edge_f
 		}
 	);
 }
-fn gather_node_id_def<'s>(calls:&mut SetOfItems<'s>, nmaps:&'s NodeMaps, node_id:ast::NodeId) {
+fn gather_node_id_def<'s>(calls:&mut GraphNodes<'s>, nmaps:&'s NodeMaps, node_id:ast::NodeId) {
 	match nmaps.jump_def_map.find(&node_id) { None=>{},
 		Some(def_id)=>{
 			match nmaps.xcmap.find(def_id) { None=>{},
@@ -314,7 +346,7 @@ fn gather_node_id_def<'s>(calls:&mut SetOfItems<'s>, nmaps:&'s NodeMaps, node_id
 
 
 // todo - walk generics..
-fn gather_use_graph_item<'a>(nmaps:&'a NodeMaps<'a>, edge_fn: &|RefCCMItem<'a>, RefCCMItem<'a>|, item:&ast::Item) {
+fn gather_use_graph_item<'a>(nmaps:&'a NodeMaps<'a,'a>, edge_fn: &|GraphNode<'a>, GraphNode<'a>|, item:&ast::Item) {
 	// todo: VisitChildren can actually be done here, using the AST itself.
 	// we dont traverse 'block' for the minute because its' done above.
 	// using the ast directly is easier, but only when we have *everything* implemented.
@@ -323,7 +355,7 @@ fn gather_use_graph_item<'a>(nmaps:&'a NodeMaps<'a>, edge_fn: &|RefCCMItem<'a>, 
 	let opt_item=nmaps.rf_find_source(&item_defid);
 
 	// we will create edges between this item & its contents, the ends cached here:-
-	let mut edge_ends:SetOfItems=HashSet::new();
+	let mut edge_ends:GraphNodes=HashSet::new();
 
 	match item.node {
 		ast::ItemEnum(ref enum_def,ref generics)=>{
@@ -403,7 +435,7 @@ fn gather_use_graph_item<'a>(nmaps:&'a NodeMaps<'a>, edge_fn: &|RefCCMItem<'a>, 
 	}
 }
 
-fn gather_fn_decl<'a> (edge_ends:&mut SetOfItems<'a>, nmaps:&'a NodeMaps<'a>, edge_fn: &|RefCCMItem<'a>, RefCCMItem<'a>| ,  p_fn_decl:&ast::FnDecl, opt_block:Option<&ast::Block>){ 
+fn gather_fn_decl<'a> (edge_ends:&mut GraphNodes<'a>, nmaps:&'a NodeMaps<'a,'a /* a<astl shorter , should be ok*/>, edge_fn: &|GraphNode<'a>, GraphNode<'a>| ,  p_fn_decl:&ast::FnDecl, opt_block:Option<&ast::Block>){ 
 	for arg in p_fn_decl.inputs.iter() {
 		gather_type(edge_ends,nmaps, arg.ty);
 	}
@@ -413,7 +445,7 @@ fn gather_fn_decl<'a> (edge_ends:&mut SetOfItems<'a>, nmaps:&'a NodeMaps<'a>, ed
 	}
 }
 
-fn gather_trait_ref<'a>(edge_ends:&mut SetOfItems<'a>, nmaps:&'a NodeMaps<'a>, tr:&ast::TraitRef) {
+fn gather_trait_ref<'a>(edge_ends:&mut GraphNodes<'a>, nmaps:&'a NodeMaps<'a,'a>, tr:&ast::TraitRef) {
 //	println!(" trait..{}", ::syntax::print::pprust::path_to_str(&tr.path) );
 	match nmaps.jump_def_map.find(&tr.ref_id) {None=>{},
 		Some(defid)=>{
@@ -429,7 +461,7 @@ fn gather_trait_ref<'a>(edge_ends:&mut SetOfItems<'a>, nmaps:&'a NodeMaps<'a>, t
 
 
 fn gather_type<'s>(
-		calls:&mut SetOfItems<'s>,
+		calls:&mut GraphNodes<'s>,
 		nmaps:&'s NodeMaps, 
 //		node:&FNodeInfo, 
 //		(child_id,child_node):(ast::NodeId, &FNodeInfo),
@@ -480,9 +512,58 @@ fn gather_type<'s>(
 	}
 }
 
+fn find_named_nodes<'a>(nmaps:&NodeMaps, all_nodes:&GraphNodes<'a>, opts:&CG_Options)->GraphNodes<'a> {
+	let mut acc=HashSet::new();
+	for node in all_nodes.iter() {
+		// todo: search name must be split into components
+		// look for connections A::B == A connected to B
+		// ... use the connection table for this..
+		for search_name in opts.search.iter() {
+			if node.ident_str() == search_name.as_slice() { acc.insert(*node); }
+		}
+	}
+	acc
+}
 
+fn graph_distance<'a>(nmaps:&NodeMaps, all_nodes:&GraphNodes<'a>, start_nodes:&GraphNodes<'a>, 
+			edges:&GraphEdges)->HashMap<DefId, uint>
+{
+	// TODO: if start_nodes is empty - all nodes have equal distance of zero. else..
+	let invalid:uint=!0;
+	let mut dist:HashMap<DefId,uint> =HashMap::new();
+	let list= if start_nodes.len()>0 {start_nodes} else {all_nodes};
+	for node in list.iter() {
+		dist.insert(node.def_id(),0);
+	};
+	let mut changed=false;
+	while true {
+		changed=false;
+		for edge in edges.iter() {
+			let id0=edge.val0().def_id();
+			let id1=edge.val1().def_id();
+			let change:Option<(DefId,uint)> = {
+				let d0=dist.find(&id0).clone();
+				let d1=dist.find(&id1).clone();
+				if (d0==None && d1.is_some()) {
+					Some((id0, d1.unwrap()+1))
 
+				} else
+				if (d0.is_some() && d1==None) {
+					Some((id1, d0.unwrap()+1))
+				} else {None}
+			};
+			match change {
+				Some((id,d))=>{dist.insert(id,d); changed=true;}
+				None=>{},
+			}
 
+// todo - pattern match didn't work because we were modifying what we matched on , can it work?
+		}
+		if changed==false{ break;}
+	}
+
+	dist
+}
 
 
 
