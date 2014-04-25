@@ -51,7 +51,7 @@ pub fn lookup_def_of_expr(dc:&RustFindCtx, expr:&ast::Expr, nodeinfomap:&FNodeIn
 		//				let rec_ty_node= astnode_expr(*receiver).ty_node_id();
 		//				let rec_ty_node1= dc.tycx.node_types.find(&(*id as uint));
 
-			let method_map =dc.ca.maps.method_map;
+			let method_map =&dc.ca.ty_cx.method_map;
 			let method_call=typeck::MethodCall{expr_id:expr.id,  autoderef:0}; // TODO is that e.id or call_ident...
 			//cfg[DEBUG] io::println(format!("e.id={:?} call_ident={:?}", e.id, call_ident.name));
 			match method_map.borrow().get(&method_call).origin {
@@ -283,7 +283,7 @@ pub fn lookup_def_of_node_sub(dc:&RustFindCtx,node:&AstNode_,m:ShowDefMode,nim:&
 
 pub fn make_jump_to_def_map(dc:&RustFindCtx)->( FNodeInfoMap, ~HashMap<ast::NodeId,ast::DefId>,~JumpToDefMap)
 {
-    let mut t = Profiler::new("make_jdm");
+    let  t = Profiler::new("make_jdm");
     let nim=build_node_info_map(dc.crate_);
     let ndm=build_node_def_node_table(dc);
     let jdm=build_jump_to_def_map(dc, &nim,ndm);

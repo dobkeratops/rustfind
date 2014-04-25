@@ -39,7 +39,7 @@ impl<'astl> self::FNodeInfoMapBuilder<'astl> {
 
 pub fn rf_push_parent_child<'astl>(spt:&mut FNodeInfoMap<'astl>, parent_id:ast::NodeId, child_id: ast::NodeId) {
 	let parent_node = spt.find_mut(&parent_id);
-	match (parent_node) {
+	match parent_node {
 		Some(p)=> p.children.push(child_id),
 		_=>{},
 	}
@@ -126,7 +126,7 @@ impl<'astl> Visitor<ast::NodeId> for FNodeInfoMapBuilder<'astl> {
                     self.variant(*v, p);
                 }
             }
-            ast::ItemTrait(_, ref tr, _) => {
+            ast::ItemTrait(_,_, ref tr, _) => {
                 for t in tr.iter() {
                     self.trait_ref(t, p);
                 }

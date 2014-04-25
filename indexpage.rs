@@ -32,7 +32,7 @@ pub fn write_index_html(source_dir: &Path,extentions:&[~str], options:&::RF_Opti
 						let ext=path.extension_str().unwrap_or(&"");;	
 						let filename=path.filename_str().unwrap_or(&"");
 						let dirname=path.dirname_str().unwrap_or(&"");
-						if (ext=="rs") { 
+						if ext=="rs" { 
 							let link_target= path.as_str().unwrap_or("").to_owned()+".html";
 							if Path::new(link_target.as_slice()).exists() {
 								let bucket=files_per_dir.find_or_insert(
@@ -65,7 +65,7 @@ pub fn write_index_html(source_dir: &Path,extentions:&[~str], options:&::RF_Opti
 
 	doc.begin_tag("c40").writeln(rust2html::get_git_branch_info()).end_tag();
 
-	if (options.write_callgraph) {
+	if options.write_callgraph {
 		doc.begin_tag_link("callgraph.html");
 		doc.write("callgraph");
 		doc.end_tag();
@@ -116,7 +116,6 @@ fn write_grid_of_text_links(doc:&mut HtmlWriter, links:&Vec<(~str,~str)>) {
 	}
 	if column!=0 {
 		doc.write_tag("br");
-		column=0;
 	}
 
 }

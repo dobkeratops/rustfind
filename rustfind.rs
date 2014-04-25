@@ -5,6 +5,7 @@
 #![allow(non_camel_case_types)]
 #![allow(unused_variable)]
 #![allow(unused_imports)]
+#![allow(unused_must_use)]
 
 extern crate syntax;
 extern crate rustc;
@@ -175,7 +176,7 @@ fn main() {
 
     let mut args = os::args().move_iter().collect::<Vec<~str>>();
     let binary = args.shift().unwrap();
-    let mut args = args.move_iter().collect::<~[~str]>();
+    let args = args.move_iter().collect::<~[~str]>();
 
 
     let opts = optgroups();
@@ -448,7 +449,7 @@ pub fn write_crate_as_html_and_rfx(dc:&RustFindCtx,lib_html_path:&str,opts: &RF_
 
 
     if opts.write_html {
-		let mut tm=::timer::Profiler::new("write_crate_as_html_and_rfx");
+		let tm=::timer::Profiler::new("write_crate_as_html_and_rfx");
         rust2html::write_crate_as_html_sub(dc,&nmaps,lib_html_path,opts);
     }
 	if !opts.write_callgraph {

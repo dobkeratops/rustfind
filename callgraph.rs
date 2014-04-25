@@ -21,8 +21,7 @@ use timer::Profiler;
 use find_ast_node::*;
 use rfindctx::*;
 
-// build a call graph.
-// we also want to build a graph of users of types - including types.
+// build item graph (call graph/reference graph including useage of types.)
 
 /*
 
@@ -55,7 +54,7 @@ impl CG_Options {
 		CG_Options{
 			local_only:false,
 			search:vec!(~"main"),
-			max_nodes:200
+			max_nodes:0x7fffffff
 		}
 	}	
 }
@@ -63,13 +62,13 @@ impl CG_Options {
 /// Generate callgraph file.
 /// Todo - seperate into callgraph iterator and file writer passing a closure..
 #[deriving(Clone,Eq,TotalEq,Hash)]
-type GraphNode<'a> =(
+pub type GraphNode<'a> =(
 				DefId,
 				&'a CrossCrateMapItem	// 
 					// if its a local-node, we've got the whole thing. if its from the 'crosscratemap'.. limited info
 			);
 
-trait GraphNodeAcessors {
+pub trait GraphNodeAcessors {
 	fn def_id(&self)->DefId;
 	fn ident_str<'a>(&'a self)->&'a str;
 }
@@ -79,17 +78,17 @@ impl<'a> GraphNodeAcessors for  GraphNode<'a> {
 	fn ident_str<'a>(&'a self)->&'a str { self.val1().item_name.as_slice() }
 }
 
-type GraphNodes<'a> =HashSet<GraphNode<'a>>;
-type GraphEdge<'a> =(GraphNode<'a>,GraphNode<'a>);
-type GraphEdges<'a> =HashSet<GraphEdge<'a>>;
+pub type GraphNodes<'a> =HashSet<GraphNode<'a>>;
+pub type GraphEdge<'a> =(GraphNode<'a>,GraphNode<'a>);
+pub type GraphEdges<'a> =HashSet<GraphEdge<'a>>;
 static g_debug_dist:bool=false;
 // TODO: Use mangled symbols for the nodes.
 pub fn write_call_graph<'a>(nmaps:&'a NodeMaps<'a,'a>, outdirname:&str, filename:&str,opts:&CG_Options) {
 
-	gather_use_graph( nmaps, &|x,y|{});
+	gather_use_graph( nmaps, &mut |x,y|{});
 
 //	println!("Writing callgraph {} {}..",outdirname, filename);
-	match fs::File::create(&posix::Path::new(outdirname+filename.to_owned()+~".dot")) {
+	match fs::File::create(&posix::Path::new(outdirname+filename.to_owned()+".dot")) {
 		Ok(mut dotf)=>{ write_call_graph_sub(nmaps,outdirname, filename,opts, &mut dotf);},
 		_ => println!("can't write callgraph {}", filename),
 	}
@@ -108,7 +107,7 @@ fn write_call_graph_sub<'a>(nmaps:&'a NodeMaps<'a,'a>, outdirname:&str, filename
 
 	// Gather items with call-graph links,
 	gather_use_graph(nmaps, // We miss do notation :( but maybe we could encapsulate the traversal in an iterator?
-		&|caller,callee| {
+		&mut |caller,callee| {
 			for x in [caller,callee].iter() {
 				items_per_module.insert_or_update_with(x.val1().file_name.as_slice(), HashSet::new(), |k,v|{v.insert(*x);});
 				all_items.insert(caller);
@@ -129,7 +128,7 @@ fn write_call_graph_sub<'a>(nmaps:&'a NodeMaps<'a,'a>, outdirname:&str, filename
 			astnode_item(item)=>match item.node{
 				ast::ItemEnum(_,_)=>Some(info.rf_node()),
 				ast::ItemStruct(_,_)=>Some(info.rf_node()),
-				ast::ItemTrait(_,_,_)=>Some(info.rf_node()),
+				ast::ItemTrait(_,_,_,_)=>Some(info.rf_node()),
 
 				_=>None,
 			},
@@ -197,7 +196,7 @@ fn write_call_graph_sub<'a>(nmaps:&'a NodeMaps<'a,'a>, outdirname:&str, filename
 		module_subgraph_end(dotf, 2);
 	}
 
-	// Write out all the calls..
+	// Write out all the edges..
 	// Todo- write out the library links, just de-emphasize them much further
 	dotf.write_line("\tedge [len=4.0];");
 	for &(ref f1,ref f2) in all_calls.iter() {
@@ -279,12 +278,12 @@ fn is_main((def_id,xcmi):GraphNode)->bool{
 static debug_callgraph:bool=false;
 
 
-pub fn gather_use_graph<'a>(nmaps:&'a NodeMaps<'a,'a>, edge_fn: &|GraphNode<'a>, GraphNode<'a>|)
+pub fn gather_use_graph<'a>(nmaps:&'a NodeMaps<'a,'a>, edge_fn: &mut |GraphNode<'a>, GraphNode<'a>|)
 {
 	gather_use_graph_module(nmaps, edge_fn, &nmaps.krate.module);
 }
 
-pub fn gather_use_graph_module<'a>(nmaps:&'a NodeMaps<'a,'a>, edge_fn: &|GraphNode<'a>, GraphNode<'a>|, module:&ast::Mod) {
+pub fn gather_use_graph_module<'a>(nmaps:&'a NodeMaps<'a,'a>, edge_fn: &mut |GraphNode<'a>, GraphNode<'a>|, module:&ast::Mod) {
 
 	for &item in module.items.iter() {
 //		let item_shared_ref = *item; // we know its valid/ lets unsafe transmute it :(
@@ -294,7 +293,7 @@ pub fn gather_use_graph_module<'a>(nmaps:&'a NodeMaps<'a,'a>, edge_fn: &|GraphNo
 
 }
 
-fn gather_use_graph_rec<'a>(edges:&mut GraphNodes<'a>,nmaps:&'a NodeMaps<'a,'a>, edge_fn:&|GraphNode<'a>, GraphNode<'a>|, node_id:ast::NodeId)
+fn gather_use_graph_rec<'a>(edges:&mut GraphNodes<'a>,nmaps:&'a NodeMaps<'a,'a>, edge_fn:&mut |GraphNode<'a>, GraphNode<'a>|, node_id:ast::NodeId)
 {
 	let node=nmaps.node_info_map.find(&node_id);
 	if !node.is_some() {return;}
@@ -353,7 +352,7 @@ fn gather_node_id_def<'s>(calls:&mut GraphNodes<'s>, nmaps:&'s NodeMaps, node_id
 
 
 // todo - walk generics..
-fn gather_use_graph_item<'a>(nmaps:&'a NodeMaps<'a,'a>, edge_fn: &|GraphNode<'a>, GraphNode<'a>|, item:&ast::Item) {
+fn gather_use_graph_item<'a>(nmaps:&'a NodeMaps<'a,'a>, edge_fn: &mut |GraphNode<'a>, GraphNode<'a>|, item:&ast::Item) {
 	// todo: VisitChildren can actually be done here, using the AST itself.
 	// we dont traverse 'block' for the minute because its' done above.
 	// using the ast directly is easier, but only when we have *everything* implemented.
@@ -401,7 +400,7 @@ fn gather_use_graph_item<'a>(nmaps:&'a NodeMaps<'a,'a>, edge_fn: &|GraphNode<'a>
 				gather_fn_decl(&mut edge_ends, nmaps,edge_fn,  method.decl, Some(&(*method.body)));
 			}
 		}
-		ast::ItemTrait(ref generics,ref vec_trait_ref,ref vec_trait_method)=>{
+		ast::ItemTrait(ref generics,ref sized,ref vec_trait_ref,ref vec_trait_method)=>{
 			for trait_ref in vec_trait_ref.iter() {
 				gather_trait_ref(&mut edge_ends, nmaps, trait_ref);
 			}
@@ -442,7 +441,7 @@ fn gather_use_graph_item<'a>(nmaps:&'a NodeMaps<'a,'a>, edge_fn: &|GraphNode<'a>
 	}
 }
 
-fn gather_fn_decl<'a> (edge_ends:&mut GraphNodes<'a>, nmaps:&'a NodeMaps<'a,'a /* a<astl shorter , should be ok*/>, edge_fn: &|GraphNode<'a>, GraphNode<'a>| ,  p_fn_decl:&ast::FnDecl, opt_block:Option<&ast::Block>){ 
+fn gather_fn_decl<'a> (edge_ends:&mut GraphNodes<'a>, nmaps:&'a NodeMaps<'a,'a /* a<astl shorter , should be ok*/>, edge_fn: &mut |GraphNode<'a>, GraphNode<'a>| ,  p_fn_decl:&ast::FnDecl, opt_block:Option<&ast::Block>){ 
 	for arg in p_fn_decl.inputs.iter() {
 		gather_type(edge_ends,nmaps, arg.ty);
 	}
@@ -543,7 +542,7 @@ fn graph_distance<'a>(nmaps:&NodeMaps, all_nodes:&GraphNodes<'a>, start_nodes:&G
 		dist.insert(node.def_id(),0);
 	};
 	let mut changed=false;
-	while true {
+	loop {
 		changed=false;
 		for edge in edges.iter() {
 			let id0=edge.val0().def_id();
@@ -551,11 +550,11 @@ fn graph_distance<'a>(nmaps:&NodeMaps, all_nodes:&GraphNodes<'a>, start_nodes:&G
 			let change:Option<(DefId,uint)> = {
 				let d0=dist.find(&id0).clone();
 				let d1=dist.find(&id1).clone();
-				if (d0==None && d1.is_some()) {
+				if d0==None && d1.is_some() {
 					Some((id0, d1.unwrap()+1))
 
 				} else
-				if (d0.is_some() && d1==None) {
+				if d0.is_some() && d1==None {
 					Some((id1, d0.unwrap()+1))
 				} else {None}
 			};
@@ -578,11 +577,11 @@ fn filter_nodes_by_dist<'a>(all_nodes:&GraphNodes<'a>, dist:&HashMap<DefId,uint>
 	// score = distance<<8 + 255-max(num_connections,0)
 	let mut acc:GraphNodes=HashSet::new();
 	let	mut threshold_dist=0;
-	while true {
+	loop {
 		let mut num_within_threshold=0;
 		let mut max_dist=0;
 		for x in all_nodes.iter() {
-			let d=match (dist.find(&x.def_id())) {	
+			let d=match dist.find(&x.def_id()) {	
 				Some(&x) => {	
 					max_dist=::std::cmp::max(x,max_dist);
 					x
@@ -600,7 +599,6 @@ fn filter_nodes_by_dist<'a>(all_nodes:&GraphNodes<'a>, dist:&HashMap<DefId,uint>
 	for x in all_nodes.iter() {
 		if *dist.find(&x.def_id()).unwrap_or(&0x7fff) <threshold_dist {
 			acc.insert(*x);
-			dump!(dist.find(&x.def_id()).unwrap_or(&0x7fff));
 		}
 	}
 	acc

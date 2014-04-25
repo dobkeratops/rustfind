@@ -55,7 +55,7 @@ pub fn make_html_from_source(dc: &RustFindCtx, fm: &codemap::FileMap, nmaps: &No
                  fln: &FileLineNodes, lib_path: &str, 
                  out_file: &Path, options: &::RF_Options) -> ~str {
     // todo - Rust2HtmlCtx { fm,nim,jdm,jrm } .. cleanup common intermediates
-	let mut p=Profiler::new("make_html");
+	let  p=Profiler::new("make_html");
 //	::callgraph::dump_callgraph(xcm, nmaps);
 
     let mut doc= HtmlWriter::new();
@@ -222,7 +222,7 @@ pub fn get_git_branch_info()->~str {
 	match process::Process::output("git",&[~"branch",~"-v"]) {
 		Err(_)=>{},
 		Ok(out)=> {
-			let mut curr_branch=~"";
+			let  curr_branch=~"";
 			for line in str::from_utf8(out.output.as_slice()).unwrap_or("").lines() {
 				if line.chars().nth(0).unwrap_or('\0')=='*' { return line.to_owned();}
 			}
@@ -985,7 +985,7 @@ fn write_symbol_references(doc:&mut HtmlWriter,dc:&RustFindCtx, fm:&codemap::Fil
 					let files = dc.codemap().files.borrow();
 					let rfm = &files.get(ref_ifp.file_index as uint);
 					let tagname=make_html_name_rel(rfm.name, fm.name) + "#" + (ref_ifp.line + 1).to_str();
-					let mut this_link_lines_shown=0;
+					let this_link_lines_shown=0;
 
                     if lines_per_link>0 {
                         if newline==false {

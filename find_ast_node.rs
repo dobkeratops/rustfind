@@ -605,7 +605,7 @@ impl<'a> AstNode_<'a> {
         match *self {
             astnode_ty(ty)=>
                 match ty.node {
-                    ast::TyPath(_,_,NodeId)=>Some(NodeId),
+                    ast::TyPath(_,_,node_id)=>Some(node_id),
                     _ => self.rf_get_id()
                 },
             _ => self.rf_get_id()
@@ -653,7 +653,7 @@ impl AstNodeAccessors for ast::Item_ {
         ast::ItemTy(ref ty,_)=>Some(ty.id),
         ast::ItemEnum(_,_)=>None,
         ast::ItemStruct(_,_)=>None,
-        ast::ItemTrait(_,_,_)=>None,
+        ast::ItemTrait(_,_,_,_)=>None,
         ast::ItemImpl(_,_,ref ty,_)=>Some(ty.id), //TODO, is this wrong, just node_id of a component?
         ast::ItemMac(_)=>None,
         }
