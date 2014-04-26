@@ -13,13 +13,13 @@ use std::io;
 use std::io::fs;
 use codemaput::{ZIndexFilePos,ToZIndexFilePos};
 use find_ast_node::{FNodeInfoMap,FNodeInfo,AstNode_,NodeKind};
-use rfindctx::{RustFindCtx};
+use rustfindctx::{RustFindCtx};
 use crosscratemap::{CrossCrateMap,CrossCrateMapItem};
 pub use super::NodeMaps;
 use rsfind::MyOption;
 use timer::Profiler;
 use find_ast_node::*;
-use rfindctx::*;
+use rustfindctx::*;
 
 // build item graph (call graph/reference graph including useage of types.)
 

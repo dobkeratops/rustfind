@@ -11,7 +11,7 @@ use std::io;
 use std::io::fs;
 use codemaput::{ZIndexFilePos,ToZIndexFilePos};
 use find_ast_node::{FNodeInfoMap,FNodeInfo};
-use rfindctx::{RustFindCtx};
+use rustfindctx::{RustFindCtx};
 use crosscratemap::{CrossCrateMap};
 use jumptodefmap::{JumpToDefMap,JumpToRefMap,MultiMap};
 pub use super::NodeMaps;

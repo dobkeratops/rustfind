@@ -10,7 +10,7 @@ use find_ast_node::FNodeInfoMap;
 use jumptodefmap::{JumpToDefMap};
 use codemaput::ToZTextFilePos;
 use ioutil;
-use rfindctx::{RustFindCtx, str_of_opt_ident};
+use rustfindctx::{RustFindCtx, str_of_opt_ident};
 use find_ast_node::{AstNodeAccessors,NodeKind};
 
 /*new file*/

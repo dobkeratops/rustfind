@@ -12,7 +12,7 @@ use std::hash::Hash;
 use find_ast_node::{FNodeInfoMap, FNodeInfo, AstNode_, NodeTreeLoc, find_node_tree_loc_at_byte_pos,
     build_node_info_map, get_node_source, astnode_expr,
       ToJsonStr, ToJsonStrFc, AstNodeAccessors};
-use rfindctx::{RustFindCtx,get_source_loc};
+use rustfindctx::{RustFindCtx,get_source_loc};
 use codemaput::{ZTextFilePos,byte_pos_from_text_file_pos_str};
 use rf_ast_ut::*;
 use util::flatten_to_str_ng; //todo - why is qualifying manually not working?!

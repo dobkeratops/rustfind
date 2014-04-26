@@ -38,7 +38,7 @@ use find_ast_node::{safe_node_id_to_type,get_node_info_str,find_node_tree_loc_at
 use jumptodefmap::{lookup_def_at_text_file_pos_str, make_jump_to_def_map, def_info_from_node_id,
     lookup_def_at_text_file_pos, dump_json};
 
-use rfindctx::{RustFindCtx,ctxtkey};
+pub use rustfindctx::{RustFindCtx,ctxtkey};
 pub use codemaput::{ZTextFilePos,ZTextFilePosLen,get_span_str,ToZTextFilePos,ZIndexFilePos,ToZIndexFilePos};
 use rsfind::{SDM_LineCol,SDM_Source,SDM_GeditCmd};
 use crosscratemap::{CrossCrateMap,CrossCrateMapItem};
@@ -53,7 +53,7 @@ pub mod ioutil;
 //pub mod htmlwriter;
 pub mod rust2html;
 pub mod codemaput;
-pub mod rfindctx;
+pub mod rustfindctx;
 pub mod rsfind;
 pub mod crosscratemap;
 pub mod rfserver;
@@ -370,7 +370,7 @@ fn debug_test(dc:&RustFindCtx) {
     let mut test_cursor=15 as uint;
 
     while test_cursor<500 {
-        let loc = rfindctx::get_source_loc(dc,codemap::BytePos(test_cursor as u32));
+        let loc = rustfindctx::get_source_loc(dc,codemap::BytePos(test_cursor as u32));
 
         logi!(~"\n=====Find AST node at: ",loc.file.name,":",loc.line,":",loc.col.to_uint().to_str(),":"," =========");
 

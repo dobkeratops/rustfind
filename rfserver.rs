@@ -1,4 +1,4 @@
-use rfindctx::{RustFindCtx,find_file_name_in,first_file_name};
+use rustfindctx::{RustFindCtx,find_file_name_in,first_file_name};
 use jumptodefmap::{dump_json,lookup_def_at_text_file_pos_str, make_jump_to_def_map};
 use find_ast_node::def_of_symbol_to_str;
 use std::io;

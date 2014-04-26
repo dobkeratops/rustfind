@@ -1,5 +1,5 @@
 use rf_common::*;
-use rfindctx::RustFindCtx;
+use rustfindctx::RustFindCtx;
 use std::from_str::FromStr;
 use syntax::ast;
 use syntax::codemap;
