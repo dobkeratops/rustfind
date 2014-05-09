@@ -202,14 +202,14 @@ pub fn dump_json(dc:&RustFindCtx) {
     io::println("}");
 }
 
-pub fn lookup_def_at_text_file_pos(dc:&RustFindCtx, tfp:&ZTextFilePos, show_mode:ShowDefMode)->Option<~str> {
+pub fn lookup_def_at_text_file_pos(dc:&RustFindCtx, tfp:&ZTextFilePos, show_mode:ShowDefMode)->Option<StrBuf> {
     match tfp.to_byte_pos(dc.tycx_ref()) {
         None=>None,
         Some(bp)=>lookup_def_at_byte_pos(dc,bp,show_mode)
     }
 }
 
-pub fn lookup_def_at_text_file_pos_str(dc:&RustFindCtx,file_pos_str:&str, show_mode:ShowDefMode)->Option<~str> {
+pub fn lookup_def_at_text_file_pos_str(dc:&RustFindCtx,file_pos_str:&str, show_mode:ShowDefMode)->Option<StrBuf> {
     match byte_pos_from_text_file_pos_str(dc,file_pos_str) {
         None=>None,
         Some(bp)=>lookup_def_at_byte_pos(dc,bp,show_mode),
@@ -232,16 +232,16 @@ pub fn node_from_text_file_pos_str(dc:&RustFindCtx, file_pos_str:&str)->Option<A
 
 
 
-pub fn lookup_def_at_byte_pos(dc:&RustFindCtx, bp:BytePos, m:ShowDefMode)->Option<~str> {
+pub fn lookup_def_at_byte_pos(dc:&RustFindCtx, bp:BytePos, m:ShowDefMode)->Option<StrBuf> {
     let ndt=find_node_tree_loc_at_byte_pos(dc.crate_,bp);
     lookup_def_of_node_tree_loc(dc,&ndt,m)
 }
 
-pub fn lookup_def_of_node_tree_loc(dc:&RustFindCtx,node_tree_loc:&NodeTreeLoc,m:ShowDefMode)->Option<~str> {
+pub fn lookup_def_of_node_tree_loc(dc:&RustFindCtx,node_tree_loc:&NodeTreeLoc,m:ShowDefMode)->Option<StrBuf> {
     lookup_def_of_node(dc,*node_tree_loc.last().get_ref(),m)
 }
 
-pub fn lookup_def_of_node(dc: &RustFindCtx, node: &AstNode_, m: ShowDefMode)->Option<~str> {
+pub fn lookup_def_of_node(dc: &RustFindCtx, node: &AstNode_, m: ShowDefMode)->Option<StrBuf> {
     io::println("def of node:"+node.rf_get_id().unwrap_or(0).to_str());
     let node_spans=build_node_info_map(dc.crate_);
     let node_def_node = build_node_def_node_table(dc);
@@ -249,13 +249,13 @@ pub fn lookup_def_of_node(dc: &RustFindCtx, node: &AstNode_, m: ShowDefMode)->Op
 }
 
 
-pub fn lookup_def_of_node_sub(dc:&RustFindCtx,node:&AstNode_,m:ShowDefMode,nim:&FNodeInfoMap, node_def_node:&HashMap<ast::NodeId,ast::DefId>)->Option<~str> {
+pub fn lookup_def_of_node_sub(dc:&RustFindCtx,node:&AstNode_,m:ShowDefMode,nim:&FNodeInfoMap, node_def_node:&HashMap<ast::NodeId,ast::DefId>)->Option<StrBuf> {
     // TODO - cache outside?
 
 
-    fn mk_result(dc:&RustFindCtx,  m:ShowDefMode, nim:&FNodeInfoMap, def_node_id:ast::DefId, _: &str)->Option<~str> {
+    fn mk_result(dc:&RustFindCtx,  m:ShowDefMode, nim:&FNodeInfoMap, def_node_id:ast::DefId, _: &str)->Option<StrBuf> {
         if def_node_id.krate != 0 {
-            Some(StrBuf::from_str("{cross-crate-def not implemented, ")+def_node_id.to_str()+"}")
+            Some(StrBuf::from_str("{cross-crate-def not implemented, ").append(def_node_id.to_str().as_slice()).append("}"))
         }
         else {
             match nim.find(&def_node_id.node) {
@@ -264,10 +264,13 @@ pub fn lookup_def_of_node_sub(dc:&RustFindCtx,node:&AstNode_,m:ShowDefMode,nim:&
                     let loc=get_source_loc(dc,def_info.rf_span().lo);
                     let def_pos_str=
                         loc.file.name + ":"+loc.line.to_str()+": "+
-                            match m { SDM_LineCol=>loc.col.to_uint().to_str()+": ", _ =>StrBuf::from_str("") }+"\n";
+                            match m {
+								SDM_LineCol=>loc.col.to_uint().to_strbuf().append(": "),
+								_ =>StrBuf::from_str("")
+							}.append("\n");
                     return  match m{
-                        SDM_Source=>Some(def_pos_str+get_node_source(dc.tycx_ref(),nim, def_node_id)+"\n"),
-                        SDM_GeditCmd=>Some("+"+loc.line.to_str()+" "+loc.file.name+" "),
+                        SDM_Source=>Some(def_pos_str.append( get_node_source(dc.tycx_ref(),nim, def_node_id).as_slice()).append("\n") ),
+                        SDM_GeditCmd=>Some(StrBuf::from_str("+").append(loc.line.to_str().as_slice()).append(" ").append(loc.file.name.as_slice()).append(" ")),
                         _ => Some(def_pos_str)
                     };
 
