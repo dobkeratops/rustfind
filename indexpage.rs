@@ -22,20 +22,20 @@ pub fn write_index_html(source_dir: &Path,extentions:&Vec<StrBuf>, options:&::RF
 	// Display all files in the directory tree, 
 	// under the containing directory paths.
 	let mut files_per_dir=HashMap::<StrBuf,Vec<(StrBuf,StrBuf)> >::new();
+	let mut all_dirs = HashSet::<StrBuf>::new();
 	match walk_dir(source_dir) {
 		Ok(mut dirs)=> {
-//			write_index_html_sub(source_dir, dirs, extentions);
-//			println!("dir contents {:?} {:?}", source_dir, dirs);
 			for path in dirs {
 				match path.as_str() {
 					Some( ref s)=> {
 						let ext=path.extension_str().unwrap_or("");;	
 						let filename=path.filename_str().unwrap_or("");
-						let dirname=path.dirname_str().unwrap_or("");
+						let dirname=path.dirname_str().unwrap_or("./");
 						if ext=="rs" { 
 							let link_target= StrBuf::new()
 								.append(path.as_str().unwrap_or("").to_strbuf().as_slice()).append(".html");
-							if Path::new(link_target.as_slice()).exists() {
+							if Path::new(link_target.as_slice()).exists() || true{ // TODO - why doesn't this filter work now?
+								all_dirs.insert(dirname.to_strbuf());
 								let bucket=files_per_dir.find_or_insert(
 									dirname.to_strbuf(),
 									Vec::<(StrBuf,StrBuf)>::new()
@@ -72,12 +72,21 @@ pub fn write_index_html(source_dir: &Path,extentions:&Vec<StrBuf>, options:&::RF
 		doc.end_tag();
 	}
 
+	let mut all_dirs_sort:Vec<_> = Vec::new();
 
-	for (dir, files) in files_per_dir.iter() {
+	for dir in all_dirs.iter() {
+		all_dirs_sort.push(dir.clone());
+	}
+	all_dirs_sort.sort();
+
+	for dir in all_dirs_sort.iter() {
+//		for (_, files) in files_per_dir.find(dir).aiter() {
+		let files = files_per_dir.find(dir).unwrap();
 		doc.writeln("");
 		doc.begin_tag("c30"); doc.writeln(dir.as_slice()); doc.end_tag();
-	
+		
 		write_grid_of_text_links(&mut doc,files);	
+		
 	}
 
 	// write as grid, todo abstract it ffs.

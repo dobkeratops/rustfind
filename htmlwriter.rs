@@ -4,7 +4,7 @@ use std::iter::range_inclusive;
 pub struct HtmlWriter {
     pub doc:StrBuf,
     pub tag_stack:Vec<StrBuf>,	// todo- these can be strslice? &str even?
-    pub xlat:HashMap<char, StrBuf>,
+    pub xlat:HashMap<char, StrBuf>,	// todo - remove this, just use a match to translate?
 }
 
 /// convert u8 into html char.
