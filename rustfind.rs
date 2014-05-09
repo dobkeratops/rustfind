@@ -175,13 +175,13 @@ fn main() {
 //    let mut args = os::args();
 //    let binary = args.shift().unwrap();
 
-    let mut args = os::args().move_iter().collect::<Vec<StrBuf>>();
+    let mut args = os::args().move_iter().collect::<Vec<~str>>();
     let binary = args.shift().unwrap();
-    let args = args.move_iter().collect::<Vec<StrBuf>>();
+    let args = args.move_iter().collect::<Vec<~str>>();
 
 
     let opts = optgroups();
-	let matches = getopts(args, opts).unwrap();
+	let matches = getopts(args.as_slice(), opts).unwrap();
     let libs1 = matches.opt_strs("L").iter().map(|s| Path::new(s.as_slice())).collect::<Vec<Path>>();
 
     let libs:Vec<Path> = if libs1.len() > 0 {
@@ -199,7 +199,7 @@ fn main() {
     };
 
     if matches.opt_present("h") || matches.opt_present("help") {
-        usage(binary);
+        usage(binary.as_slice());
         return;
     };
     if matches.free.len()>0 {
@@ -218,7 +218,7 @@ fn main() {
         let mut i=0;
         let lib_html_path = if matches.opt_present("x") {
             let given_path=matches.opt_str("x").unwrap();
-			if given_path!=StrBuf::from_str(".") {given_path+"/"} 
+			if given_path.as_slice()!="." {given_path.as_slice().to_strbuf().append("/")} 
 			else 
 				{StrBuf::from_str("")}	// "-x ."we need this behaviour to emit relative pages we can publish
 			
@@ -229,7 +229,7 @@ fn main() {
 					println!("$RUST_PATH not set, so can't find library crate .rfx files to get standard library links. set this or pass the path with option -x");
 					StrBuf::from_str("")
 				}
-	            Some(value) => value+"/src/"
+	            Some(value) => value.to_strbuf().append("/src/")
 			}
         };
         if matches.opt_present("f") {
@@ -241,7 +241,7 @@ fn main() {
             }
         }
         if matches.opt_present("d") {
-			all_options.rustdoc_url = Some(Path::new(matches.opt_str("d").unwrap_or(StrBuf::from_str(""))));
+			all_options.rustdoc_url = Some(Path::new(matches.opt_str("d").unwrap_or("".to_owned())));
 			println!("TODO:linking to rustdoc pages at {}",all_options.rustdoc_url.clone().unwrap().as_str());
         }
         if matches.opt_present("n") {
@@ -259,16 +259,16 @@ fn main() {
         }
         if matches.opt_present("F") {
             let find_node = matches.opt_str("F").unwrap();
-			all_options.callgraph_opt.search.push(find_node);
+			all_options.callgraph_opt.search.push(find_node.to_strbuf());
         }
         if matches.opt_present("m") {
-            let max_nodes:uint = from_str(matches.opt_str("F").unwrap_or(StrBuf::from_str("100"))).unwrap_or(100);
+            let max_nodes:uint = from_str(matches.opt_str("F").unwrap_or("100".to_owned())).unwrap_or(100);
 			all_options.callgraph_opt.max_nodes=max_nodes;
 		}
         if matches.opt_present("r") {
             println!("Writing .rfx ast nodes/cross-crate-map:-");
 			all_options.write_html=false;
-            write_crate_as_html_and_rfx(dc,lib_html_path, &all_options);
+            write_crate_as_html_and_rfx(dc,lib_html_path.as_slice(), &all_options);
             println!("Writing .rfx .. done");
             done=true;
         }
@@ -279,14 +279,14 @@ fn main() {
 
 		// callgraph options - If didn't search any, look for 'main'..
 		if all_options.callgraph_opt.search.len()==0 {
-			all_options.callgraph_opt.search.push("main".to_owned());
+			all_options.callgraph_opt.search.push("main".to_strbuf());
 		}
 
         // Dump as html..
         if matches.opt_present("w") || !(done) {
             println!("Creating HTML pages from source & .rfx:-");
 			all_options.write_html=true;
-            write_crate_as_html_and_rfx(dc,lib_html_path, &all_options);
+            write_crate_as_html_and_rfx(dc,lib_html_path.as_slice(), &all_options);
             println!("Creating HTML pages from source.. done");
         }
 	} else {
@@ -378,7 +378,7 @@ fn debug_test(dc:&RustFindCtx) {
         let nodetloc = find_node_tree_loc_at_byte_pos(dc.crate_,codemap::BytePos(test_cursor as u32));
         let node_info =  get_node_info_str(dc,&nodetloc);
         dump!(node_info);
-        println("node ast loc:"+(nodetloc.iter().map(|x| { x.rf_get_id().to_str() })).collect::<Vec<StrBuf>>().to_str());
+        println("node ast loc:"+(nodetloc.iter().map(|x| { x.rf_get_id().to_str() })).collect::<Vec<~str>>().to_str());
 
 
         if_some!(id in nodetloc.last().get_ref().rf_ty_node_id() then {
@@ -427,7 +427,7 @@ pub fn write_crate_as_html_and_rfx(dc:&RustFindCtx,lib_html_path:&str,opts: &RF_
 
     dc.cstore().iter_crate_data(|i,md| {
         println!("loading cross crate data {} {}", i, md.name);
-        let xcm_sub=crosscratemap::cross_crate_map_read_into(&mut xcm, i as int, lib_html_path + "lib"+md.name+&"/lib.rfx",lib_html_path);
+        let xcm_sub=crosscratemap::cross_crate_map_read_into(&mut xcm, i as int, StrBuf::new().append(lib_html_path.as_slice()).append("lib").append(md.name.as_slice()).append("/lib.rfx").as_slice(),lib_html_path.as_slice());
     });
 
 	// Pull togetherr the node info maps/def maps /jump maps..
@@ -457,8 +457,8 @@ pub fn write_crate_as_html_and_rfx(dc:&RustFindCtx,lib_html_path:&str,opts: &RF_
 		return;
 	}
 	let dirname=opts.output_dir.as_str().unwrap_or("");
-	let dirname=if dirname.len()>0{dirname+"/"}else{StrBuf::from_str("")};
-	callgraph::write_call_graph(&nmaps, dirname,"callgraph", &opts.callgraph_opt);
+	let dirname=if dirname.len()>0{StrBuf::from_str(dirname.as_slice()).append("/")}else{StrBuf::new()};
+	callgraph::write_call_graph(&nmaps, dirname.as_slice(),"callgraph", &opts.callgraph_opt);
 }
 
 

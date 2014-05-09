@@ -21,7 +21,7 @@ fn mk_xlat_table()-> HashMap<char,StrBuf>
             '>' =>"&gt;".to_strbuf(),
             '&' =>"&amp;".to_strbuf(),
             '\t' =>"&nbsp;&nbsp;&nbsp;&nbsp;".to_strbuf(),
-            c => StrBuf::from_char(c,1),//x.slice(0,1)
+            c => StrBuf::from_char(1,c),//x.slice(0,1)
             });
     }
     xlat
@@ -39,7 +39,7 @@ impl<'a> HtmlWriter {
     }
     pub fn begin_tag_ext(&'a mut self, tag_name:&str, key_values:&[(StrBuf,StrBuf)])->&'a mut HtmlWriter {
         self.write_tag_sub(tag_name,key_values,false);
-        self.tag_stack.push(tag_name.to_str());
+        self.tag_stack.push(tag_name.to_strbuf());
         self
     }
     pub fn begin_tag(&'a mut self, tag_name:&str)->&'a mut HtmlWriter {

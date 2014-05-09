@@ -47,7 +47,7 @@ fn file_get_time_stamp_str(fpath:&Path)->StrBuf {
 		Ok(stat)=>stat.modified as i64, Err(_)=>0_i64
 	};
 	let ts=::time::at_utc(::time::Timespec::new(file_time/1000,0));
-	ts.ctime()
+	ts.ctime().as_slice().to_strbuf()
 }
 
 /// Takes populated node maps (NodeMaps)&'CrossCrateMap, plus a 'filemap' from crate-analysis, and generates an HTML view of the source with links.
@@ -220,7 +220,7 @@ pub fn get_git_branch_info()->StrBuf {
 	use std::str;
 	use std::io::pipe;
 
-	match process::Process::output("git",&vec![StrBuf::from_str("branch"),StrBuf::from_str("-v")]) {
+	match process::Process::output("git",vec!["branch".to_owned(),"-v".to_owned()].as_slice()) {
 		Err(_)=>{},
 		Ok(out)=> {
 			let  curr_branch=StrBuf::from_str("");

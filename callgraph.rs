@@ -259,7 +259,7 @@ fn to_dotfile_symbol(&(ref def_id,ref xcmi):&GraphNode)-> Option<StrBuf> {
 //	let pathname:StrBuf=xcmi.file_name.chars().map(|x|match x{'/'|'<'|'>'|'.'=>'_',_=>x}).collect(); 
 	let fname=StrBuf::new().append(xcmi.file_name.as_slice()).append("_").append(xcmi.item_name.as_slice());
 //	let cleaned_up_name:StrBuf=
-	if  xcmi.item_name.chars().filter(|&x|match x{'<'|'>'|'.'|':'=>true,_=>false}).len()>0 
+	if  xcmi.item_name.as_slice().chars().filter(|&x|match x{'<'|'>'|'.'|':'=>true,_=>false}).len()>0 
 		|| (xcmi.item_name.as_slice().chars().nth(0)==Some('_') && xcmi.item_name.as_slice().chars().nth(1)==Some('_'))
 	{
 		None // dont return if we had non symbol characters - its a generated item (eg deriving)
