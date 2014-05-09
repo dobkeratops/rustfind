@@ -22,7 +22,7 @@ macro_rules! logi{
     ($($a:expr),*)=>(println!("{}", file!()+":"+line!().to_str()+": " $(+$a.to_str())* ))
 }
 //macro_rules! dump{ ($a:expr)=>(logi!(fmt!("%s=%?",stringify!($a),$a).indent(2,160));)}
-/*fn newline_if_over(a:~str,l:uint) -> ~str {
+/*fn newline_if_over(a:StrBuf,l:uint) -> StrBuf {
     if a.len()>l {
         a+"\n"
     } else {

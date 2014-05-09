@@ -192,10 +192,10 @@ pub fn cross_crate_map_write(dc:&RustFindCtx, _:&str,nim:&FNodeInfoMap, _:&HashM
         }
 
         for (k,v) in jdm.iter()  {
-            let cname: ~str = if v.krate > 0 {
-                dc.cstore().get_crate_data(v.krate).name.to_str()
+            let cname: StrBuf = if v.krate > 0 {
+                dc.cstore().get_crate_data(v.krate).name.to_strbuf()
             } else {
-                curr_crate_name_only.to_str()
+                curr_crate_name_only.to_strbuf()
             };
             //println(cdata.name);
             try!(writeln!(&mut out_file, "jdef\t{}\t{}\t{}", k, cname, v.node));

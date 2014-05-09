@@ -21,14 +21,14 @@ enum IdentifierType {
     var_name
 }
 
-type NamespaceName=(~str,IdentifierType);
-type NamespacePath=~[NamespaceName];
+type NamespaceName=(StrBuf,IdentifierType);
+type NamespacePath=Vec<NamespaceName>;
 type Line=int;
 type Column=int;
-type Filename=~str;
+type Filename=StrBuf;
 type SourceLocation=(Filename,(Line,Column));
 type SourceSpan=(Filename,(Line,Column),(Line,Column));
-type Identifier=~str;
+type Identifier=StrBuf;
 
 
 type SymbolDef=(IdentifierType,SourceLocation,~NamespacePath);

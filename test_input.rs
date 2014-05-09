@@ -3,7 +3,7 @@
 use test_input2::{foo_bar_test_func};
 mod test_input2;
 
-fn yada(a:int,c:Foo,b:test_input2::fruit::SomeStruct)->~str { a.to_str() }
+fn yada(a:int,c:Foo,b:test_input2::fruit::SomeStruct)->StrBuf { a.to_strbuf() }
 fn main() {
     use test_input2::fruit::{SomeStruct};
     println!("{}", foo_bar_test_func(SomeStruct{red_value:1,green_value:2,blue_value:3},(4,5)).to_str());
@@ -79,7 +79,7 @@ fn some2(a:Animal) {
 
 }
 
-fn foobarbaz()->Pair<Result<int,~str>,Animal> {
+fn foobarbaz()->Pair<Result<int,StrBuf>,Animal> {
     Pair{a:Ok(0),b:a_cat(0)}
 }
 

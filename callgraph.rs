@@ -46,7 +46,7 @@ pub fn dump_functions(nmaps:&NodeMaps) {
 pub struct CG_Options {	
 	// TODO - when we have a solid IDE, we can stop Clike namespacing
 	pub local_only:bool,
-	pub search: Vec<~str>,	// nodes to look for..
+	pub search: Vec<StrBuf>,	// nodes to look for..
 	pub max_nodes:uint
 }
 impl CG_Options {
@@ -156,7 +156,7 @@ fn write_call_graph_sub<'a>(nmaps:&'a NodeMaps<'a,'a>, outdirname:&str, filename
 	// TODO: Generalize to modules.
 	for (&modname,items) in items_per_module.iter() {
 //				let modstr=::std::str::from_chars(modname.chars().map(|x|if x=='/'{'_'}else{x}));
-		let modstr:~str=modname.chars().map(|x|match x{'/'|'.'=>'_',_=>x}).collect();
+		let modstr:StrBuf=modname.chars().map(|x|match x{'/'|'.'=>'_',_=>x}).collect();
 		if items.len()==0{ continue;}
 		if modstr.chars().nth(0)==Some('<') {continue;} // things like <std macros>
 		// todo: use mangled module name
@@ -245,19 +245,19 @@ fn module_subgraph_begin(dotf:&mut fs::File,  depth:uint, mangled_name:&str,modu
 fn  module_subgraph_end(dotf:&mut fs::File, depth:uint) {
 	dotf.write_line(indent(depth)+"}");
 }
-fn to_dotfile_symbol(&(ref def_id,ref xcmi):&GraphNode)-> Option<~str> {
+fn to_dotfile_symbol(&(ref def_id,ref xcmi):&GraphNode)-> Option<StrBuf> {
 	// TODO: this should be the symbols' qualified module pathname
 	// its only coincidentally correlated with the filename+symbol most of the time.
-//	let pathname:~str=xcmi.file_name.chars().map(|x|match x{'/'|'<'|'>'|'.'=>'_',_=>x}).collect(); 
+//	let pathname:StrBuf=xcmi.file_name.chars().map(|x|match x{'/'|'<'|'>'|'.'=>'_',_=>x}).collect(); 
 	let fname=xcmi.file_name +"_"+xcmi.item_name;
-//	let cleaned_up_name:~str=
+//	let cleaned_up_name:StrBuf=
 	if  xcmi.item_name.chars().filter(|&x|match x{'<'|'>'|'.'|':'=>true,_=>false}).len()>0 
 		|| (xcmi.item_name.chars().nth(0)==Some('_') && xcmi.item_name.chars().nth(1)==Some('_'))
 	{
 		None // dont return if we had non symbol characters - its a generated item (eg deriving)
 	}
 	else {
-		let filtered:~str=xcmi.file_name.chars().map(|x|match x{'/'|'<'|'>'|'.'=>'_',_=>x}).collect();
+		let filtered:StrBuf=xcmi.file_name.chars().map(|x|match x{'/'|'<'|'>'|'.'=>'_',_=>x}).collect();
 		let concat=filtered+"_"+ xcmi.item_name;
 		if concat.len()>0 { Some(concat)} else {None}
 	}

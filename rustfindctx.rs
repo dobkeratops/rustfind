@@ -28,7 +28,7 @@ impl RustFindCtx {
 // what was this?
 //pub static ctxtkey: local_data::Key<@RustFindCtx> = &local_data::Key;
 
-pub fn first_file_name(dc:&RustFindCtx)->~str {
+pub fn first_file_name(dc:&RustFindCtx)->StrBuf {
     let files = dc.codemap().files.borrow();
     files.get(0).name.to_str() // clone?
 }

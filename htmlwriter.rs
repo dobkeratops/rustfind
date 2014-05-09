@@ -3,12 +3,12 @@ use std::iter::range_inclusive;
 
 pub struct HtmlWriter {
     pub doc:StrBuf,
-    pub tag_stack:Vec<~str>,	// todo- these can be strslice? &str even?
-    pub xlat:HashMap<char, ~str>,
+    pub tag_stack:Vec<StrBuf>,	// todo- these can be strslice? &str even?
+    pub xlat:HashMap<char, StrBuf>,
 }
 
 /// convert u8 into html char.
-fn mk_xlat_table()-> HashMap<char,~str>
+fn mk_xlat_table()-> HashMap<char,StrBuf>
 {
     let mut xlat= HashMap::new();
 //  let mut i=0u8;
@@ -16,12 +16,12 @@ fn mk_xlat_table()-> HashMap<char,~str>
 
         xlat.insert(i as char,
             match i as char{
-            ' ' =>"&nbsp;".to_owned(),
-            '<' =>"&lt;".to_owned(),
-            '>' =>"&gt;".to_owned(),
-            '&' =>"&amp;".to_owned(),
-            '\t' =>"&nbsp;&nbsp;&nbsp;&nbsp;".to_owned(),
-            c => str::from_char(c),//x.slice(0,1)
+            ' ' =>"&nbsp;".to_strbuf(),
+            '<' =>"&lt;".to_strbuf(),
+            '>' =>"&gt;".to_strbuf(),
+            '&' =>"&amp;".to_strbuf(),
+            '\t' =>"&nbsp;&nbsp;&nbsp;&nbsp;".to_strbuf(),
+            c => StrBuf::from_char(c),//x.slice(0,1)
             });
     }
     xlat

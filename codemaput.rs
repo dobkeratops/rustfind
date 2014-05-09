@@ -31,7 +31,7 @@ pub macro_rules! if_some {
 
 //pub type ZeroBasedIndex=uint;
 pub struct ZTextFilePos {
-    pub name: ~str,
+    pub name: StrBuf,
     pub line: u32,
     pub col: u32
 }
@@ -120,7 +120,7 @@ impl ZTextFilePos {
         ZTextFilePos {name: filename.to_owned(), line: _line, col: _col}
     }
 
-    pub fn to_str(&self) -> ~str {
+    pub fn to_str(&self) -> StrBuf {
         self.name + ":" + (self.line + 1).to_str() + ":" + self.col.to_str() + ":"
     }
 
@@ -192,7 +192,7 @@ pub fn get_span_str(tc :&ty::ctxt, sp: &codemap::Span) -> StrBuf {
 }
 
 
-// fn get_str_at_text_file_pos_len(cx:ty::ctxt, tfp:&ZTextFilePos,len:uint)->~str {
+// fn get_str_at_text_file_pos_len(cx:ty::ctxt, tfp:&ZTextFilePos,len:uint)->StrBuf {
 
 
 //}
@@ -336,7 +336,7 @@ pub fn dump_cstore_info(tc: &ty::ctxt) {
     });
 }
 /*
-pub fn flatten_to_str<T,U:ToStr>(xs:&[T],f:&fn(x:&T)->U, sep:&str)->~str {
+pub fn flatten_to_str<T,U:ToStr>(xs:&[T],f:&fn(x:&T)->U, sep:&str)->StrBuf {
     let mut acc=~"";
     let mut i=0; // TODO - functional way.
     while i<xs.len() {

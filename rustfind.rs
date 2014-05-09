@@ -175,9 +175,9 @@ fn main() {
 //    let mut args = os::args();
 //    let binary = args.shift().unwrap();
 
-    let mut args = os::args().move_iter().collect::<Vec<~str>>();
+    let mut args = os::args().move_iter().collect::<Vec<StrBuf>>();
     let binary = args.shift().unwrap();
-    let args = args.move_iter().collect::<~[~str]>();
+    let args = args.move_iter().collect::<Vec<StrBuf>>();
 
 
     let opts = optgroups();
@@ -378,7 +378,7 @@ fn debug_test(dc:&RustFindCtx) {
         let nodetloc = find_node_tree_loc_at_byte_pos(dc.crate_,codemap::BytePos(test_cursor as u32));
         let node_info =  get_node_info_str(dc,&nodetloc);
         dump!(node_info);
-        println("node ast loc:"+(nodetloc.iter().map(|x| { x.rf_get_id().to_str() })).collect::<Vec<~str>>().to_str());
+        println("node ast loc:"+(nodetloc.iter().map(|x| { x.rf_get_id().to_str() })).collect::<Vec<StrBuf>>().to_str());
 
 
         if_some!(id in nodetloc.last().get_ref().rf_ty_node_id() then {

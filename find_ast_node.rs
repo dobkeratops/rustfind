@@ -356,7 +356,7 @@ pub trait KindToStr {
     fn kind_to_str(&self)->&'static str;
     fn get_kind(&self)->NodeKind;
 }
-pub trait ToJsonStr {fn to_json_str(&self)->~str;}
+pub trait ToJsonStr {fn to_json_str(&self)->StrBuf;}
 
 
 // TODO Check with rust people what here can be replaced with existing code in from the compiler libs..
@@ -415,7 +415,7 @@ pub fn build_node_info_map(c:AstSPtr<ast::Crate>)-> FNodeInfoMap {
     vt.all_nodes
 }
 
-pub trait ToJsonStrFc {fn to_json_str(&self,c:&RustFindCtx)->~str;}
+pub trait ToJsonStrFc {fn to_json_str(&self,c:&RustFindCtx)->StrBuf;}
 
 pub fn node_spans_table_to_json_sub(dc:&RustFindCtx,ns:&FNodeInfoMap)->StrBuf {
     // TODO - is there a cleaner functional way,
@@ -448,7 +448,7 @@ pub fn node_spans_table_to_json_sub(dc:&RustFindCtx,ns:&FNodeInfoMap)->StrBuf {
 }
 
 impl<'astl> ToJsonStrFc for FNodeInfoMap<'astl> {
-    fn to_json_str(&self,dc:&RustFindCtx)->~str {
+    fn to_json_str(&self,dc:&RustFindCtx)->StrBuf {
         let mut ret=StrBuf::from_str("[\n");
 		ret.push_str(node_spans_table_to_json_sub(dc,self).as_slice());
 		ret.push_str("]\n");
@@ -457,7 +457,7 @@ impl<'astl> ToJsonStrFc for FNodeInfoMap<'astl> {
 }
 
 impl ToJsonStr for HashMap<ast::NodeId,ast::DefId> {
-    fn to_json_str(&self)->~str {
+    fn to_json_str(&self)->StrBuf {
         let mut r=StrBuf::from_str("[\n");
 //      for self.iter().advance|(&key,&value)| {
         for (&key,&value) in self.iter() {
@@ -956,9 +956,9 @@ pub fn get_node_info_str<'astl>(dc:&RustFindCtx,node:&NodeTreeLoc<'astl>)->StrBu
 
     match node.last().expect("No last node available") {
 //          TODO -factor out repeatedly used functions here..
-//          fn astnode_pat_to_str(&astnode_pat(x))->~str
-//          fn path_to_str(&astnode_pat(x))->~str
-//          fn expr_to_str(&astnode_pat(x))->~str
+//          fn astnode_pat_to_str(&astnode_pat(x))->StrBuf
+//          fn path_to_str(&astnode_pat(x))->StrBuf
+//          fn expr_to_str(&astnode_pat(x))->StrBuf
 
         &astnode_view_item(_)=>StrBuf::from_str("view_item: ?"),
         &astnode_item(x)=>StrBuf::from_str("item: ").append("id=").append(x.id.to_str()).append(" ").append(token::get_ident(x.ident).get()).append(

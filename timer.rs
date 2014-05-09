@@ -22,7 +22,7 @@ impl Timer {
     pub fn end(&mut self) -> () {
         self.end_time = time::precise_time_ns();
     }
-    pub fn get_time_string(&self) -> ~str {
+    pub fn get_time_string(&self) -> StrBuf {
         return format_as_time(self.get_total_time());
     }
     pub fn get_total_time(&self) -> u64 {
@@ -39,7 +39,7 @@ impl Timer {
 /// automatically profile a scopeblock, RAII based.
 pub struct Profiler {
 	time:Timer,
-	name:~str,
+	name:StrBuf,
 }
 
 static  mut g_depth:int=0;	// TODO - use an appropriate primitive, threadsafe, howto?
@@ -62,7 +62,7 @@ impl Drop for Profiler {
 	}
 }
 
-pub fn format_as_time(total_time: u64) -> ~str {
+pub fn format_as_time(total_time: u64) -> StrBuf {
     let hours = total_time / HR_MULTIPLIER;
     let minutes = (total_time 
                    - hours * HR_MULTIPLIER) 
@@ -114,7 +114,7 @@ pub fn format_as_time(total_time: u64) -> ~str {
     return time_string.as_slice().to_owned();
 }
 
-fn format_number(num: u64) -> ~str {
+fn format_number(num: u64) -> StrBuf {
     let repr = num.to_str();
     let mut ret_val = StrBuf::new();
     let mut index = 0;

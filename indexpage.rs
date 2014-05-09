@@ -21,7 +21,7 @@ pub fn write_index_html(source_dir: &Path,extentions:&Vec<StrBuf>, options:&::RF
 
 	// Display all files in the directory tree, 
 	// under the containing directory paths.
-	let mut files_per_dir=HashMap::<~str,Vec<(~str,~str)> >::new();
+	let mut files_per_dir=HashMap::<StrBuf,Vec<(StrBuf,StrBuf)> >::new();
 	match walk_dir(source_dir) {
 		Ok(mut dirs)=> {
 //			write_index_html_sub(source_dir, dirs, extentions);
@@ -37,7 +37,7 @@ pub fn write_index_html(source_dir: &Path,extentions:&Vec<StrBuf>, options:&::RF
 							if Path::new(link_target.as_slice()).exists() {
 								let bucket=files_per_dir.find_or_insert(
 									dirname.to_owned(),
-									Vec::<(~str,~str)>::new()
+									Vec::<(StrBuf,StrBuf)>::new()
 								);
 // does the file we link to actually exist?
 								bucket.push( (filename.to_owned(), link_target)  );
@@ -93,7 +93,7 @@ pub fn write_index_html(source_dir: &Path,extentions:&Vec<StrBuf>, options:&::RF
 	rust2html::file_write_bytes_as(&index_path, doc.as_bytes());
 }
 
-fn write_grid_of_text_links(doc:&mut HtmlWriter, links:&Vec<(~str,~str)>) {
+fn write_grid_of_text_links(doc:&mut HtmlWriter, links:&Vec<(StrBuf,StrBuf)>) {
 	let mut max_line_len:uint=1;
 	for &(ref name,ref link) in links.iter() {
 		max_line_len =cmp::max(max_line_len, name.len()+1)

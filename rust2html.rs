@@ -42,7 +42,7 @@ pub mod htmlwriter;	// TODO - this is wrong, will cause confusion!
 // we could give the whole generator a root dir to look for crates? ... and assume html is generated in there..
 
 
-fn file_get_time_stamp_str(fpath:&Path)->~str {
+fn file_get_time_stamp_str(fpath:&Path)->StrBuf {
 	let file_time=match fs::stat(fpath) {
 		Ok(stat)=>stat.modified as i64, Err(_)=>0_i64
 	};
@@ -53,7 +53,7 @@ fn file_get_time_stamp_str(fpath:&Path)->~str {
 /// Takes populated node maps (NodeMaps)&'CrossCrateMap, plus a 'filemap' from crate-analysis, and generates an HTML view of the source with links.
 pub fn make_html_from_source(dc: &RustFindCtx, fm: &codemap::FileMap, nmaps: &NodeMaps,
                  fln: &FileLineNodes, lib_path: &str, 
-                 out_file: &Path, options: &::RF_Options) -> ~str {
+                 out_file: &Path, options: &::RF_Options) -> StrBuf {
     // todo - Rust2HtmlCtx { fm,nim,jdm,jrm } .. cleanup common intermediates
 	let  p=Profiler::new("make_html");
 //	::callgraph::dump_callgraph(xcm, nmaps);
@@ -127,7 +127,7 @@ pub fn make_html_from_source(dc: &RustFindCtx, fm: &codemap::FileMap, nmaps: &No
     }
 
 	source_view_page_end(&mut doc,out_file,options);
-    doc.doc.into_owned()
+    doc.doc
 }
 
 fn source_view_page_begin(doc:&mut HtmlWriter, out_file:&Path, options:&::RF_Options) {
@@ -382,8 +382,8 @@ pub fn node_color_index(ni:&FNodeInfo)->int {
         _ =>1
 	}
 }
-pub fn color_index_to_tag(i:int)->~str {
-    "c"+i.to_str()
+pub fn color_index_to_tag(i:int)->StrBuf {
+    StrBuf::from_str("c").append(i.to_str().as_slice())
 }
 fn is_alphanumeric(c:char)->bool {
     match c {
@@ -707,7 +707,7 @@ fn symbol_refs_link_str(dc:&RustFindCtx, fm:&codemap::FileMap, lib_path:&str, nm
 }
 
 
-fn write_line_attr_links(dst:&mut SourceCodeWriter<HtmlWriter>,text_line:&str,color:&Vec<int>,links:&Vec<i64>, resolve_link: |i64| -> Option<~str>) {
+fn write_line_attr_links(dst:&mut SourceCodeWriter<HtmlWriter>,text_line:&str,color:&Vec<int>,links:&Vec<i64>, resolve_link: |i64| -> Option<StrBuf>) {
     // emit a span..
     let no_color=-1;
     let mut curr_col=no_color;

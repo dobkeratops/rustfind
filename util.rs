@@ -22,9 +22,9 @@ pub fn text_line_pos_to_offset(text: &[u8], (line, ofs_in_line): (u32, u32))->Op
     return None;
 }
 
-pub fn get_filename_only(fnm:&str)->~str {
-    let toks:~[&str]=fnm.split(':').collect();
-    return toks[0].to_str();
+pub fn get_filename_only(fnm:&str)->StrBuf {
+    let toks:Vec<&str> =fnm.split(':').collect();
+    return (*toks.get(0)).to_str();
 }
 
 
@@ -50,7 +50,7 @@ pub fn text_offset_to_line_pos(text:&[u8], src_ofs: u32)-> Option<(u32, u32)> {
     }
     return None;
 }
-pub fn flatten_to_str<T,U:ToStr>(xs:&[T],f: |&T| -> U, sep:&str)->~str {
+pub fn flatten_to_str<T,U:ToStr>(xs:&[T],f: |&T| -> U, sep:&str)->StrBuf {
     let mut acc=StrBuf::new();
     let mut i=0; // TODO - functional way.
     while i<xs.len() {
