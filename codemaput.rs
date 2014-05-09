@@ -102,13 +102,13 @@ impl FromStr for ZTextFilePos {
         if toks.len() <= 0 {
             None
         } else if toks.len() == 1 {
-            Some(ZTextFilePos::new(toks[0], 0, 0))
+            Some(ZTextFilePos::new(*toks.get(0), 0, 0))
         } else {
-            match from_str::<u32>(toks[1]) {
+            match from_str::<u32>(*toks.get(1)) {
                 None => None,
-                Some(editor_line_number) => match FromStr::from_str(toks[2]) {
-                    None => Some(ZTextFilePos::new(toks[0], editor_line_number - 1, 0)),
-                    Some(col) => Some(ZTextFilePos::new(toks[0], editor_line_number, col))
+                Some(editor_line_number) => match FromStr::from_str(*toks.get(2)) {
+                    None => Some(ZTextFilePos::new(*toks.get(0), editor_line_number - 1, 0)),
+                    Some(col) => Some(ZTextFilePos::new(*toks.get(0), editor_line_number, col))
                 }
             }
         }
@@ -130,7 +130,7 @@ impl ZTextFilePos {
         while i > 0 {   // caution, need loop because we return, wait for new foreach ..in..
             i -= 1;
             let fm = &files.get(i);
-            let filemap_filename: &str = fm.name;
+            let filemap_filename: &str = fm.name.as_slice();
             if filemap_filename == self.name {
                 let lines = fm.lines.borrow();
                 if self.line as uint >= lines.len() {
@@ -187,8 +187,8 @@ pub fn get_span_str(tc :&ty::ctxt, sp: &codemap::Span) -> StrBuf {
     let loc_lo = tc.sess.codemap().lookup_char_pos(sp.lo);
     // TODO-assert both in same file!
     let file_org = loc_lo.file.start_pos;
-    let slice = loc_lo.file.src.slice((sp.lo - file_org).to_uint(), (sp.hi - file_org).to_uint());
-    slice.to_str()
+    let slice = loc_lo.file.src.as_slice().slice((sp.lo - file_org).to_uint(), (sp.hi - file_org).to_uint());
+    slice.to_strbuf()
 }
 
 
@@ -285,7 +285,7 @@ impl ToZIndexFilePos for codemap::BytePos {
 pub fn get_crate_name(tc: &ty::ctxt, i: ast::CrateNum) -> StrBuf {
     if i > 0 {
         let cd = tc.sess.cstore.get_crate_data(i);
-        cd.name.to_owned()
+        cd.name.to_strbuf()
     } else {
         StrBuf::from_str("")
     }
@@ -348,11 +348,11 @@ pub fn flatten_to_str<T,U:ToStr>(xs:&[T],f:&fn(x:&T)->U, sep:&str)->~str {
     acc
 }
 */
-pub fn loc_to_str(loc:codemap::Loc) -> ~str {
-    loc.file.name + ":" + loc.line.to_str() + ":" + loc.col.to_uint().to_str() + ":"
+pub fn loc_to_str(loc:codemap::Loc) -> StrBuf {
+    StrBuf::from_str(loc.file.name.as_slice()).append(":").append(loc.line.to_str().as_slice()).append(":").append( loc.col.to_uint().to_str().as_slice() ).append( ":" )
 }
 
-pub fn zget_file_line_str(_: &ty::ctxt, _: &str, _: u32) -> ~str {
+pub fn zget_file_line_str(_: &ty::ctxt, _: &str, _: u32) -> StrBuf {
 //  for c.sess.codemap.files.rev_iter().advance |fm:&codemap::FileMap| {
 //  let mut i = cx.sess.codemap.files.len();
 //  while i > 0 {   // caution, need loop because we return, wait for new foreach ..in..
@@ -379,20 +379,20 @@ pub fn dump_span(text: &[u8], sp: &codemap::Span) {
 
 
 pub fn byte_pos_from_text_file_pos_str(dc:&RustFindCtx,filepos:&str)->Option<codemap::BytePos> {
-    let toks=filepos.split(':').collect::<~[_]>();
+    let toks=filepos.split(':').collect::<Vec<_> >();
     if toks.len()<3 { return None; }
 //  let t0:()=toks[0];
 
 //  let line:Option<uint> = FromStr::from_str(toks[1]);
 //  if_some!(line in FromStr::from_str(toks[1]) then {
 //      if_some!(col in FromStr::from_str(toks[2]) then {
-    let line: Option<u32> = from_str(toks[1]);
-    let col:Option<u32> = from_str(toks[2]);
+    let line: Option<u32> = from_str(*toks.get(1));
+    let col:Option<u32> = from_str(*toks.get(2));
     if line.is_some() && col.is_some() {
         //todo - if no column specified, just lookup everything on that line!
         let l0 = line.unwrap()-1;
         let c0= col.unwrap()-1;
-        let foo= ZTextFilePos::new(toks[0],l0,c0).to_byte_pos(dc.tycx_ref());
+        let foo= ZTextFilePos::new(*toks.get(0),l0,c0).to_byte_pos(dc.tycx_ref());
         return foo;
     }
     return None;

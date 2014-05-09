@@ -23,9 +23,9 @@ pub fn run_server(dc:&RustFindCtx) {
         print!("rustfind {}> ", curr_file);
         ::std::io::stdio::flush();
         let input_line=BufferedReader::new(io::stdin()).read_line().expect("read_line failed on stdin");
-        let toks:~[&str]=input_line.words().collect();
+        let toks:Vec<&str> =input_line.words().collect();
         if toks.len()>0 {
-            match toks[0] {
+            match *toks.get(0) {
                 "h" | "help" | "?" => 
                     println!("interactive mode\n - enter file:line:pos or line:pos for current file\n - show location & def of symbol there\n j-dump json q-quit i-info"),
                 "i"=> {
@@ -40,13 +40,13 @@ pub fn run_server(dc:&RustFindCtx) {
                 _ =>{
                     // todo - if you just supply line, lookup defs on that line
                     // todo - lookup defs from symbol, remembering context of previous lookups?
-                    let cmd=toks[0];
-                    let cmd1 = match cmd[0] as char { 
+                    let cmd=*toks.get(0);
+                    let cmd1 = match cmd.chars().nth(0).unwrap_or('\0') { 
                         '0'..'9' => curr_file + ":" + cmd,
                         _ => cmd.to_str() 
                     };
-                    let subtoks:~[&str]=cmd1.split(':').collect();
-                    curr_file=find_file_name_in(dc, subtoks[0].to_str()).unwrap_or(curr_file);
+                    let subtoks:Vec<&str> =cmd1.split(':').collect();
+                    curr_file=find_file_name_in(dc, subtoks.get(0)).unwrap_or(curr_file);
                     //dump!(cmd1,subtoks,curr_file);
                     let def=lookup_def_at_text_file_pos_str(dc, cmd1, SDM_Source);
                     println!("{}", def.unwrap_or("no def found"));

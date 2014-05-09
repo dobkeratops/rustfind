@@ -33,12 +33,12 @@ pub fn first_file_name(dc:&RustFindCtx)->~str {
     files.get(0).name.to_str() // clone?
 }
 
-pub fn find_file_name_in(dc:&RustFindCtx,fname:&str)->Option<~str> {
+pub fn find_file_name_in(dc:&RustFindCtx,fname:&str)->Option<StrBuf> {
     // todo subsequence match..
     // TODO - is there an existing way of doing this, "index_of.." ..contains()..?
     let files = dc.codemap().files.borrow();
     for f in files.iter() {
-        if fname==f.name {return Some(fname.to_owned());}
+        if fname==f.name.as_slice() {return Some(fname.to_strbuf());}
     }
     None
 }
@@ -51,12 +51,12 @@ pub fn get_source_loc(dc:&RustFindCtx, pos:codemap::BytePos)->codemap::Loc {
 
 pub fn str_of_opt_ident(id:Option<ast::Ident>)->StrBuf{
     match id {
-        Some(i)=>token::get_ident(i).get().to_owned(), None=>StrBuf::new()
+        Some(i)=>token::get_ident(i).get().to_strbuf(), None=>StrBuf::new()
     }
 }
 
 pub fn str_of_ident(id:ast::Ident)->StrBuf{
-	token::get_ident(id).get().to_owned()
+	token::get_ident(id).get().to_strbuf()
 }
 
 

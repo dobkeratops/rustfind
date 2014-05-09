@@ -23,8 +23,8 @@ pub type ZeroBasedIndex=uint;
 /// specificially we need node->span info
 #[deriving(Clone,Hash,TotalEq,Eq)]
 pub struct CrossCrateMapItem {
-	pub item_name:~str,
-    pub file_name:~str,
+	pub item_name:StrBuf,
+    pub file_name:StrBuf,
     pub line:ZeroBasedIndex,
     pub col:uint,
     pub len:uint,
@@ -43,7 +43,7 @@ pub type CrossCrateMap = HashMap<ast::DefId,CrossCrateMapItem>;
 
 
 fn get_def_id_name<'a>(xcm:&'a CrossCrateMap, def_id:&ast::DefId)->&'a str {
-	xcm.find(def_id).map(|x|x.item_name.as_slice()).unwrap_or(&"")
+	xcm.find(def_id).map(|x|x.item_name.as_slice()).unwrap_or("")
 }
 
 pub trait FindNode {
@@ -76,7 +76,7 @@ pub fn read_cross_crate_map(crate_num:int, crate_name:&str,lib_path:&str)->Box<C
 //      println(s.to_str());
         let toks=s.split('\t').collect::<Vec<&str>>();
         if toks.len()>=6 {
-            match toks[0] {
+            match *toks.get(0) {
                 "jdef"=> {
                     // jimp- to def info, we dont need this here as we already generated it
                     // for the current crate. TODO , genarlized rfx would use it..
@@ -86,30 +86,30 @@ pub fn read_cross_crate_map(crate_num:int, crate_name:&str,lib_path:&str)->Box<C
                     //cratename is ignoredd, because we already know it.
                     // parent id ignored, we use span information to reconstruct AST
 
-                    let node_id: int= from_str::<int>(toks[2]).unwrap_or(0);
+                    let node_id: int= from_str::<int>(*toks.get(2)).unwrap_or(0);
                     xcm.insert(ast::DefId{krate:crate_num as u32, node:node_id as u32,},
                         CrossCrateMapItem{
-							item_name:	toks.iter().nth(9).map_or(StrBuf::from_str(""),|x|x.to_owned()),
-                            file_name:  toks[4].to_owned(),
-                            line:   from_str(toks[5]).unwrap_or(0)-1,
-                            col:    from_str(toks[6]).unwrap_or(0),
-                            len:    from_str(toks[7]).unwrap_or(0),
-							kind:	NodeKind::from_str(toks[8])
+							item_name:	toks.iter().nth(9).map_or(StrBuf::from_str(""),|x|x.to_strbuf()),
+                            file_name:  toks.get(4).to_strbuf(),
+                            line:   from_str(*toks.get(5)).unwrap_or(0)-1,
+                            col:    from_str(*toks.get(6)).unwrap_or(0),
+                            len:    from_str(*toks.get(7)).unwrap_or(0),
+							kind:	NodeKind::from_str(*toks.get(8))
                         }
                     );
                 }
                 // legacy noode definitons,no keyword
                 _=>{
 
-                    let node_id:int=from_str(toks[1]).unwrap_or(0);
+                    let node_id:int=from_str(*toks.get(1)).unwrap_or(0);
                     xcm.insert(ast::DefId{krate:crate_num as u32, node:node_id as u32,},
                         CrossCrateMapItem{
-							item_name:	toks.iter().nth(9).map_or(StrBuf::from_str(""),|x|x.to_owned()),
-                            file_name:  toks[2].to_owned(),
-                            line:   from_str(toks[3]).unwrap_or(0)-1,
-                            col:    from_str(toks[4]).unwrap_or(0),
-                            len:    from_str(toks[5]).unwrap_or(0),
-							kind:	NodeKind::from_str(toks[6])
+							item_name:	toks.iter().nth(9).map_or(StrBuf::from_str(""),|x|x.to_strbuf()),
+                            file_name:  toks.get(2).to_strbuf(),
+                            line:   from_str(*toks.get(3)).unwrap_or(0)-1,
+                            col:    from_str(*toks.get(4)).unwrap_or(0),
+                            len:    from_str(*toks.get(5)).unwrap_or(0),
+							kind:	NodeKind::from_str(*toks.get(6))
 							
                         }
                     );
@@ -139,7 +139,7 @@ pub fn cross_crate_map_combine_current_crate(xcm:&mut CrossCrateMap,dc:&RustFind
 			   xcm.insert(ast::DefId{krate:0, node:*node_id as u32,},
 					CrossCrateMapItem{
 						item_name:	str_of_opt_ident(node_info.rf_get_ident()),
-						file_name:	tfp.name.clone(),
+						file_name:	tfp.name.to_strbuf(),
 						line:	tfp.line as uint,
 						col:	tfp.col as uint,
 						len:	(node_info.rf_span().hi - node_info.rf_span().lo).to_uint(),
@@ -156,7 +156,7 @@ fn get_crate_name(dc:&RustFindCtx)->(posix::Path,StrBuf) {
     let crate_rel_path_name= dc.codemap().files.borrow();
     let crate_rel_path_name = Path::new(crate_rel_path_name.get(0).name.as_slice());
     let curr_crate_name_only = crate_rel_path_name.filestem_str().unwrap_or("");
-	(crate_rel_path_name.clone(),curr_crate_name_only.to_owned())
+	(crate_rel_path_name.clone(),curr_crate_name_only.to_strbuf())
 }
 
 pub fn cross_crate_map_write(dc:&RustFindCtx, _:&str,nim:&FNodeInfoMap, _:&HashMap<ast::NodeId, ast::DefId>, jdm:&JumpToDefMap) {
