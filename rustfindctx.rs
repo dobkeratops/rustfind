@@ -25,8 +25,8 @@ impl RustFindCtx {
 		return	self.ca.ty_cx
 	}
 }
-
-pub static ctxtkey: local_data::Key<@RustFindCtx> = &local_data::Key;
+// what was this?
+//pub static ctxtkey: local_data::Key<@RustFindCtx> = &local_data::Key;
 
 pub fn first_file_name(dc:&RustFindCtx)->~str {
     let files = dc.codemap().files.borrow();
@@ -49,13 +49,13 @@ pub fn get_source_loc(dc:&RustFindCtx, pos:codemap::BytePos)->codemap::Loc {
 }
 
 
-pub fn str_of_opt_ident(id:Option<ast::Ident>)->~str{
+pub fn str_of_opt_ident(id:Option<ast::Ident>)->StrBuf{
     match id {
-        Some(i)=>token::get_ident(i).get().to_owned(), None=>~""
+        Some(i)=>token::get_ident(i).get().to_owned(), None=>StrBuf::new()
     }
 }
 
-pub fn str_of_ident(id:ast::Ident)->~str{
+pub fn str_of_ident(id:ast::Ident)->StrBuf{
 	token::get_ident(id).get().to_owned()
 }
 

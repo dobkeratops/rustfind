@@ -14,7 +14,7 @@ use std::vec::Vec;
 // each listed file links to its 'file.html'.
 
 
-pub fn write_index_html(source_dir: &Path,extentions:&[~str], options:&::RF_Options) {
+pub fn write_index_html(source_dir: &Path,extentions:&Vec<StrBuf>, options:&::RF_Options) {
 
 	//println!("output dir={}",options.output_dir.as_str().unwrap_or(""));
 	println!("Generating index page:-");

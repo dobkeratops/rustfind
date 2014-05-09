@@ -97,7 +97,7 @@ impl ToZTextFilePos for codemap::BytePos {
 
 impl FromStr for ZTextFilePos {
     fn from_str(file_pos_str: &str) -> Option<ZTextFilePos> {
-        let toks: ~[&str] = file_pos_str.split(':').collect();
+        let toks: Vec<&str> = file_pos_str.split(':').collect();
 
         if toks.len() <= 0 {
             None
@@ -154,12 +154,12 @@ impl ZTextFilePos {
         }
     }
 
-    pub fn get_str_at(&self, tc: &ty::ctxt, len: u32) -> ~str {
+    pub fn get_str_at(&self, tc: &ty::ctxt, len: u32) -> StrBuf {
         let a = self.to_byte_pos_len(tc, len);
         match a {
             Some((bp_lo, bp_hi)) => get_span_str(tc,
                 &codemap::Span {lo: bp_lo, hi: bp_hi, expn_info: None}),
-            None => ~""
+            None => StrBuf::from_str("")
         }
     }
 }
@@ -178,12 +178,12 @@ impl ZTextFilePosLen {
 //      text_file_pos_len_to_byte_pos(tc,&self.tfp, self.len)
         self.tfp.to_byte_pos_len(tc, self.len)
     }
-    pub fn get_str(&self, tc: &ty::ctxt) -> ~str {
+    pub fn get_str(&self, tc: &ty::ctxt) -> StrBuf {
         self.tfp.get_str_at(tc, self.len)
     }
 }
 
-pub fn get_span_str(tc :&ty::ctxt, sp: &codemap::Span) -> ~str {
+pub fn get_span_str(tc :&ty::ctxt, sp: &codemap::Span) -> StrBuf {
     let loc_lo = tc.sess.codemap().lookup_char_pos(sp.lo);
     // TODO-assert both in same file!
     let file_org = loc_lo.file.start_pos;
@@ -282,12 +282,12 @@ impl ToZIndexFilePos for codemap::BytePos {
     }
 }
 
-pub fn get_crate_name(tc: &ty::ctxt, i: ast::CrateNum) -> ~str {
+pub fn get_crate_name(tc: &ty::ctxt, i: ast::CrateNum) -> StrBuf {
     if i > 0 {
         let cd = tc.sess.cstore.get_crate_data(i);
         cd.name.to_owned()
     } else {
-        ~""
+        StrBuf::from_str("")
     }
 }
 
@@ -368,7 +368,7 @@ pub fn zget_file_line_str(_: &ty::ctxt, _: &str, _: u32) -> ~str {
 //          };
 //      }
 //  }
-    return ~"";
+    return StrBuf::from_str("");
 }
 
 pub fn dump_span(text: &[u8], sp: &codemap::Span) {

@@ -30,7 +30,7 @@ macro_rules! logi{
     }
 }*/
 macro_rules! dump{ ($($a:expr),*)=>
-    (   {   let mut txt=~"";
+    (   {   let mut txt=StrBuf::new();
             $( txt=txt.append(
                 format!("{:s}={:?}",stringify!($a),$a) + ",")
             );*;

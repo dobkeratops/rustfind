@@ -53,7 +53,7 @@ impl CG_Options {
 	pub fn new()->CG_Options {
 		CG_Options{
 			local_only:false,
-			search:vec!(~"main"),
+			search:vec!("main"),
 			max_nodes:0x7fffffff
 		}
 	}	

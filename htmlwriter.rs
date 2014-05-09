@@ -37,7 +37,7 @@ impl<'a> HtmlWriter {
         self.doc.push_str("\"");
         self
     }
-    pub fn begin_tag_ext(&'a mut self, tag_name:&str, key_values:&[(~str,~str)])->&'a mut HtmlWriter {
+    pub fn begin_tag_ext(&'a mut self, tag_name:&str, key_values:&[(StrBuf,StrBuf)])->&'a mut HtmlWriter {
         self.write_tag_sub(tag_name,key_values,false);
         self.tag_stack.push(tag_name.to_str());
         self
@@ -49,20 +49,20 @@ impl<'a> HtmlWriter {
         self.begin_tag_ext(tag_name,&[]);
         self.depth()
     }
-    pub fn write_tag_ext(&'a mut self, tag_name:&str, key_values:&[(~str,~str)])->&'a mut HtmlWriter {
+    pub fn write_tag_ext(&'a mut self, tag_name:&str, key_values:&[(StrBuf,StrBuf)])->&'a mut HtmlWriter {
         self.write_tag_sub(tag_name,key_values,true)
     }
     pub fn write_tag(&'a mut self, tag_name:&str)->&'a mut HtmlWriter {
         self.write_tag_sub(tag_name,&[],true);
         self
     }
-    fn write_tag_sub(&'a mut self, tag_name:&str, key_values:&[(~str,~str)], closed:bool)->&'a mut HtmlWriter {
+    fn write_tag_sub(&'a mut self, tag_name:&str, key_values:&[(StrBuf,StrBuf)], closed:bool)->&'a mut HtmlWriter {
         self.doc.push_str("<"+tag_name);
         for &(ref k,ref v) in key_values.iter() {
             self.doc.push_str(" ");
-            self.doc.push_str(*k);
-            self.doc.push_str(&"=");
-            self.write_quoted_str(*v);
+            self.doc.push_str(k.as_slice());
+            self.doc.push_str("=");
+            self.write_quoted_str(v.as_slice());
         }
         if closed { self.doc.push_str("/"); }
         self.doc.push_str(">");
@@ -117,11 +117,11 @@ impl<'a> HtmlWriter {
         self
     }
     pub fn begin_tag_anchor(&'a mut self, anchor:&str)->&'a mut HtmlWriter {
-        self.begin_tag_ext("a",[(~"id",anchor.to_owned())]);
+        self.begin_tag_ext("a",&[(StrBuf::from_str("id"),StrBuf::from_str(anchor))]);
 		self
 	}
     pub fn begin_tag_link(&'a mut self, link:&str)->&'a mut HtmlWriter {
-        self.begin_tag_ext("a",[(~"href",link.to_owned())]);
+        self.begin_tag_ext("a",&[(StrBuf::from_str("href"),StrBuf::from_str(link))]);
         self
     }
     #[allow(dead_code)]

@@ -114,10 +114,10 @@ pub fn lookup_def_node_of_node(dc:&RustFindCtx,node:&AstNode_, nodeinfomap:&FNod
     return None;
 }
 
-pub fn build_jump_to_def_map(dc:&RustFindCtx, nim: &FNodeInfoMap,nd:&HashMap<ast::NodeId,ast::DefId>)->~JumpToDefMap{
+pub fn build_jump_to_def_map(dc:&RustFindCtx, nim: &FNodeInfoMap,nd:&HashMap<ast::NodeId,ast::DefId>)->Box<JumpToDefMap>{
 // todo: NodeId->AStNode  .. lookup_def_ inner functionality extracted
 	let prof=::timer::Profiler::new("build_jump_to_def_map");
-    let mut jdm=~HashMap::new();
+    let mut jdm=box HashMap::new();
     for (k,node_info) in nim.iter() {
         match lookup_def_node_of_node(dc,&node_info.rf_node(), nim,nd) {
             None=>{},
@@ -255,7 +255,7 @@ pub fn lookup_def_of_node_sub(dc:&RustFindCtx,node:&AstNode_,m:ShowDefMode,nim:&
 
     fn mk_result(dc:&RustFindCtx,  m:ShowDefMode, nim:&FNodeInfoMap, def_node_id:ast::DefId, _: &str)->Option<~str> {
         if def_node_id.krate != 0 {
-            Some(~"{cross-crate-def not implemented, "+def_node_id.to_str()+"}")
+            Some(StrBuf::from_str("{cross-crate-def not implemented, ")+def_node_id.to_str()+"}")
         }
         else {
             match nim.find(&def_node_id.node) {
@@ -264,7 +264,7 @@ pub fn lookup_def_of_node_sub(dc:&RustFindCtx,node:&AstNode_,m:ShowDefMode,nim:&
                     let loc=get_source_loc(dc,def_info.rf_span().lo);
                     let def_pos_str=
                         loc.file.name + ":"+loc.line.to_str()+": "+
-                            match m { SDM_LineCol=>loc.col.to_uint().to_str()+": ", _ =>~"" }+"\n";
+                            match m { SDM_LineCol=>loc.col.to_uint().to_str()+": ", _ =>StrBuf::from_str("") }+"\n";
                     return  match m{
                         SDM_Source=>Some(def_pos_str+get_node_source(dc.tycx_ref(),nim, def_node_id)+"\n"),
                         SDM_GeditCmd=>Some("+"+loc.line.to_str()+" "+loc.file.name+" "),
@@ -281,7 +281,7 @@ pub fn lookup_def_of_node_sub(dc:&RustFindCtx,node:&AstNode_,m:ShowDefMode,nim:&
     }
 }
 
-pub fn make_jump_to_def_map(dc:&RustFindCtx)->( FNodeInfoMap, ~HashMap<ast::NodeId,ast::DefId>,~JumpToDefMap)
+pub fn make_jump_to_def_map(dc:&RustFindCtx)->( FNodeInfoMap, Box<HashMap<ast::NodeId,ast::DefId>>,Box<JumpToDefMap>)
 {
     let  t = Profiler::new("make_jdm");
     let nim=build_node_info_map(dc.crate_);
@@ -319,9 +319,9 @@ impl<'a,K:Hash+TotalEq,V> MultiMap<K,V> {
     }
 }
 
-pub fn build_node_def_node_table(dc:&RustFindCtx)->~HashMap<ast::NodeId, ast::DefId>
+pub fn build_node_def_node_table(dc:&RustFindCtx)->Box<HashMap<ast::NodeId, ast::DefId>>
 {
-    let mut r=~HashMap::new();
+    let mut r=box HashMap::new();
     let curr_crate_id_hack=0;   // TODO WHAT IS CRATE ID REALLY?!
 
     for (id, _t) in dc.tycx_ref().node_types.borrow().iter() { //range(0, dc.tycx.next_id.get() as uint) { 

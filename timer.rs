@@ -138,9 +138,9 @@ fn format_number_test() {
     let num2 = 12345678;
     let num3 = 1234;
 
-    assert!(format_number(num1) == ~"123,456,789");
-    assert!(format_number(num2) == ~"12,345,678");
-    assert!(format_number(num3) == ~"1,234");
+    assert!(format_number(num1) == "123,456,789");
+    assert!(format_number(num2) == "12,345,678");
+    assert!(format_number(num3) == "1,234");
 }
 
 #[test]
@@ -150,8 +150,8 @@ fn format_as_time_test() {
     let num3 = 1 * MIN_MULTIPLIER + 5 * SEC_MULTIPLIER + 98765432;
     let num4 = 3 * HR_MULTIPLIER + num3;
 
-    assert!(format_as_time(num1) == ~"2,000 ns");
-    assert!(format_as_time(num2) == ~"3.141 sec");
-    assert!(format_as_time(num3) == ~"1:05.098 min");
-    assert!(format_as_time(num4) == ~"3:01:05.098 hr");
+    assert!(format_as_time(num1) == "2,000 ns");
+    assert!(format_as_time(num2) == "3.141 sec");
+    assert!(format_as_time(num3) == "1:05.098 min");
+    assert!(format_as_time(num4) == "3:01:05.098 hr");
 }

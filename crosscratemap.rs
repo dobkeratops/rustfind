@@ -58,7 +58,7 @@ impl FindNode for CrossCrateMap {
 }
 
 
-pub fn read_cross_crate_map(crate_num:int, crate_name:&str,lib_path:&str)->~CrossCrateMap {
+pub fn read_cross_crate_map(crate_num:int, crate_name:&str,lib_path:&str)->Box<CrossCrateMap> {
     let mut raw_bytes=ioutil::fileLoad(crate_name);
     if raw_bytes.len()==0 {
         println("loading lib crosscratemap "+lib_path+"/"+crate_name);
@@ -71,10 +71,10 @@ pub fn read_cross_crate_map(crate_num:int, crate_name:&str,lib_path:&str)->~Cros
     println("loaded cratemap "+rfx.get_ref().len().to_str()+" bytes"+" as crate "+crate_num.to_str());
 //  for &x in raw_bytes.iter() { rfx.push_char(x as char); }
 
-    let mut xcm=~HashMap::new();
+    let mut xcm=box HashMap::new();
     for s in rfx.get_ref().lines() {
 //      println(s.to_str());
-        let toks=s.split('\t').collect::<~[&str]>();
+        let toks=s.split('\t').collect::<Vec<&str>>();
         if toks.len()>=6 {
             match toks[0] {
                 "jdef"=> {
@@ -89,7 +89,7 @@ pub fn read_cross_crate_map(crate_num:int, crate_name:&str,lib_path:&str)->~Cros
                     let node_id: int= from_str::<int>(toks[2]).unwrap_or(0);
                     xcm.insert(ast::DefId{krate:crate_num as u32, node:node_id as u32,},
                         CrossCrateMapItem{
-							item_name:	toks.iter().nth(9).map_or(~"",|x|x.to_owned()),
+							item_name:	toks.iter().nth(9).map_or(StrBuf::from_str(""),|x|x.to_owned()),
                             file_name:  toks[4].to_owned(),
                             line:   from_str(toks[5]).unwrap_or(0)-1,
                             col:    from_str(toks[6]).unwrap_or(0),
@@ -104,7 +104,7 @@ pub fn read_cross_crate_map(crate_num:int, crate_name:&str,lib_path:&str)->~Cros
                     let node_id:int=from_str(toks[1]).unwrap_or(0);
                     xcm.insert(ast::DefId{krate:crate_num as u32, node:node_id as u32,},
                         CrossCrateMapItem{
-							item_name:	toks.iter().nth(9).map_or(~"",|x|x.to_owned()),
+							item_name:	toks.iter().nth(9).map_or(StrBuf::from_str(""),|x|x.to_owned()),
                             file_name:  toks[2].to_owned(),
                             line:   from_str(toks[3]).unwrap_or(0)-1,
                             col:    from_str(toks[4]).unwrap_or(0),
@@ -152,7 +152,7 @@ pub fn cross_crate_map_combine_current_crate(xcm:&mut CrossCrateMap,dc:&RustFind
 	}
 }
 
-fn get_crate_name(dc:&RustFindCtx)->(posix::Path,~str) {
+fn get_crate_name(dc:&RustFindCtx)->(posix::Path,StrBuf) {
     let crate_rel_path_name= dc.codemap().files.borrow();
     let crate_rel_path_name = Path::new(crate_rel_path_name.get(0).name.as_slice());
     let curr_crate_name_only = crate_rel_path_name.filestem_str().unwrap_or("");

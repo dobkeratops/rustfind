@@ -887,10 +887,10 @@ pub fn get_ast_node_of_node_id<'astl>(info:&FNodeInfoMap<'astl>,id:ast::NodeId)-
     }
 }
 
-pub fn get_node_info_str<'astl>(dc:&RustFindCtx,node:&NodeTreeLoc<'astl>)->~str
+pub fn get_node_info_str<'astl>(dc:&RustFindCtx,node:&NodeTreeLoc<'astl>)->StrBuf
 {
-    fn path_to_str(path:&ast::Path)->~str {
-        let mut acc=~"";
+    fn path_to_str(path:&ast::Path)->StrBuf {
+        let mut acc=StrBuf::new();
         let mut first=true;
 //      for path.idents.iter().advance |x|{
         for x in path.segments.iter() {
@@ -901,59 +901,56 @@ pub fn get_node_info_str<'astl>(dc:&RustFindCtx,node:&NodeTreeLoc<'astl>)->~str
         acc
         // typeparams too... path.types?
     }
-    fn pat_to_str(dc:&RustFindCtx,p:&ast::Pat)->~str{
+    fn pat_to_str(dc:&RustFindCtx,p:&ast::Pat)->StrBuf{
         // todo -factor out and recurse
         match p.node {
-            ast::PatIdent(_, ref path, _)=>~"pat_ident:"+path_to_str(path),
-            ast::PatEnum(ref path, _)=>~"pat_enum:"+path_to_str(path),//    `todo-fields..
+            ast::PatIdent(_, ref path, _)=>StrBuf::from_str("pat_ident:").append(path_to_str(path).as_slice()),
+            ast::PatEnum(ref path, _)=>StrBuf::from_str("pat_enum:").append(path_to_str(path).as_slice()),//    `todo-fields..
             ast::PatStruct(ref path,ref sfields,_) => {
-                ~"pat_struct:" + path_to_str(path) + "{" + 
-                    sfields.iter().map(|x| pat_to_str(dc,x.pat) + ",").collect::<Vec<~str>>().to_str() + "}"
+                StrBuf::from_str("pat_struct:").append(path_to_str(path).as_slice()).append("{").append(sfields.iter().map(|x| pat_to_str(dc,x.pat).append(",")).collect::<Vec<StrBuf>>().to_str().as_slice()).append("}")
             },
             ast::PatTup(ref elems) => {
-                ~"pat_tupl:" + elems.iter().map(|&x| pat_to_str(dc, x)).collect::<Vec<~str>>().to_str()
+                StrBuf::from_str("pat_tupl:").append( elems.iter().map(|&x| pat_to_str(dc, x)).collect::<Vec<StrBuf>>().to_str().as_slice())
             },
             //ast::pat_box(ref box)=>~"box",
-            ast::PatUniq(..)=>~"uniq",
-            ast::PatRegion(..)=>~"rgn",
-            ast::PatLit(..)=>~"literal",
-            ast::PatRange(..)=>~"range",
+            ast::PatUniq(..)=>StrBuf::from_str("uniq"),
+            ast::PatRegion(..)=>StrBuf::from_str("rgn"),
+            ast::PatLit(..)=>StrBuf::from_str("literal"),
+            ast::PatRange(..)=>StrBuf::from_str("range"),
 
-            _=>~"?"
+            _=>StrBuf::from_str("?")
         }
     };
-    fn ty_to_str(dc:&RustFindCtx,t:&ast::Ty)->~str{
+    fn ty_to_str(dc:&RustFindCtx,t:&ast::Ty)->StrBuf{
         match t.node{
-            ast::TyNil=> ~"nil",
-            ast::TyBot=>~"bottomtype",
-            ast::TyBox(..)=>~"box",
-            ast::TyVec(..)=>~"vec",
-            ast::TyFixedLengthVec(..)=>~"[T,..N]",
-            ast::TyPtr(..)=>~"*",
-            ast::TyRptr(..)=>~"&",
+            ast::TyNil=> StrBuf::from_str("nil"),
+            ast::TyBot=>StrBuf::from_str("bottomtype"),
+            ast::TyBox(..)=>StrBuf::from_str("box"),
+            ast::TyVec(..)=>StrBuf::from_str("vec"),
+            ast::TyFixedLengthVec(..)=>StrBuf::from_str("[T,..N]"),
+            ast::TyPtr(..)=>StrBuf::from_str("*"),
+            ast::TyRptr(..)=>StrBuf::from_str("&"),
             ast::TyTup(ref types) => {
-                ~"(" + types.iter().map(|x| ty_to_str(dc, *x)).collect::<Vec<~str>>().to_str() + ")" //todo: factor this out, map..
+				StrBuf::from_str("(").append(
+                types.iter().map(|x| ty_to_str(dc, *x)).collect::<Vec<StrBuf>>().to_str().as_slice()).append(")") //todo: factor this out, map..
             },
-            ast::TyPath(ref path, _, node_id)=>~"path:id="+node_id.to_str()+" "+path_to_str(path)
+            ast::TyPath(ref path, _, node_id)=>StrBuf::from_str("path:id=").append(node_id.to_str().as_slice()).append(" ").append(path_to_str(path).as_slice())
             ,
 
-            ast::TyInfer=>~"infered",
-            _ =>~"?"
+            ast::TyInfer=>StrBuf::from_str("infered"),
+            _ =>StrBuf::from_str("?")
         }
     }
-    fn expr_to_str(dc:&RustFindCtx, x:&ast::Expr_)->~str {
+    fn expr_to_str(dc:&RustFindCtx, x:&ast::Expr_)->StrBuf {
         match *x {
-            ast::ExprStruct(ref p,_,_)=>~"(expr_struct "+ path_to_str(p) +")",
+            ast::ExprStruct(ref p,_,_)=>StrBuf::from_str("(expr_struct ").append(path_to_str(p).as_slice()).append(")"),
             ast::ExprCall(ref e,ref args) => {
-                ~"(expr_call(" + expr_to_str(dc,&e.node) +
-                    args.iter().map(|x| expr_to_str(dc, &x.node)).collect::<Vec<~str>>().to_str() + ")"
+                StrBuf::from_str("(expr_call(").append(expr_to_str(dc,&e.node).as_slice()).append(args.iter().map(|x| expr_to_str(dc, &x.node)).collect::<Vec<StrBuf>>().to_str().as_slice()).append(")")
             },
             ast::ExprField(ref e, ref i, ref tys) => {
-                ~"(expr_field(" + expr_to_str(dc, &e.node) + ")" +
-                    token::get_ident(*i).get() + 
-                    tys.iter().map(|x| ty_to_str(dc, *x)).collect::<Vec<~str>>().to_str() + ")"
+                StrBuf::from_str("(expr_field(").append(expr_to_str(dc, &e.node).as_slice()).append(")").append(token::get_ident(*i).get().as_slice()).append(tys.iter().map(|x| ty_to_str(dc, *x)).collect::<Vec<StrBuf>>().to_str().as_slice()).append(")")
             },
-            _=>~"expr"
+            _=>StrBuf::from_str("expr")
         }
     }
 
@@ -963,36 +960,33 @@ pub fn get_node_info_str<'astl>(dc:&RustFindCtx,node:&NodeTreeLoc<'astl>)->~str
 //          fn path_to_str(&astnode_pat(x))->~str
 //          fn expr_to_str(&astnode_pat(x))->~str
 
-        &astnode_view_item(_)=>~"view_item: ?",
-        &astnode_item(x)=>~"item: "+
-            "id="+x.id.to_str()+" "+
-            token::get_ident(x.ident).get()+
+        &astnode_view_item(_)=>StrBuf::from_str("view_item: ?"),
+        &astnode_item(x)=>StrBuf::from_str("item: ").append("id=").append(x.id.to_str()).append(" ").append(token::get_ident(x.ident).get()).append(
             match x.node {
-                ast::ItemFn(_,_,_,_,_) =>~" fn_decl",
-                ast::ItemStruct(_, _) =>~" struct_def",
-                _=>~"item_unknown"
-            },
+                ast::ItemFn(_,_,_,_,_) =>" fn_decl",
+                ast::ItemStruct(_, _) =>" struct_def",
+                _=>"item_unknown"
+            }),
 
-        &astnode_local(_)=>~"local: ?",
-        &astnode_block(_)=>~"block: ?",
-        &astnode_stmt(_)=>~"stmt: ?",
-        &astnode_arm(_)=>~"arm: ?",
+        &astnode_local(_)=>StrBuf::from_str("local: ?"),
+        &astnode_block(_)=>StrBuf::from_str("block: ?"),
+        &astnode_stmt(_)=>StrBuf::from_str("stmt: ?"),
+        &astnode_arm(_)=>StrBuf::from_str("arm: ?"),
         &astnode_struct_field(sf)=>
-            "id="+sf.node.id.to_str()+" "+
+            StrBuf::from_str("id=").append(sf.node.id.to_str().as_slice()).append(" ").append(
             match sf.node.kind {
-                ast::NamedField(nf, _)=>"struct named_field: "+token::get_ident(nf).get()+" ",
-                _=>~"struct anon_field"
-            }+
-            ":"+ty_to_str(dc, sf.node.ty)/*sf.node.ty ..parse it.. */,
-        &astnode_pat(p)=>"pattern: "+
-            "id="+p.id.to_str()+" "+
-            pat_to_str(dc,p)
+                ast::NamedField(nf, _)=>StrBuf::from_str("struct named_field: ").append(token::get_ident(nf).get()).append(" "),
+                _=>StrBuf::from_str("struct anon_field")
+            }.as_slice()).append(":").append(ty_to_str(dc, sf.node.ty).as_slice())/*sf.node.ty ..parse it.. */,
+        &astnode_pat(p)=>StrBuf::from_str("pattern: ").append("id=").append(
+            p.id.to_str()).append(" ").append(
+            pat_to_str(dc,p).as_slice())
         ,
-        &astnode_decl(_)=>~"decl: ?",
-        &astnode_ty(x)=>~"type: "+ty_to_str(dc,x),
-        &astnode_struct_def(_)=>~"struct def",
+        &astnode_decl(_)=>StrBuf::from_str("decl: ?"),
+        &astnode_ty(x)=>StrBuf::from_str("type: ").append(ty_to_str(dc,x).as_slice()),
+        &astnode_struct_def(_)=>StrBuf::from_str("struct def"),
         &astnode_expr(x)=>expr_to_str(dc,&x.node),
-        _=> ~"unknown"
+        _=> StrBuf::from_str("unknown")
     }
 }
 
@@ -1006,22 +1000,22 @@ pub fn safe_node_id_to_type(cx: &ty::ctxt, id: ast::NodeId) -> Option<ty::t> {
 
 
 
-pub fn def_of_symbol_to_str<'astl>(_:&RustFindCtx, _:&FNodeInfoMap<'astl>, _:&HashMap<ast::NodeId, ast::DefId>, _:&str)->~str {
-    ~"TODO"
+pub fn def_of_symbol_to_str<'astl>(_:&RustFindCtx, _:&FNodeInfoMap<'astl>, _:&HashMap<ast::NodeId, ast::DefId>, _:&str)->StrBuf {
+    StrBuf::from_str("TODO")
 }
 
 
 // TODO- this should return a slice?
-pub fn get_node_source<'astl>(tc:&ty::ctxt, nim:&FNodeInfoMap<'astl>, did:ast::DefId)->~str {
+pub fn get_node_source<'astl>(tc:&ty::ctxt, nim:&FNodeInfoMap<'astl>, did:ast::DefId)->StrBuf {
     if did.krate==0{
         match nim.find(&did.node) {
-            None=>~"",
+            None=>StrBuf::from_str(""),
             Some(info)=>{
                 get_span_str(tc,&info.span)
             }
         }
     } else {
-        "{out of crate def:"+did.to_str()+"}"
+        (StrBuf::from_str("{out of crate def:").append(did.to_str().as_slice()).append("}"))
     }
 }
 

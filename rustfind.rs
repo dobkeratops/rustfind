@@ -38,7 +38,8 @@ use find_ast_node::{safe_node_id_to_type,get_node_info_str,find_node_tree_loc_at
 use jumptodefmap::{lookup_def_at_text_file_pos_str, make_jump_to_def_map, def_info_from_node_id,
     lookup_def_at_text_file_pos, dump_json};
 
-pub use rustfindctx::{RustFindCtx,ctxtkey};
+pub use rustfindctx::RustFindCtx;
+//pub use rustfindctx::ctxtkey;
 pub use codemaput::{ZTextFilePos,ZTextFilePosLen,get_span_str,ToZTextFilePos,ZIndexFilePos,ToZIndexFilePos};
 use rsfind::{SDM_LineCol,SDM_Source,SDM_GeditCmd};
 use crosscratemap::{CrossCrateMap,CrossCrateMapItem};
@@ -205,7 +206,7 @@ fn main() {
         let mut done=false;
         let filename=util::get_filename_only(matches.free.get(0).as_slice());
         let dc = @get_ast_and_resolve(&Path::new(filename), libs.move_iter().collect());
-        local_data::set(ctxtkey, dc);
+//        local_data::set(ctxtkey, dc);
 
         let mut all_options = RF_Options::new();
         if matches.opt_present("D") {
@@ -217,16 +218,16 @@ fn main() {
         let mut i=0;
         let lib_html_path = if matches.opt_present("x") {
             let given_path=matches.opt_str("x").unwrap();
-			if given_path!=~"." {given_path+"/"} 
+			if given_path!=StrBuf::from_str(".") {given_path+"/"} 
 			else 
-				{~""}	// "-x ."we need this behaviour to emit relative pages we can publish
+				{StrBuf::from_str("")}	// "-x ."we need this behaviour to emit relative pages we can publish
 			
         } else {
 			println!("No library path specified with -x, so using $RUST_PATH/src\n")
 			match os::getenv("RUST_PATH") {
 				None=>{
 					println!("$RUST_PATH not set, so can't find library crate .rfx files to get standard library links. set this or pass the path with option -x");
-					~""
+					StrBuf::from_str("")
 				}
 	            Some(value) => value+"/src/"
 			}
@@ -234,13 +235,13 @@ fn main() {
         if matches.opt_present("f") {
             while i<matches.free.len() {
                 let mode=if matches.opt_present("g"){SDM_GeditCmd} else {SDM_Source};
-                println!("{}", lookup_def_at_text_file_pos_str(dc,matches.free.get(i).as_slice(),mode).unwrap_or(~"no def found"));
+                println!("{}", lookup_def_at_text_file_pos_str(dc,matches.free.get(i).as_slice(),mode).unwrap_or(StrBuf::from_str("no def found")));
                 i+=1;
                 done=true;
             }
         }
         if matches.opt_present("d") {
-			all_options.rustdoc_url = Some(Path::new(matches.opt_str("d").unwrap_or(~"")));
+			all_options.rustdoc_url = Some(Path::new(matches.opt_str("d").unwrap_or(StrBuf::from_str(""))));
 			println!("TODO:linking to rustdoc pages at {}",all_options.rustdoc_url.clone().unwrap().as_str());
         }
         if matches.opt_present("n") {
@@ -261,7 +262,7 @@ fn main() {
 			all_options.callgraph_opt.search.push(find_node);
         }
         if matches.opt_present("m") {
-            let max_nodes:uint = from_str(matches.opt_str("F").unwrap_or(~"100")).unwrap_or(100);
+            let max_nodes:uint = from_str(matches.opt_str("F").unwrap_or(StrBuf::from_str("100"))).unwrap_or(100);
 			all_options.callgraph_opt.max_nodes=max_nodes;
 		}
         if matches.opt_present("r") {
@@ -372,7 +373,7 @@ fn debug_test(dc:&RustFindCtx) {
     while test_cursor<500 {
         let loc = rustfindctx::get_source_loc(dc,codemap::BytePos(test_cursor as u32));
 
-        logi!(~"\n=====Find AST node at: ",loc.file.name,":",loc.line,":",loc.col.to_uint().to_str(),":"," =========");
+        logi!("\n=====Find AST node at: ",loc.file.name,":",loc.line,":",loc.col.to_uint().to_str(),":"," =========");
 
         let nodetloc = find_node_tree_loc_at_byte_pos(dc.crate_,codemap::BytePos(test_cursor as u32));
         let node_info =  get_node_info_str(dc,&nodetloc);
@@ -432,7 +433,7 @@ pub fn write_crate_as_html_and_rfx(dc:&RustFindCtx,lib_html_path:&str,opts: &RF_
 	// Pull togetherr the node info maps/def maps /jump maps..
     let (info_map,def_map,jump_def_map) = make_jump_to_def_map(dc);
 //	nim:&FNodeInfoMap, jdm:&JumpToDefMap,
-    let mut def2refs = ~MultiMap::new();
+    let mut def2refs = box MultiMap::new();
     for (&nref,&ndef) in jump_def_map.iter() {
         if ndef.krate==0 {
             def2refs.insert(ndef.node,nref);
@@ -456,7 +457,7 @@ pub fn write_crate_as_html_and_rfx(dc:&RustFindCtx,lib_html_path:&str,opts: &RF_
 		return;
 	}
 	let dirname=opts.output_dir.as_str().unwrap_or("");
-	let dirname=if dirname.len()>0{dirname+"/"}else{~""};
+	let dirname=if dirname.len()>0{dirname+"/"}else{StrBuf::from_str("")};
 	callgraph::write_call_graph(&nmaps, dirname,"callgraph", &opts.callgraph_opt);
 }
 

@@ -63,7 +63,7 @@ pub fn make_html_from_source(dc: &RustFindCtx, fm: &codemap::FileMap, nmaps: &No
 	let time_stamp=file_get_time_stamp_str(&Path::new(fm.name.clone()));	
 	let git_str = get_git_branch_info();	// yikes, where?! cwd
 
-    let hash=get_str_hash(fm.name);
+    let hash=get_str_hash(fm.name.as_slice());
 	source_view_page_begin(&mut doc,out_file,options);
 
 
@@ -77,9 +77,9 @@ pub fn make_html_from_source(dc: &RustFindCtx, fm: &codemap::FileMap, nmaps: &No
     if options.write_file_path {
         let t0=doc.begin_tag_check("div");//,&[(~"style",~"background-color:#"+bg+";")]);
         let t1=doc.begin_tag_check("fileblock");
-        doc.write_path_links(fm.name);
+        doc.write_path_links(fm.name.as_slice());
 		
-		if git_str.len()>0 {doc.begin_tag("c40").writeln("\tgit branch:\t"+git_str).end_tag();}
+		if git_str.len()>0 {doc.begin_tag("c40").writeln(StrBuf::from_str("\tgit branch:\t").append(git_str.as_slice()).as_slice()).end_tag();}
 		doc.begin_tag("c40").writeln("\tmodified:\t"+time_stamp).end_tag();
         doc.end_tag_check(t1);
         doc.end_tag_check(t0);
@@ -89,7 +89,7 @@ pub fn make_html_from_source(dc: &RustFindCtx, fm: &codemap::FileMap, nmaps: &No
         for line in range(0, fm.lines.borrow().len()) {
             scw.line_index=line;
             // todo: line numbers want to go in a seperate column so they're unselectable..
-            scw.doc.write_tagged("ln",pad_to_length((line+1).to_str(),max_digits," "));
+            scw.doc.write_tagged("ln",pad_to_length((line+1).to_str().as_slice(),max_digits," ").as_slice());
             scw.doc.begin_tag_anchor((line+1).to_str()); 
             let lend = if line < (fm.lines.borrow().len()-1) {
                 (fm.lines.borrow().get(line+1) - fstart).to_uint()
@@ -97,7 +97,7 @@ pub fn make_html_from_source(dc: &RustFindCtx, fm: &codemap::FileMap, nmaps: &No
                 fm.src.len()
             };
             scw.doc.write(" ");
-            let line_str = fm.src.slice((fm.lines.borrow().get(line) - fstart).to_uint(), lend);
+            let line_str = fm.src.as_slice().slice((fm.lines.borrow().get(line) - fstart).to_uint(), lend);
             //doc.writeln(line_str);
 			
             scw.doc.end_tag();
@@ -148,7 +148,7 @@ pub fn write_crate_as_html_sub(dc:&RustFindCtx, nmaps:&NodeMaps,
 	lib_path:&str, options: &::RF_Options) {
 
 	//println!("output dir={}",options.output_dir.as_str().unwrap_or(""));
-	indexpage::write_index_html(&Path::new("."), &[~"rs",~"cpp",~"h",~"c"],options);
+	indexpage::write_index_html(&Path::new("."), &vec![StrBuf::from_str("rs"),StrBuf::from_str("cpp"),StrBuf::from_str("h"),StrBuf::from_str("c")],options);
 
     let npl=NodesPerLinePerFile::new(dc,nmaps.node_info_map);
 
@@ -156,8 +156,8 @@ pub fn write_crate_as_html_sub(dc:&RustFindCtx, nmaps:&NodeMaps,
 
     let files=&dc.codemap().files.borrow();
     for (i,cm_file) in files.iter().enumerate() {
-        if is_valid_filename(cm_file.name) {
-            let html_name = options.output_dir.join(Path::new(make_html_name(cm_file.name)));
+        if is_valid_filename(cm_file.name.as_slice()) {
+            let html_name = options.output_dir.join(Path::new(make_html_name(cm_file.name.as_slice())));
             println!("generating {}: {}.. ", i.to_str(), html_name.display());
             let doc_str=make_html_from_source(dc, &**cm_file, nmaps,npl.file.get(i) , lib_path,
                                   &html_name, options);
@@ -200,8 +200,9 @@ pub fn write_head(doc:&mut HtmlWriter, out_file: &Path, options: &::RF_Options) 
         let path = match css_rel_path.with_filename(stylesheet_name).as_str() {
             Some(s) => s,
             None => stylesheet_name
-        }.to_owned();
-        doc.write_tag_ext("link", &[(~"href", path), (~"rel", ~"stylesheet"), (~"type", ~"text/css")]);
+        }.to_strbuf();
+        doc.write_tag_ext("link", &[(StrBuf::from_str("href"), path), (StrBuf::from_str("rel"), StrBuf::from_str("stylesheet")), (
+StrBuf::from_str("type"), StrBuf::from_str("text/css"))]);
     };
 
     doc.begin_tag("head");
@@ -212,23 +213,23 @@ pub fn write_head(doc:&mut HtmlWriter, out_file: &Path, options: &::RF_Options) 
 }
 
 /// spawns git to find version info for the source tree here.
-pub fn get_git_branch_info()->~str {
+pub fn get_git_branch_info()->StrBuf {
 	use std::io;
 	use std::io::process;
 	use std::os;
 	use std::str;
 	use std::io::pipe;
 
-	match process::Process::output("git",&[~"branch",~"-v"]) {
+	match process::Process::output("git",&vec![StrBuf::from_str("branch"),StrBuf::from_str("-v")]) {
 		Err(_)=>{},
 		Ok(out)=> {
-			let  curr_branch=~"";
+			let  curr_branch=StrBuf::from_str("");
 			for line in str::from_utf8(out.output.as_slice()).unwrap_or("").lines() {
 				if line.chars().nth(0).unwrap_or('\0')=='*' { return line.to_owned();}
 			}
 		},
 	}
-	return ~"";
+	return StrBuf::from_str("");
 }
 
 
@@ -246,7 +247,7 @@ fn num_digits(a:uint)->uint{
     while aa>=10 { aa/=10; n+=1;}
     n
 }
-fn pad_to_length(a:&str,l:uint,pad:&str)->~str {
+fn pad_to_length(a:&str,l:uint,pad:&str)->StrBuf {
     let mut acc=StrBuf::from_str(" ");
     let mut i=(l-a.len()) as int;
     while i>0 {
@@ -280,19 +281,19 @@ pub fn get_file_index(dc:&RustFindCtx,fname:&str)->Option<uint> {
     }
     None
 }
-pub fn get_crate_name(dc:&RustFindCtx,ci:ast::CrateNum)->~str {
+pub fn get_crate_name(dc:&RustFindCtx,ci:ast::CrateNum)->StrBuf {
     super::codemaput::get_crate_name(dc.tycx_ref(),ci)
 }
 
 
 impl NodesPerLinePerFile {
-    fn new(dc:&RustFindCtx, nim:&FNodeInfoMap)->~NodesPerLinePerFile {
+    fn new(dc:&RustFindCtx, nim:&FNodeInfoMap)->Box<NodesPerLinePerFile>{
         // todo, figure this out functionally?!
         //      dc.sess.codemap.files.map(
         //              |fm:&@codemap::FileMap|{ slice::from_elem(fm.lines.len(), ~[]) }
         //          ).collect();
 
-        let mut npl=~NodesPerLinePerFile{file:Vec::new()};
+        let mut npl= box NodesPerLinePerFile{file:Vec::new()};
 //      let mut fi=0;
 //      npl.file = slice::from_elem(dc.sess.codemap.files.len(),);
         let files = dc.codemap().files.borrow();
@@ -599,7 +600,7 @@ fn write_line_with_links(dst:&mut SourceCodeWriter<HtmlWriter>,dc:&RustFindCtx,f
         x=0; wb=true;
         while x<line.len() {
             if wb {
-                match sub_match(line,x,&[&"let",&"mut", &"const", &"use", &"mod", &"match",&"if",&"else",&"break",&"return",&"while",&"loop",&"for",&"do",&"ref",&"pub",&"priv",&"unsafe",&"extern",&"in",&"as",&"crate"]) {
+                match sub_match(line,x,&vec!["let","mut", "const", "use", "mod", "match","if","else","break","return","while","loop","for","do","ref","pub","priv","unsafe","extern","in","as","crate"]) {
                 None=>{},
                 Some((_, len))=>{
                     let me=x+len;
@@ -664,8 +665,7 @@ fn make_def_link_str(dc:&RustFindCtx, fm:&codemap::FileMap, lib_path:&str,nmaps:
 		// line table. ?! TODO: dont we hve the line table in 'crosscratemap'
 
 		Some(a) if defid.krate>0 =>{
-			Some(make_html_name_reloc(a.file_name,fm.name,lib_path)+
-				"#n"+defid.node.to_str())
+			Some(make_html_name_reloc(a.file_name,fm.name,lib_path).append("#n").append(defid.node.to_str().as_slice()) )
 		},
 		// Local crate link:
 		Some(a)=>
@@ -776,7 +776,7 @@ fn get_source_line_filtered(fm:&codemap::FileMap, line_index:uint)-> (~str, uint
 		};
 		i+=1;
 	}
-	return (~"",i);
+	return (StrBuf::from_str(""),i);
 }
 #[test]
 fn test_whitespace() {
@@ -800,7 +800,7 @@ fn get_source_line(fm:&codemap::FileMap, i: uint) -> ~str {
     if i > 0 {
         fm.src.slice((lines.get(i as uint) - fm.start_pos).to_uint(), (le - fm.start_pos.to_uint()) as uint).to_owned()
     } else {
-        ~""
+        StrBuf::from_str("")
     }
 }
 fn num_source_lines(fm:&codemap::FileMap)->uint {
@@ -890,7 +890,7 @@ fn write_symbol_references(doc:&mut HtmlWriter,dc:&RustFindCtx, fm:&codemap::Fil
 	// 
 
     let depth=doc.depth();
-    doc.begin_tag_ext("div",[(~"class",~"refblock")]);
+    doc.begin_tag_ext("div",[(StrBuf::from_str("class"),StrBuf::from_str("refblock"))]);
 
     let file_def_nodes = find_defs_in_file(fm,nmaps.node_info_map);
 
@@ -931,7 +931,7 @@ fn write_symbol_references(doc:&mut HtmlWriter,dc:&RustFindCtx, fm:&codemap::Fil
                     let oifp=ni.rf_span().lo.to_index_file_pos(dc.tycx_ref());
                     assert!(oifp.is_some()); let ifp=oifp.unwrap();
                     (ni,ifp,id)})
-                .collect::<~[(&FNodeInfo,ZIndexFilePos,ast::NodeId)]>();
+                .collect::<Vec<(&FNodeInfo,ZIndexFilePos,ast::NodeId)> >();
 
             let l=refs_iter.len();
             fn pri_of(x:&FNodeInfo) -> uint { 
@@ -984,7 +984,7 @@ fn write_symbol_references(doc:&mut HtmlWriter,dc:&RustFindCtx, fm:&codemap::Fil
 
 					let files = dc.codemap().files.borrow();
 					let rfm = &files.get(ref_ifp.file_index as uint);
-					let tagname=make_html_name_rel(rfm.name, fm.name) + "#" + (ref_ifp.line + 1).to_str();
+					let tagname=make_html_name_rel(rfm.name, fm.name).append("#").append( (ref_ifp.line + 1).to_str().as_slice());
 					let this_link_lines_shown=0;
 
                     if lines_per_link>0 {
@@ -1012,8 +1012,8 @@ fn write_symbol_references(doc:&mut HtmlWriter,dc:&RustFindCtx, fm:&codemap::Fil
 							// we need to account for if we skipped it..
 							let (src_line,i)=get_source_line_filtered(&***rfm, ref_line_index as uint); 
 							if (i as int)<=end_line {
-								doc.write_tagged(if i as u32==ref_ifp.line{&"c41"}else{&"c40"},(i+1).to_str()+&": ");
-								doc.writeln_tagged(if i as u32==ref_ifp.line{&"c1"}else{&"c2"}, src_line);
+								doc.write_tagged(if i as u32==ref_ifp.line{"c41"}else{"c40"},(i+1).to_str()+": ");
+								doc.writeln_tagged(if i as u32==ref_ifp.line{"c1"}else{"c2"}, src_line);
 								last_link_line=i as int;
 							}
 							ref_line_index = i as int+1;
@@ -1026,7 +1026,7 @@ fn write_symbol_references(doc:&mut HtmlWriter,dc:&RustFindCtx, fm:&codemap::Fil
 
                        	if  num_links<200 {
 	                        doc.begin_tag_link(tagname);
-                            doc.write_tagged("c40","("+(ref_ifp.line+1).to_str()+")");
+                            doc.write_tagged("c40",StrBuf::from_str("(").append((ref_ifp.line+1).to_str().as_slice()).append(")").as_slice());
    	                        newline=false;
    	                        links_written+=1;
    	                        last_link_line=ref_ifp.line as int+1;
@@ -1059,11 +1059,22 @@ impl ::rust2html::htmlwriter::HtmlWriter{ // todo, why doesn't that allow path r
 
                 self.begin_tag_anchor("line"+(node_file_pos.line+1).to_str()+"_col"+node_file_pos.col.to_str() + "_refs" );
                 self.begin_tag("c43");
-                self.writeln(dc.codemap().files.borrow().get(node_file_pos.file_index as uint).name + ":" + (node_file_pos.line + 1).to_str() + ":" + node_file_pos.col.to_str()
-                            +"-"+(node_end_file_pos.line+1).to_str()+":"+node_file_pos.col.to_str() +" -" +info.rf_kind().as_str() + "- definition:");
+                self.writeln(
+					StrBuf::from_str(dc.codemap().files.borrow().get( node_file_pos.file_index as uint).name.as_slice())
+					.append(":")
+					.append( (node_file_pos.line + 1).to_str() .as_slice())
+					.append( ":" )
+					.append( node_file_pos.col.to_str().as_slice() )
+					.append("-")
+					.append((node_end_file_pos.line+1).to_str().as_slice())
+					.append(":")
+					.append(node_file_pos.col.to_str().as_slice())
+					.append(" -")
+					.append(info.rf_kind().as_str().as_slice())
+					.append("- definition:"));
                 self.end_tag();
 
-                self.begin_tag_link( "#"+(node_file_pos.line+1).to_str());
+                self.begin_tag_link( StrBuf::from_str("#").append((node_file_pos.line+1).to_str().as_slice()));
                 self.begin_tag("pr");
             //          dump!(def_tfp);
 				let (linestr1,l1)=get_source_line_filtered(fm,node_file_pos.line as uint);
@@ -1084,7 +1095,7 @@ impl ::rust2html::htmlwriter::HtmlWriter{ // todo, why doesn't that allow path r
         let fname = dc.codemap().files.borrow();
         let fname = fname.get(fi).name.as_slice();
         self
-            .begin_tag_link( make_html_name_rel(fname,origin_fm.name));
+            .begin_tag_link( make_html_name_rel(fname,origin_fm.name.as_slice()));
         self
             .begin_tag("c40")
             .writeln(""+fname + ":")
@@ -1096,9 +1107,9 @@ impl ::rust2html::htmlwriter::HtmlWriter{ // todo, why doesn't that allow path r
     pub fn write_path_links(&mut self/*doc:&mut HtmlWriter*/, file_name:&str) {
     	let pldepth=self.depth();
         self.writeln("");
-        let file_path_col=&"c0";
-        let file_delim_col=&"c1";
-        let name_parts = file_name.split('/').collect::<~[&str]>();
+        let file_path_col="c0";
+        let file_delim_col="c1";
+        let name_parts = file_name.split('/').collect::<Vec<&str>>();
         let num_dirs=name_parts.len()-1;
         let mut link_target=StrBuf::from_str("./");
 
@@ -1140,8 +1151,8 @@ fn get_index_file_pos(nim:&FNodeInfoMap, nid: ast::NodeId, tc:&ty::ctxt)->Option
 }
 
 
-fn make_html_name(f: &str) -> ~str { 
-    f + ".html"
+fn make_html_name(f: &str) -> StrBuf { 
+    StrBuf::from_str(f).append(".html")
 }
 
 fn count_chars_in(f:&str, x:char)->uint{
@@ -1151,7 +1162,7 @@ fn count_chars_in(f:&str, x:char)->uint{
 }
 
 
-fn make_html_name_reloc(f:&str, origin:&str, reloc:&str)->~str {
+fn make_html_name_reloc(f:&str, origin:&str, reloc:&str)->StrBuf {
     let mut acc=StrBuf::from_str("");
     if reloc.len()>0 {
 //		printf("relocating path to %s"+str);
@@ -1163,9 +1174,9 @@ fn make_html_name_reloc(f:&str, origin:&str, reloc:&str)->~str {
         }
     }
     acc.push_str(f);
-    make_html_name(acc.as_slice()).to_owned()
+    make_html_name(acc.as_slice()).to_strbuf()
 }
-fn make_html_name_rel(f:&str, origin:&str)->~str {
+fn make_html_name_rel(f:&str, origin:&str)->StrBuf {
     make_html_name_reloc(f,origin,"")
 }
 
