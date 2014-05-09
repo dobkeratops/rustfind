@@ -21,7 +21,7 @@ fn mk_xlat_table()-> HashMap<char,StrBuf>
             '>' =>"&gt;".to_strbuf(),
             '&' =>"&amp;".to_strbuf(),
             '\t' =>"&nbsp;&nbsp;&nbsp;&nbsp;".to_strbuf(),
-            c => StrBuf::from_char(c),//x.slice(0,1)
+            c => StrBuf::from_char(c,1),//x.slice(0,1)
             });
     }
     xlat
@@ -72,7 +72,7 @@ impl<'a> HtmlWriter {
         match self.tag_stack.pop() {
             Some(tag_name) => {
                 self.doc.push_str("</");
-                self.doc.push_str(tag_name);
+                self.doc.push_str(tag_name.as_slice());
                 self.doc.push_str(">");
             },
             None => ()
@@ -93,7 +93,7 @@ impl<'a> HtmlWriter {
     }
     pub fn write(&'a mut self,t:&str)->&'a mut HtmlWriter {
         for x in t.chars() {
-            self.doc.push_str(self.xlat.get(&x).clone());
+            self.doc.push_str(self.xlat.get(&x).as_slice());
         };
         self
     }

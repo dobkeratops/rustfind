@@ -452,7 +452,7 @@ impl<'astl> ToJsonStrFc for FNodeInfoMap<'astl> {
         let mut ret=StrBuf::from_str("[\n");
 		ret.push_str(node_spans_table_to_json_sub(dc,self).as_slice());
 		ret.push_str("]\n");
-		ret.as_slice().to_owned()
+		ret.as_slice().to_strbuf()
     }
 }
 
@@ -464,7 +464,7 @@ impl ToJsonStr for HashMap<ast::NodeId,ast::DefId> {
             r.push_str(format!("\t\\{node_id:{:?},\tdef_id:\\{crate_:{:?},node:{:?}\\}\\},\n", key, value.krate,value.node));
         }
         r.push_str("]\n");
-        r.as_slice().to_owned()
+        r.as_slice().to_strbuf()
     }
 }
 

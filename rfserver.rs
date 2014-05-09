@@ -42,13 +42,13 @@ pub fn run_server(dc:&RustFindCtx) {
                     // todo - lookup defs from symbol, remembering context of previous lookups?
                     let cmd=*toks.get(0);
                     let cmd1 = match cmd.chars().nth(0).unwrap_or('\0') { 
-                        '0'..'9' => curr_file + ":" + cmd,
-                        _ => cmd.to_str() 
+                        '0'..'9' => StrBuf::new().append(curr_file.as_slice()).append(":").append(cmd),
+                        _ => cmd.to_strbuf() 
                     };
-                    let subtoks:Vec<&str> =cmd1.split(':').collect();
-                    curr_file=find_file_name_in(dc, subtoks.get(0)).unwrap_or(curr_file);
+                    let subtoks:Vec<&str> =cmd1.as_slice().split(':').collect();
+                    curr_file=find_file_name_in(dc, *subtoks.get(0)).unwrap_or(curr_file);
                     //dump!(cmd1,subtoks,curr_file);
-                    let def=lookup_def_at_text_file_pos_str(dc, cmd1, SDM_Source);
+                    let def=lookup_def_at_text_file_pos_str(dc, cmd1.as_slice(), SDM_Source);
                     println!("{}", def.unwrap_or(StrBuf::from_str("no def found")));
                     println!("{}", def_of_symbol_to_str(dc, &node_spans,node_def_node,*toks.get(0)));
                 }

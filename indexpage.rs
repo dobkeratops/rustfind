@@ -29,18 +29,19 @@ pub fn write_index_html(source_dir: &Path,extentions:&Vec<StrBuf>, options:&::RF
 			for path in dirs {
 				match path.as_str() {
 					Some( ref s)=> {
-						let ext=path.extension_str().unwrap_or(&"");;	
-						let filename=path.filename_str().unwrap_or(&"");
-						let dirname=path.dirname_str().unwrap_or(&"");
+						let ext=path.extension_str().unwrap_or("");;	
+						let filename=path.filename_str().unwrap_or("");
+						let dirname=path.dirname_str().unwrap_or("");
 						if ext=="rs" { 
-							let link_target= path.as_str().unwrap_or("").to_owned()+".html";
+							let link_target= StrBuf::new()
+								.append(path.as_str().unwrap_or("").to_strbuf().as_slice()).append(".html");
 							if Path::new(link_target.as_slice()).exists() {
 								let bucket=files_per_dir.find_or_insert(
-									dirname.to_owned(),
+									dirname.to_strbuf(),
 									Vec::<(StrBuf,StrBuf)>::new()
 								);
 // does the file we link to actually exist?
-								bucket.push( (filename.to_owned(), link_target)  );
+								bucket.push( (filename.to_strbuf(), link_target)  );
 							}
 			
 						}
@@ -63,7 +64,7 @@ pub fn write_index_html(source_dir: &Path,extentions:&Vec<StrBuf>, options:&::RF
 	doc.writeln("Index of " + source_dir.as_str().unwrap_or(""));
 
 
-	doc.begin_tag("c40").writeln(rust2html::get_git_branch_info()).end_tag();
+	doc.begin_tag("c40").writeln(rust2html::get_git_branch_info().as_slice()).end_tag();
 
 	if options.write_callgraph {
 		doc.begin_tag_link("callgraph.html");
@@ -74,7 +75,7 @@ pub fn write_index_html(source_dir: &Path,extentions:&Vec<StrBuf>, options:&::RF
 
 	for (dir, files) in files_per_dir.iter() {
 		doc.writeln("");
-		doc.begin_tag("c30"); doc.writeln(*dir); doc.end_tag();
+		doc.begin_tag("c30"); doc.writeln(dir.as_slice()); doc.end_tag();
 	
 		write_grid_of_text_links(&mut doc,files);	
 	}
@@ -103,8 +104,8 @@ fn write_grid_of_text_links(doc:&mut HtmlWriter, links:&Vec<(StrBuf,StrBuf)>) {
 
 	let mut column=0;
 	for &(ref name,ref link) in links.iter() {
-		doc.begin_tag_link(*link);
-		doc.write(*name);
+		doc.begin_tag_link(link.as_slice());
+		doc.write(name.as_slice());
 		doc.end_tag();
 		let mut i=name.len();
 		while i<max_line_len { doc.write(" "); i+=1;}

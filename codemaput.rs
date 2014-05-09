@@ -117,11 +117,15 @@ impl FromStr for ZTextFilePos {
 
 impl ZTextFilePos {
     pub fn new(filename: &str, _line: u32, _col: u32) -> ZTextFilePos {
-        ZTextFilePos {name: filename.to_owned(), line: _line, col: _col}
+        ZTextFilePos {name: filename.to_strbuf(), line: _line, col: _col}
     }
 
     pub fn to_str(&self) -> StrBuf {
-        self.name + ":" + (self.line + 1).to_str() + ":" + self.col.to_str() + ":"
+        StrBuf::new().append(self.name.as_slice()).append(":")
+			.append( (self.line + 1).to_str().as_slice())
+			.append(":")
+			.append(self.col.to_str().as_slice())
+			.append(":")
     }
 
     pub fn to_byte_pos(&self, tc: &ty::ctxt) -> Option<codemap::BytePos> {
@@ -131,7 +135,7 @@ impl ZTextFilePos {
             i -= 1;
             let fm = &files.get(i);
             let filemap_filename: &str = fm.name.as_slice();
-            if filemap_filename == self.name {
+            if filemap_filename == self.name.as_slice() {
                 let lines = fm.lines.borrow();
                 if self.line as uint >= lines.len() {
                     return None;

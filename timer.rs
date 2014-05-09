@@ -48,7 +48,7 @@ static  mut g_depth:int=0;	// TODO - use an appropriate primitive, threadsafe, h
 impl Profiler {
 	// todo - cfg(profile)..
 	pub fn new(n:&'static str)->Profiler{
-		let mut p=Profiler { time: Timer::new(), name:n.to_owned()};
+		let mut p=Profiler { time: Timer::new(), name:n.to_strbuf()};
 		p.time.start();
 		unsafe {g_depth+=1;};
 		p
@@ -58,7 +58,7 @@ impl Drop for Profiler {
 	fn drop(&mut self) {
 		unsafe {g_depth-=1;};
 		self.time.end();
-		self.time.show_time_of(self.name);
+		self.time.show_time_of(self.name.as_slice());
 	}
 }
 
@@ -111,7 +111,7 @@ pub fn format_as_time(total_time: u64) -> StrBuf {
 
     //time_string += format!(" ({})", total_time);
 
-    return time_string.as_slice().to_owned();
+    return time_string.as_slice().to_strbuf();
 }
 
 fn format_number(num: u64) -> StrBuf {
@@ -129,7 +129,7 @@ fn format_number(num: u64) -> StrBuf {
         index += 1;
     }
 
-    return ret_val.as_slice().to_owned()
+    return ret_val.as_slice().to_strbuf()
 }
 
 #[test]

@@ -30,7 +30,7 @@ impl RustFindCtx {
 
 pub fn first_file_name(dc:&RustFindCtx)->StrBuf {
     let files = dc.codemap().files.borrow();
-    files.get(0).name.to_str() // clone?
+    files.get(0).name.to_strbuf() // clone?
 }
 
 pub fn find_file_name_in(dc:&RustFindCtx,fname:&str)->Option<StrBuf> {

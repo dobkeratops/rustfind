@@ -263,11 +263,18 @@ pub fn lookup_def_of_node_sub(dc:&RustFindCtx,node:&AstNode_,m:ShowDefMode,nim:&
                 Some(def_info)=>{
                     let loc=get_source_loc(dc,def_info.rf_span().lo);
                     let def_pos_str=
-                        loc.file.name + ":"+loc.line.to_str()+": "+
-                            match m {
-								SDM_LineCol=>loc.col.to_uint().to_strbuf().append(": "),
-								_ =>StrBuf::from_str("")
-							}.append("\n");
+						StrBuf::new()
+							.append(loc.file.name.as_slice())
+							.append(":")
+							.append(loc.line.to_str().as_slice())
+							.append(": ")
+							.append(
+	                            match m {
+									SDM_LineCol=>loc.col.to_uint().to_str().to_strbuf().append(": "),
+									_ =>StrBuf::new()
+								}.as_slice()
+							)
+							.append("\n");
                     return  match m{
                         SDM_Source=>Some(def_pos_str.append( get_node_source(dc.tycx_ref(),nim, def_node_id).as_slice()).append("\n") ),
                         SDM_GeditCmd=>Some(StrBuf::from_str("+").append(loc.line.to_str().as_slice()).append(" ").append(loc.file.name.as_slice()).append(" ")),

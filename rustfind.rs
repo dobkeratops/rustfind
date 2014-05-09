@@ -187,7 +187,7 @@ fn main() {
     let libs:Vec<Path> = if libs1.len() > 0 {
         libs1
     } else {
-        match os::getenv(&"RUST_LIBS") {
+        match os::getenv("RUST_LIBS") {
             Some(x) => vec!(Path::new(x)),
             None => {
 				println("ERROR.. No library path specified with -L , and RUST_LIBS not set, \n so we dont have a library path to use");

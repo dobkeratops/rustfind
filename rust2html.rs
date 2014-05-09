@@ -80,7 +80,7 @@ pub fn make_html_from_source(dc: &RustFindCtx, fm: &codemap::FileMap, nmaps: &No
         doc.write_path_links(fm.name.as_slice());
 		
 		if git_str.len()>0 {doc.begin_tag("c40").writeln(StrBuf::from_str("\tgit branch:\t").append(git_str.as_slice()).as_slice()).end_tag();}
-		doc.begin_tag("c40").writeln("\tmodified:\t"+time_stamp).end_tag();
+		doc.begin_tag("c40").writeln(StrBuf::from_str("\tmodified:\t").append(time_stamp.as_slice()).as_slice()).end_tag();
         doc.end_tag_check(t1);
         doc.end_tag_check(t0);
     }
@@ -725,12 +725,12 @@ fn write_line_attr_links(dst:&mut SourceCodeWriter<HtmlWriter>,text_line:&str,co
             curr_col = *color.get(x);
             curr_link=*links.get(x);
             if curr_col !=no_color {
-                dst.doc.begin_tag(color_index_to_tag(curr_col));
+                dst.doc.begin_tag(color_index_to_tag(curr_col).as_slice());
             }
             if curr_link !=no_link {
 				let link=resolve_link(*links.get(x));
 				match link {
-					Some(link_target)=>{dst.doc.begin_tag_link(link_target);},
+					Some(link_target)=>{dst.doc.begin_tag_link(link_target.as_slice());},
 					None=> {dst.doc.begin_tag("nop");},
 				}
             }

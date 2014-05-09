@@ -53,7 +53,7 @@ impl CG_Options {
 	pub fn new()->CG_Options {
 		CG_Options{
 			local_only:false,
-			search:vec!("main"),
+			search:vec!("main".to_strbuf()),
 			max_nodes:0x7fffffff
 		}
 	}	
@@ -158,9 +158,9 @@ fn write_call_graph_sub<'a>(nmaps:&'a NodeMaps<'a,'a>, outdirname:&str, filename
 //				let modstr=::std::str::from_chars(modname.chars().map(|x|if x=='/'{'_'}else{x}));
 		let modstr:StrBuf=modname.chars().map(|x|match x{'/'|'.'=>'_',_=>x}).collect();
 		if items.len()==0{ continue;}
-		if modstr.chars().nth(0)==Some('<') {continue;} // things like <std macros>
+		if modstr.as_slice().chars().nth(0)==Some('<') {continue;} // things like <std macros>
 		// todo: use mangled module name
-		module_subgraph_begin(dotf,2, modstr, modstr.slice_to(modname.rfind('.').unwrap_or(modname.len())));
+		module_subgraph_begin(dotf,2, modstr.as_slice(), modstr.as_slice().slice_to(modname.rfind('.').unwrap_or(modname.len())));
 		for item in items.iter() {
 			let &(defid,xcmi)=item;
 			if opts.local_only && defid.krate!=0 {continue;}
@@ -170,8 +170,10 @@ fn write_call_graph_sub<'a>(nmaps:&'a NodeMaps<'a,'a>, outdirname:&str, filename
 				None=>{},
 				Some(symbol)=> {
 					// write a node 
-					let url_name= xcmi.file_name+".html#"+(xcmi.line+1).to_str();
-					dotf.write_line("\t\t"+symbol + "["+
+					let url_name= StrBuf::new().append(xcmi.file_name.as_slice()).append(".html#").append((xcmi.line+1).to_str().as_slice());
+					dotf.write_line(
+						StrBuf::new().append("\t\t").append(symbol.as_slice()).append("[")
+						.append(
 						if is_main((defid,xcmi)){
 							"fontcolor=white, color=\"#00000040\", fontsize=32, "}
 						else{
@@ -185,10 +187,16 @@ fn write_call_graph_sub<'a>(nmaps:&'a NodeMaps<'a,'a>, outdirname:&str, filename
 								NK_Mod=>"fontcolor=\"#4d76ae\", fontsize=16, ",
 								_=>" "
 							}
-						}+
-						"label=\""+xcmi.kind.as_str()+ " "
-						+xcmi.item_name+"\""
-						+" URL=\""+ url_name  + "\"];"
+						})
+						.append("label=\"")
+						.append(xcmi.kind.as_str().as_slice())
+						.append(" ")
+						.append(xcmi.item_name.as_slice())
+						.append("\"")
+						.append(" URL=\"")
+						.append(url_name.as_slice())
+						.append("\"];")
+						.as_slice()
 					);
 				}
 			}
@@ -216,7 +224,7 @@ fn write_call_graph_sub<'a>(nmaps:&'a NodeMaps<'a,'a>, outdirname:&str, filename
 					if is_either(f1,f2,NK_Impl){"\"#e0373020\""} else
 
 					{"\"#00000020\""};
-				dotf.write_line("\t"+ fstr1 +" -> "+ fstr2 + "[color="+edge_color+ "]" );
+				dotf.write_line(StrBuf::new().append("\t").append(fstr1.as_slice()).append(" -> ").append(fstr2.as_slice()).append("[color=").append(edge_color).append("]").as_slice() );
 			}
 			_=>{}
 		}
@@ -225,7 +233,7 @@ fn write_call_graph_sub<'a>(nmaps:&'a NodeMaps<'a,'a>, outdirname:&str, filename
 }
 
 fn indent(depth:uint)->&'static str{
-	let tabs=&'static "\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t";
+	let tabs="\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t";
 	if depth<tabs.len() {tabs.slice_to(depth)} else {tabs}
 }
 fn module_subgraph_begin(dotf:&mut fs::File,  depth:uint, mangled_name:&str,module_name:&str) {
@@ -249,16 +257,16 @@ fn to_dotfile_symbol(&(ref def_id,ref xcmi):&GraphNode)-> Option<StrBuf> {
 	// TODO: this should be the symbols' qualified module pathname
 	// its only coincidentally correlated with the filename+symbol most of the time.
 //	let pathname:StrBuf=xcmi.file_name.chars().map(|x|match x{'/'|'<'|'>'|'.'=>'_',_=>x}).collect(); 
-	let fname=xcmi.file_name +"_"+xcmi.item_name;
+	let fname=StrBuf::new().append(xcmi.file_name.as_slice()).append("_").append(xcmi.item_name.as_slice());
 //	let cleaned_up_name:StrBuf=
 	if  xcmi.item_name.chars().filter(|&x|match x{'<'|'>'|'.'|':'=>true,_=>false}).len()>0 
-		|| (xcmi.item_name.chars().nth(0)==Some('_') && xcmi.item_name.chars().nth(1)==Some('_'))
+		|| (xcmi.item_name.as_slice().chars().nth(0)==Some('_') && xcmi.item_name.as_slice().chars().nth(1)==Some('_'))
 	{
 		None // dont return if we had non symbol characters - its a generated item (eg deriving)
 	}
 	else {
-		let filtered:StrBuf=xcmi.file_name.chars().map(|x|match x{'/'|'<'|'>'|'.'=>'_',_=>x}).collect();
-		let concat=filtered+"_"+ xcmi.item_name;
+		let filtered:StrBuf=xcmi.file_name.as_slice().chars().map(|x|match x{'/'|'<'|'>'|'.'=>'_',_=>x}).collect();
+		let concat=StrBuf::new().append(filtered.as_slice()).append("_").append(xcmi.item_name.as_slice());
 		if concat.len()>0 { Some(concat)} else {None}
 	}
 //	cleaned_up_name

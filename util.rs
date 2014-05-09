@@ -24,7 +24,7 @@ pub fn text_line_pos_to_offset(text: &[u8], (line, ofs_in_line): (u32, u32))->Op
 
 pub fn get_filename_only(fnm:&str)->StrBuf {
     let toks:Vec<&str> =fnm.split(':').collect();
-    return (*toks.get(0)).to_str();
+    return (*toks.get(0)).to_strbuf();
 }
 
 
@@ -59,7 +59,7 @@ pub fn flatten_to_str<T,U:ToStr>(xs:&[T],f: |&T| -> U, sep:&str)->StrBuf {
 
         i+=1;
     }
-    acc.as_slice().to_owned()
+    acc.as_slice().to_strbuf()
 }
 
 pub fn flatten_to_str_ng<T, U:ToStr>(xs: &Vec<T>, f: |&T| -> U, sep: &str) -> StrBuf {
