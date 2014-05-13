@@ -12,6 +12,7 @@ extern crate rustc;
 extern crate getopts;
 extern crate serialize;
 extern crate collections;
+extern crate core;
 
 extern crate time;
 extern crate libc;
@@ -191,7 +192,7 @@ fn main() {
             Some(x) => vec!(Path::new(x)),
             None => {
 				println("ERROR.. No library path specified with -L , and RUST_LIBS not set, \n so we dont have a library path to use");
-				println("possible fix, set RUST_LIBS = $RUST_PATH/x86_64-unknown-linux-gnu/stage2/lib/rustlib/x86_64-unknown-linux-gnu/lib  ?");
+				println("possible fix, set RUST_LIBS = /usr/local/lib/rustlib/x86_64-unknown-linux-gnu/lib  ?");
 				fail!();
 				Vec::<Path>::new()
 			}

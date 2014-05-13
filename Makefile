@@ -1,9 +1,16 @@
 ifndef RUST_PATH
 $(info Set $$RUST_PATH=<rust tree> to be able to link to rust std libs)
-$(info $$RUST_PATH is also required to generate HTML for the rust libs)
+$(error $$RUST_PATH is also required to generate HTML for the rust libs)
 	RF_LIBS = 
 else
-	RF_LIBS = -L $(RUST_PATH)/x86_64-unknown-linux-gnu/stage2/lib/rustlib/x86_64-unknown-linux-gnu/lib
+#	RF_LIBS = -L $(RUST_PATH)/x86_64-unknown-linux-gnu/stage2/lib/rustlib/x86_64-unknown-linux-gnu/lib
+endif
+ifndef RUST_LIBS
+$(info set RUST_LIBS to point to compiled libraries, )
+$(info using /usr/local/lib/rustlib/x86_64-unknown-linux-gnu/lib  by default )
+	RF_LIBS = -L /usr/local/lib/rustlib/x86_64-unknown-linux-gnu/lib
+else
+	RF_LIBS = -L $(RUST_LIBS)
 endif
 
 RF_OPTS = $(RF_LIBS) -o html/ -C
@@ -87,10 +94,12 @@ rust: rust_lib_pre
 
 	cd $(RUST_PATH)/src;pwd;
 
+	cd $(RUST_PATH)/src;pwd; rustfind libcore/lib.rs
 	cd $(RUST_PATH)/src;pwd; rustfind libstd/lib.rs
 	cd $(RUST_PATH)/src;pwd; rustfind libgreen/lib.rs
 	cd $(RUST_PATH)/src;pwd; rustfind librustuv/lib.rs
 	cd $(RUST_PATH)/src;pwd; rustfind libnative/lib.rs
+	cd $(RUST_PATH)/src;pwd; rustfind liblibc/lib.rs
 	cd $(RUST_PATH)/src;pwd; rustfind libflate/lib.rs
 	cd $(RUST_PATH)/src;pwd; rustfind libarena/lib.rs
 	cd $(RUST_PATH)/src;pwd; rustfind libglob/lib.rs
@@ -104,7 +113,6 @@ rust: rust_lib_pre
 	cd $(RUST_PATH)/src;pwd; rustfind libcollections/lib.rs
 	cd $(RUST_PATH)/src;pwd; rustfind libnum/lib.rs
 	cd $(RUST_PATH)/src;pwd; rustfind libtest/lib.rs
-	cd $(RUST_PATH)/src;pwd; rustfind libtime/lib.rs
 	cd $(RUST_PATH)/src;pwd; rustfind librand/lib.rs
 	cd $(RUST_PATH)/src;pwd; rustfind libworkcache/lib.rs
 #	cd $(RUST_PATH)/src;pwd; ~/rustfind/rustfind libextra/lib.rs
@@ -117,6 +125,8 @@ rust: rust_lib_pre
 
 	cd $(RUST_PATH)/src;pwd; rustfind libfourcc/lib.rs
 	cd $(RUST_PATH)/src;pwd; rustfind libhexfloat/lib.rs
+	cd $(RUST_PATH)/src;pwd; rustfind libgraphviz/lib.rs
+	cd $(RUST_PATH)/src;pwd; rustfind libtime/lib.rs
 
 help:
 	@echo "rustfind makefile:"
